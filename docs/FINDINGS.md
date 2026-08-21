@@ -367,3 +367,45 @@ The stored value survived until the client closed, because RuneLite batches conf
 **Consequence:** two changes. The id list is corrected. And diagnostic log lines that carry an `npc_id` should carry the name alongside it — an id on its own invites exactly this. The `xp damage in:` line has since been removed, but the rule stands for anything added later.
 
 **Related:** `WORKING-AGREEMENT.md` §3b, "plausibility standing in for verification". This is that failure, committed by the person who had just re-read the section.
+
+---
+
+## 2026-08-20 — XP allocation confirmed working in a live client; Step 5 measurement partially met
+
+**Status:** verified
+**Method:** Nine dagannoth kills in Kourend Catacombs with the rewritten allocator, kill lines cross-checked against the published base rate.
+**Finding:** After inverting the allocator to park XP and settle it when the damage arrives, **every kill attributed XP to the correct monster and `unallocatedXp` stayed at 0 throughout.** Before the fix it climbed roughly 650 per kill and never allocated anything at all.
+
+Aggregate against a `4 + 1.33 = 5.33` XP-per-damage base:
+
+| npc_id | kills | rolled damage | xp | per point |
+|---|---|---|---|---|
+| 7259 | 5 | 358 | 1919 | 5.36 |
+| 7260 | 3 | 372 | 1939 | 5.21 |
+
+Both straddle base. XP per *rolled* damage should land slightly under, since rolled damage includes overkill the game does not pay for.
+
+**Two reporting artifacts worth knowing before reading a log:**
+
+1. **`xp=` on a kill line is a snapshot taken before the killing blow's XP has landed.** XP arrives a tick before its hitsplat, so the last hit's XP drains after the line is written and shows up in the *next* kill's cumulative total. Per-kill deltas therefore bounce; aggregates are correct. Chasing a per-kill delta as a bug wastes an evening.
+2. Early in the session 7259 read 5.52 and 7260 read 5.16, which looked like XP leaking between variants. It was the lag above plus a small sample. The gap closed from 0.36 to 0.15 as N grew. **Recorded because the wrong reading was reached first, twice.**
+
+**Still outstanding for Step 5:** the settle window and noise floor are still unmeasured numbers. `SETTLE_TICKS = 2` has not been varied.
+**Source:** none — measured against the live client, RuneLite 1.12.36.
+
+---
+
+## 2026-08-20 — Damage below a monster's max HP is arithmetic proof of unseen damage
+
+**Status:** unverified-assumption (single observation, mechanism is sound, test named below)
+**Method:** One kill among nine stood out — `npc_id=7259 dmg=67/67`, where every other kill of that variant took 71–72.
+**Finding:** A combat record opens on the first hitsplat **we witness**, so damage dealt before we engaged is invisible and `EXACT` currently means "nobody else hit it after we arrived" rather than "we earned this". Thirteen kills in multicombat produced zero detected foreign damage while the game printed the ironman kill-credit warning at least once.
+
+There may be a way to catch it without ever seeing the other player's hitsplat. **If we deal less total damage than the monster has hitpoints, and it dies, the difference came from somewhere else.** That is conservation, not a heuristic. A 70 HP dagannoth dying to 67 points from us means ~3 points arrived unseen.
+
+**Blockers, both real:**
+- It needs each monster's **max HP**, which is exactly the P0 reference table that does not exist. This is the strongest argument yet for building it — it converts contested-kill detection from "witness the splat" to arithmetic.
+- Poison, venom and damage from other NPCs are not player hitsplats and would produce the same signature. The signal proves *unseen damage*, not *another player*, so it can only ever justify downgrading to `AMBIGUOUS`, never accusing.
+
+**The test:** with max HP available, compare kills where `totalDamage() < maxHp` against the ironman kill-credit messages. Agreement across a task makes it usable.
+**Source:** none — observed in play. The wiki's summarised infobox gave 70 HP for both dagannoth variants, which our own damage contradicts for 7260 (123–124 rolled every kill); prefer the structured Bucket API over page summaries when P0 is built.
