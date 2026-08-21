@@ -353,3 +353,17 @@ The stored value survived until the client closed, because RuneLite batches conf
 
 **Wider point:** three regressions in one day came from the rewrite lacking things the deleted code had learned in-game — and this one came from *my own fix* for the previous one. A tracker that quietly writes fewer kills than it read is the exact failure this project exists to avoid, so the guard matters more than the fix.
 **Source:** none — traced against the live client and the stored config.
+
+---
+
+## 2026-08-20 — Correction: npc_id 7257 is an Ankou, not a dagannoth (supersedes the id list above)
+
+**Status:** verified (supersedes an earlier entry that was wrong)
+**Method:** `First contact: npc_id=7257 name=Ankou` — the name straight off the NPC, in the Catacombs.
+**Finding:** The earlier entry "Kourend Catacombs dagannoths are npc_ids 7257, 7259 and 7260" is **wrong on 7257**. That id belongs to an Ankou. 7259 and 7260 remain confirmed dagannoths — both were seen on kill lines carrying `name=Dagannoth`, and their damage totals cluster at 72–73 and 123–124 respectively.
+
+**How the error happened, because the mechanism matters more than the fact:** 7257 was first seen on an `xp damage in:` line, which logs only the id, during a session where every named kill was a dagannoth. I filled in the name from context and recorded it as verified. No name was ever observed. Both Catacombs monsters share a region and the ids sit next to each other, which made the wrong answer look tidy.
+
+**Consequence:** two changes. The id list is corrected. And diagnostic log lines that carry an `npc_id` should carry the name alongside it — an id on its own invites exactly this. The `xp damage in:` line has since been removed, but the rule stands for anything added later.
+
+**Related:** `WORKING-AGREEMENT.md` §3b, "plausibility standing in for verification". This is that failure, committed by the person who had just re-read the section.
