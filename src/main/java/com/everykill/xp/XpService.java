@@ -91,6 +91,12 @@ public class XpService
 		return attributor.getUnallocatedXp();
 	}
 
+	/** Only what went missing mid-fight. Teleports and alching don't count. */
+	public long getStrandedXp()
+	{
+		return attributor.getStrandedXp();
+	}
+
 	// ------------------------------------------------------------------
 
 	private static CombatSkill fromRuneLite(Skill skill)

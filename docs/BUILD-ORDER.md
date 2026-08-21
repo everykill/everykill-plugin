@@ -76,7 +76,11 @@ Unknown NPCs despawning at low HP after our damage → log to a review queue, **
 - Measure the **residual noise floor**.
 - **Report both numbers.** The spec deliberately leaves them unset.
 
-**Acceptance:** Per-monster XP on a hand-counted task is within the measured noise floor of the skill totals the client reports, and unallocated XP stays near zero during ordinary combat. A rising unallocated figure means the allocator is wrong and is the signal to chase.
+**Acceptance:** Per-monster XP on a hand-counted task is within the measured noise floor of the skill totals the client reports, and **stranded** XP stays near zero during ordinary combat.
+
+**Corrected 2026-08-21.** This previously said "a rising *unallocated* figure means the allocator is wrong". It doesn't. Three of the six combat skills we track are earned outside combat — every teleport (35 Magic), High Alch (65) and Superheat (53) is XP with no monster attached, and it landed in the same bucket. Verified in play: two write-offs of exactly 35 were both Varrock Teleport.
+
+The counter is now split. **Stranded** XP arrived while damage was on record and still could not be placed — that is the signal worth chasing, and the only one the panel shows. **Unallocated** XP arrived with no combat in progress and is expected. See `FINDINGS.md`, 2026-08-21.
 
 **Note on the checksum.** A derived figure is still worth having as a check on the allocator, but it needs the player's attack style, which nothing reads yet. `XpModel` was delivered for this and deleted in the merge: it had no caller, and every rate it encoded is in `GAME-MECHANICS.md`. Rebuild it from the doc when this step needs it rather than resurrecting untested code.
 

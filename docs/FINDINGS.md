@@ -409,3 +409,45 @@ There may be a way to catch it without ever seeing the other player's hitsplat. 
 
 **The test:** with max HP available, compare kills where `totalDamage() < maxHp` against the ironman kill-credit messages. Agreement across a task makes it usable.
 **Source:** none — observed in play. The wiki's summarised infobox gave 70 HP for both dagannoth variants, which our own damage contradicts for 7260 (123–124 rolled every kill); prefer the structured Bucket API over page summaries when P0 is built.
+
+---
+
+## 2026-08-21 — Unallocated XP is not a bug signal; teleports produce it constantly
+
+**Status:** verified
+**Method:** Two write-offs of exactly 35 XP, both while the player was banking and travelling rather than fighting. Confirmed by the player, then confirmed against the wiki's structured spell data.
+**Finding:** `bucket('infobox_spell')` gives Varrock Teleport `"exp":"35"` — an exact match, twice. The allocator was working correctly: Magic XP arrived with no damage on record, and it refused to attribute it to a monster.
+
+**But it invalidates a stated acceptance criterion.** `BUILD-ORDER.md` Step 5 said *"a rising unallocated figure means the allocator is wrong and is the signal to chase"*, and `EverykillPanel` carried the same claim in a comment. Both are false. Every teleport (35), High Alch (65) and Superheat (53) is Magic XP with no monster attached. A player alching at a bank would watch the number climb forever and reasonably conclude the plugin is broken.
+
+**Consequence:** the counter is split. XP that arrives **while damage is on record** and still cannot be placed is `strandedXp` — the real signal, and the only one the panel shows. XP that arrives with no combat in progress goes to `unallocatedXp` and is diagnostics only. The distinction is recorded on arrival, not at write-off, because the damage pools are trimmed by then. Step 5's acceptance criterion is corrected accordingly.
+
+**Wider point:** three of the six combat skills we track are earned outside combat. Any future "this number should be zero" claim needs checking against that first.
+**Source:** OSRS Wiki `infobox_spell` bucket, 2026-08-21.
+
+---
+
+## 2026-08-21 — `ActorDeath` is trusted for transform-death monsters again, and it overcounts
+
+**Status:** verified — reproduced eight times in one session
+**Method:** Eight rockslug kills in the Fremennik Slayer Dungeon, grades read off the kill log.
+**Finding:** The `com.everykill` rewrite deleted `TransformDeathNpcs` and with it the guard that ignored `ActorDeath` for monsters that must be finished with an item. The 2026-08-14 entry established that `ActorDeath` fires for these at health-ratio-zero, well before the NPC is actually dead. Nothing in `KillStateMachine` now knows that.
+
+Eight kills, one graded correctly:
+
+| kc | grade | signal | |
+|---|---|---|---|
+| 1 | INFERRED | TRANSFORM_FINISH | correct |
+| 2,3,5,6,7,8 | EXACT | OBSERVED | `ActorDeath` beat the salt |
+| 4 | INFERRED | DESPAWN_WHILE_DEAD | **1 damage on a ~27 HP monster** |
+
+The transform-finish detection itself **works** — kc=1 proves `WIDGET_TARGET_ON_NPC` carries a bag of salt, which had never been tested. It simply loses the race, because we emit the moment `ActorDeath` arrives.
+
+**kc=4 is the serious one.** One point of damage, one attack, no other player's damage seen, on a monster that takes 27. It was already at zero HP when touched. Most likely the same slug as kc=3: emitted once on a false `ActorDeath`, then again on the real despawn nine seconds later — past the ten-tick `EMITTED_TICKS` window. Cannot be proven to be the same actor, but **one damage produced a counted kill either way**.
+
+**The fix, no monster list required.** The 2026-08-14 entry already contains it: *"a real kill means the actor is gone."* Do not emit on `ActorDeath`. Hold the death signal and let the despawn confirm it. A genuine death despawns within a tick or two; a lie leaves the NPC standing, and the flag is dropped.
+
+This collapses two emission points into one, so the double-count becomes structurally impossible rather than something `EMITTED_TICKS` has to be tuned to avoid. It is also generic, so it covers the Kalphite Queen / Zalcano false-`ActorDeath` case that `BUILD-ORDER.md` Step 4 flags as untested and currently unprotected — one mechanism, both problems.
+
+**Second guard, needs P0:** damage far below a monster's max HP should never grade above `AMBIGUOUS`. Third independent argument for the max-HP table in two days.
+**Source:** none — reproduced live, RuneLite 1.12.36.

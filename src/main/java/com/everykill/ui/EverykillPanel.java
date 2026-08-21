@@ -92,8 +92,9 @@ public class EverykillPanel extends PluginPanel
 		sessionGrades.setFont(FontManager.getRunescapeSmallFont());
 		sessionGrades.setForeground(SUBTLE);
 
-		// xp that turned up with no damage on record. shown, not folded into whatever
-		// monster is nearest - this climbing means the allocator is broken.
+		// xp that went missing WHILE we were fighting something. teleports and alching
+		// are deliberately excluded - they're magic xp with no monster attached and
+		// they're normal, so counting them here would bury the real signal under noise.
 		unallocated.setFont(FontManager.getRunescapeSmallFont());
 		unallocated.setForeground(Confidence.INFERRED.getColor());
 
@@ -191,8 +192,8 @@ public class EverykillPanel extends PluginPanel
 			sessionGrades.setText(sb.append("</html>").toString());
 		}
 
-		final long stray = xpService.getUnallocatedXp();
-		unallocated.setText(stray == 0L ? " " : shortXp(stray) + " xp unattributed");
+		final long stranded = xpService.getStrandedXp();
+		unallocated.setText(stranded == 0L ? " " : shortXp(stranded) + " xp unattributed");
 
 		monsterList.removeAll();
 		final List<NpcStat> all = ledger.allTimeSorted();

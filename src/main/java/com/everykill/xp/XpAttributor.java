@@ -51,7 +51,16 @@ public class XpAttributor
 	/** npcId to total attributed XP. */
 	private final Map<Integer, Long> xpByNpc = new HashMap<>();
 
+	// xp that arrived while we weren't fighting anything. teleports, alching,
+	// superheat - all magic xp with no monster attached, all completely normal.
+	// verified 2026-08-21: two write-offs of exactly 35 were both varrock teleport.
 	private long unallocatedXp;
+
+	// xp that arrived WHILE we had damage on record and still couldn't be placed.
+	// this one is a real problem. don't let the two share a counter, or every alch
+	// buries the signal that actually matters.
+	private long strandedXp;
+
 	private boolean primed;
 
 	// ------------------------------------------------------------------
@@ -79,6 +88,7 @@ public class XpAttributor
 		pending.clear();
 		xpByNpc.clear();
 		unallocatedXp = 0L;
+		strandedXp = 0L;
 		primed = false;
 	}
 
@@ -113,8 +123,16 @@ public class XpAttributor
 			}
 			else if (now - p.tick > SETTLE_TICKS)
 			{
-				log.debug("XP written off: xp={} arrivedAt={} now={} pools={}", p.xp, p.tick, now, damageByTick.keySet());
-				unallocatedXp += p.xp;
+				if (p.duringCombat)
+				{
+					log.debug("XP stranded mid-fight: xp={} arrivedAt={} now={} pools={}",
+						p.xp, p.tick, now, damageByTick.keySet());
+					strandedXp += p.xp;
+				}
+				else
+				{
+					unallocatedXp += p.xp;
+				}
 				it.remove();
 			}
 		}
@@ -153,7 +171,10 @@ public class XpAttributor
 	{
 		if (!allocateAt(xp, tick))
 		{
-			pending.add(new Pending(xp, tick));
+			// remember whether we were mid-fight when this turned up. by the time it
+			// gets written off the pools may have been trimmed, and "was there damage
+			// when it arrived" is the question that matters.
+			pending.add(new Pending(xp, tick, !damageByTick.isEmpty()));
 		}
 	}
 
@@ -248,11 +269,13 @@ public class XpAttributor
 	{
 		private final long xp;
 		private final int tick;
+		private final boolean duringCombat;
 
-		private Pending(long xp, int tick)
+		private Pending(long xp, int tick, boolean duringCombat)
 		{
 			this.xp = xp;
 			this.tick = tick;
+			this.duringCombat = duringCombat;
 		}
 	}
 
@@ -263,9 +286,16 @@ public class XpAttributor
 		return xpByNpc.getOrDefault(npcId, 0L);
 	}
 
+	/** Everything we couldn't place, combat or not. Diagnostics only. */
 	public long getUnallocatedXp()
 	{
-		return unallocatedXp;
+		return unallocatedXp + strandedXp;
+	}
+
+	/** Only the xp that went missing mid-fight. This is the number worth showing. */
+	public long getStrandedXp()
+	{
+		return strandedXp;
 	}
 
 	/** Hand over what has accumulated and clear. The ledger holds lifetime totals. */
