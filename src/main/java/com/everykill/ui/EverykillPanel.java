@@ -25,11 +25,12 @@ import java.util.Set;
 import javax.inject.Inject;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
-import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import net.runelite.client.ui.ColorScheme;
+import net.runelite.client.ui.components.materialtabs.MaterialTab;
+import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 
@@ -59,7 +60,7 @@ public class EverykillPanel extends PluginPanel
 	private final JPanel monsterList = new JPanel();
 	private final JLabel monsterHeader = new JLabel("ALL TIME");
 	private final JLabel noticeLabel = new JLabel(" ");
-	private final JComboBox<Window> windowPicker = new JComboBox<>(Window.values());
+	private final MaterialTabGroup tabs = new MaterialTabGroup();
 
 	// npc ids whose skill breakdown is open. panel state, never persisted.
 	private final Set<Integer> expanded = new HashSet<>();
@@ -69,25 +70,23 @@ public class EverykillPanel extends PluginPanel
 	/** How far back the list looks. SESSION is the live one; the rest read day buckets. */
 	private enum Window
 	{
-		SESSION("Session", 0),
-		TODAY("Today", 1),
-		WEEK("This week", 7),
-		MONTH("This month", 30),
-		ALL("All time", 0);
+		SESSION("Now", "This session", 0),
+		TODAY("Day", "Today", 1),
+		WEEK("Wk", "This week", 7),
+		MONTH("Mth", "This month", 30),
+		ALL("All", "All time", 0);
 
+		// short on the tab because five labels share 225px; the real name goes in the
+		// tooltip and the header below, so nothing is guessed from three letters.
 		private final String label;
+		private final String tooltip;
 		private final int days;
 
-		Window(String label, int days)
+		Window(String label, String tooltip, int days)
 		{
 			this.label = label;
+			this.tooltip = tooltip;
 			this.days = days;
-		}
-
-		@Override
-		public String toString()
-		{
-			return label;
 		}
 	}
 
@@ -165,17 +164,32 @@ public class EverykillPanel extends PluginPanel
 		noticeLabel.setFont(FontManager.getRunescapeSmallFont());
 		noticeLabel.setForeground(SUBTLE);
 
-		windowPicker.setFont(FontManager.getRunescapeSmallFont());
-		windowPicker.setFocusable(false);
-		windowPicker.setMaximumSize(new Dimension(Short.MAX_VALUE, 22));
-		windowPicker.setSelectedItem(window);
-		windowPicker.addActionListener(e ->
-		{
-			window = (Window) windowPicker.getSelectedItem();
-			rebuild();
-		});
+		// MaterialTabGroup rather than a JComboBox. A stock combo box renders with a
+		// white popup and black text in the middle of a dark panel and looks exactly as
+		// bad as that sounds. This is what core's own panels use.
+		tabs.setLayout(new java.awt.GridLayout(1, Window.values().length, 2, 0));
+		tabs.setMaximumSize(new Dimension(Short.MAX_VALUE, 22));
 
-		box.add(windowPicker);
+		for (Window w : Window.values())
+		{
+			final MaterialTab tab = new MaterialTab(w.label, tabs, null);
+			tab.setFont(FontManager.getRunescapeSmallFont());
+			tab.setToolTipText(w.tooltip);
+			tab.setOnSelectEvent(() ->
+			{
+				window = w;
+				rebuild();
+				return true;
+			});
+			tabs.addTab(tab);
+
+			if (w == window)
+			{
+				tabs.select(tab);
+			}
+		}
+
+		box.add(tabs);
 		box.add(javax.swing.Box.createVerticalStrut(6));
 		box.add(monsterHeader);
 		box.add(javax.swing.Box.createVerticalStrut(4));
@@ -248,7 +262,7 @@ public class EverykillPanel extends PluginPanel
 
 		monsterList.removeAll();
 		final List<NpcStat> rows = statsForWindow();
-		monsterHeader.setText(window.label.toUpperCase() + " · " + rows.size());
+		monsterHeader.setText(window.tooltip.toUpperCase() + " · " + rows.size());
 
 		int shown = 0;
 		for (NpcStat stat : rows)
