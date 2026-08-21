@@ -16,9 +16,11 @@ import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.events.ActorDeath;
+import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
@@ -195,8 +197,41 @@ public class EverykillPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
+		// One full tick after login has passed, so the client's skill data has arrived
+		// and the login XP burst is over. GameStateChanged is too early — see
+		// XpService.prime().
+		if (!xpService.isPrimed() && client.getGameState() == GameState.LOGGED_IN)
+		{
+			xpService.prime();
+		}
+
 		detector.onGameTick(event);
 		xpService.drain(ledger::addXp);
+	}
+
+	/**
+	 * <b>Diagnostic only, P1.</b> The game tells an ironman outright when another
+	 * player has damaged their target — authoritative ground truth for exactly the
+	 * contest our {@code AMBIGUOUS} grade is supposed to catch. Logging it beside our
+	 * own grade turns "we think attribution is wrong" into a measured miss rate.
+	 *
+	 * <p>Nothing branches on this. It reads no player's name and records nothing about
+	 * anyone else — it is our own client's message to us. Remove once the miss rate is
+	 * understood, or promote it to a real signal if it proves reliable.
+	 */
+	@Subscribe
+	public void onChatMessage(ChatMessage event)
+	{
+		if (event.getType() != ChatMessageType.GAMEMESSAGE)
+		{
+			return;
+		}
+
+		final String message = event.getMessage();
+		if (message.contains("kill-credit") || message.contains("helped you kill"))
+		{
+			log.debug("Contest signal from the game: \"{}\"", message);
+		}
 	}
 
 	/** Resets the <b>session</b> only. All-time counts are untouched. */
@@ -222,8 +257,11 @@ public class EverykillPlugin extends Plugin
 		{
 			// The RS profile may have changed under us; counts are profile-scoped.
 			ledger.load();
-			xpService.prime();
 			panel.refresh();
+
+			// XP baselines are deliberately NOT seeded here — see XpService.prime().
+			// This event fires on every scene load, and the first one lands before the
+			// client has any skill data.
 		}
 		else if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{

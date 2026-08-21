@@ -8,6 +8,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Per-monster experience: <b>measured from the client, allocated by damage share.</b>
@@ -38,6 +39,7 @@ import java.util.Map;
  * <p>XP arriving with no damage on record is never forced onto the nearest monster;
  * it accumulates in {@link #getUnallocatedXp()} and is surfaced on the panel.
  */
+@Slf4j
 public class XpAttributor
 {
 	/**
@@ -178,6 +180,13 @@ public class XpAttributor
 
 		if (pool == null)
 		{
+			// Diagnostic, P1. Unallocated XP was climbing with nothing landing on any
+			// monster, and the cause was not obvious from reading. Print the whole
+			// decision so the reason is observed rather than theorised.
+			log.debug("XP unallocated: xp={} tick={} currentTick={} currentPool={}({}) previousTick={} previousPool={}({}) settle={}",
+				xp, tick, currentTick, currentTickDamage.size(), sum(currentTickDamage),
+				previousTick, previousTickDamage.size(), sum(previousTickDamage), SETTLE_TICKS);
+
 			unallocatedXp += xp;
 			return;
 		}
