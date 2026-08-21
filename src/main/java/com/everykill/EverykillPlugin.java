@@ -246,6 +246,15 @@ public class EverykillPlugin extends Plugin
 
 		final NpcStat after = ledger.record(kill);
 
+		// One line per recorded kill, at debug. This is the audit trail a hand count is
+		// checked against — without it a wrong total is a number with no explanation,
+		// and there is no way to tell a missed kill from a double-count from a
+		// misgrade. Run the dev client with --debug to see it.
+		log.debug("Kill: npc_id={} name={} grade={} signal={} region={} dmg={}/{} attacks={} hits={} maxHit={} kc={} xp={} sessionKills={} unallocatedXp={}",
+			kill.npcId, kill.npcName, kill.grade, kill.signal, kill.regionId,
+			kill.myDamage, kill.totalDamage(), kill.attacksCount, kill.hitsCount, kill.maxHit,
+			after.total(), after.xp, ledger.getSessionKills(), xpService.getUnallocatedXp());
+
 		notifier.onKillRecorded(kill, after, firstEver);
 		panel.refresh();
 	}
