@@ -107,8 +107,8 @@ public class LocalLedger
 	}
 
 	// kills save themselves, xp arrives every tick and can't, so it rides the next
-	// kill's save. everything after the last kill of the session was just being binned.
-	// call on logout and shutdown.
+	// kill's save. anything after the session's last kill had nothing to ride and was
+	// getting binned. call on logout and shutdown.
 	public void flush()
 	{
 		if (dirty)

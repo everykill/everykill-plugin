@@ -36,8 +36,9 @@ public class XpService
 		return attributor.isPrimed();
 	}
 
-	// Call from a game tick, never GameStateChanged. LOGGED_IN fires on every scene
-	// load and beats the skill data, so you get zeros. Cost us 2.3m xp last time.
+	// call from a game tick, never GameStateChanged. LOGGED_IN does not mean logged in,
+	// it fires on every fucking scene load and beats the skill data, so you get zeros.
+	// zero baseline = the player's whole combat history reads as one gain. 2.3m of it.
 	public void prime()
 	{
 		for (CombatSkill skill : CombatSkill.values())

@@ -37,7 +37,8 @@ public class XpAttributor
 	private final Map<CombatSkill, Integer> lastKnownXp = new EnumMap<>(CombatSkill.class);
 
 	// tick -> npcId -> damage. keeps a few ticks because the xp shows up before the
-	// bloody hitsplat does, so it has to wait for damage that hasn't happened yet.
+	// hitsplat does. yes, before. so we sit on it waiting for damage that hasn't
+	// happened yet, which is a stupid way to live but it's what the client does.
 	private final Map<Integer, Map<Integer, Integer>> damageByTick = new LinkedHashMap<>();
 
 	// xp with no damage to explain it yet. settled when the hitsplat turns up, written
@@ -157,8 +158,9 @@ public class XpAttributor
 	}
 
 	// own tick, then forward, then back. order matters: xp lands early so the damage
-	// ahead of it is its own and the damage behind belongs to the last drop. flip these
-	// (or just crank SETTLE_TICKS till something sticks) and you pay the wrong monster.
+	// ahead of it is its own and the damage behind belongs to the last drop. flip it,
+	// or crank SETTLE_TICKS till something sticks, and you pay the wrong monster and
+	// never hear about it. don't.
 	private boolean allocateAt(long xp, int tick)
 	{
 		for (int t = tick; t <= tick + SETTLE_TICKS; t++)

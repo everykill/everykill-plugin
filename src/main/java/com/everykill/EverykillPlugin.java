@@ -251,9 +251,9 @@ public class EverykillPlugin extends Plugin
 	{
 		if (event.getGameState() == GameState.LOGGED_IN)
 		{
-			// once per login, NOT per scene load. this fires at every loading zone and
-			// load() replaces the map wholesale, so reloading here threw away any xp
-			// that had accrued since the last kill saved.
+			// once per login, NOT per scene load. fires at every loading zone and
+			// load() nukes the map wholesale, so reloading here threw away any xp
+			// accrued since the last kill saved. four times in 32s, measured.
 			if (!ledgerLoaded)
 			{
 				ledger.load();

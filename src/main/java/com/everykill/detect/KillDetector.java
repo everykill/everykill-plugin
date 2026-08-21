@@ -59,8 +59,8 @@ public class KillDetector
 	private final KillStateMachine machine = new KillStateMachine();
 
 	// actor identity -> state machine key. NOT getIndex(), the game recycles those
-	// instantly and the next npc inherits the dead one's suppression window. kill just
-	// vanishes, no error, count quietly reads low. tested, every single time.
+	// instantly and the next npc inherits the dead one's suppression window. the kill
+	// just fucks off into the void, no error, count quietly reads low forever.
 	// minted only for npcs we damage, dropped on despawn
 	private final Map<NPC, Integer> actorKeys = new IdentityHashMap<>();
 	private int nextActorKey;
