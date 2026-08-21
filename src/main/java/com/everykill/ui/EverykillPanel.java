@@ -16,6 +16,8 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +25,7 @@ import java.util.Set;
 import javax.inject.Inject;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -56,9 +59,37 @@ public class EverykillPanel extends PluginPanel
 	private final JPanel monsterList = new JPanel();
 	private final JLabel monsterHeader = new JLabel("ALL TIME");
 	private final JLabel noticeLabel = new JLabel(" ");
+	private final JComboBox<Window> windowPicker = new JComboBox<>(Window.values());
 
 	// npc ids whose skill breakdown is open. panel state, never persisted.
 	private final Set<Integer> expanded = new HashSet<>();
+
+	private Window window = Window.ALL;
+
+	/** How far back the list looks. SESSION is the live one; the rest read day buckets. */
+	private enum Window
+	{
+		SESSION("Session", 0),
+		TODAY("Today", 1),
+		WEEK("This week", 7),
+		MONTH("This month", 30),
+		ALL("All time", 0);
+
+		private final String label;
+		private final int days;
+
+		Window(String label, int days)
+		{
+			this.label = label;
+			this.days = days;
+		}
+
+		@Override
+		public String toString()
+		{
+			return label;
+		}
+	}
 
 	@Inject
 	EverykillPanel(LocalLedger ledger, MilestoneNotifier notifier, XpService xpService)
@@ -134,6 +165,18 @@ public class EverykillPanel extends PluginPanel
 		noticeLabel.setFont(FontManager.getRunescapeSmallFont());
 		noticeLabel.setForeground(SUBTLE);
 
+		windowPicker.setFont(FontManager.getRunescapeSmallFont());
+		windowPicker.setFocusable(false);
+		windowPicker.setMaximumSize(new Dimension(Short.MAX_VALUE, 22));
+		windowPicker.setSelectedItem(window);
+		windowPicker.addActionListener(e ->
+		{
+			window = (Window) windowPicker.getSelectedItem();
+			rebuild();
+		});
+
+		box.add(windowPicker);
+		box.add(javax.swing.Box.createVerticalStrut(6));
 		box.add(monsterHeader);
 		box.add(javax.swing.Box.createVerticalStrut(4));
 		box.add(monsterList);
@@ -204,11 +247,11 @@ public class EverykillPanel extends PluginPanel
 		unallocated.setText(stranded == 0L ? " " : shortXp(stranded) + " xp unattributed");
 
 		monsterList.removeAll();
-		final List<NpcStat> all = ledger.allTimeSorted();
-		monsterHeader.setText("ALL TIME · " + all.size());
+		final List<NpcStat> rows = statsForWindow();
+		monsterHeader.setText(window.label.toUpperCase() + " · " + rows.size());
 
 		int shown = 0;
-		for (NpcStat stat : all)
+		for (NpcStat stat : rows)
 		{
 			if (shown++ >= 12)
 			{
@@ -217,9 +260,11 @@ public class EverykillPanel extends PluginPanel
 			monsterList.add(row(stat));
 		}
 
-		if (all.isEmpty())
+		if (rows.isEmpty())
 		{
-			monsterList.add(caption("No kills recorded yet."));
+			monsterList.add(caption(window == Window.ALL
+				? "No kills recorded yet."
+				: "Nothing killed in this period."));
 		}
 
 		final int suppressed = notifier.getSuppressedThisSession();
@@ -232,9 +277,46 @@ public class EverykillPanel extends PluginPanel
 		repaint();
 	}
 
+	/** Rows for whatever window is picked, biggest first, empties dropped. */
+	private List<NpcStat> statsForWindow()
+	{
+		if (window == Window.SESSION)
+		{
+			final List<NpcStat> out = new ArrayList<>(ledger.getSession().values());
+			out.sort(Comparator.comparingInt(NpcStat::total).reversed());
+			return out;
+		}
+
+		if (window == Window.ALL)
+		{
+			return ledger.allTimeSorted();
+		}
+
+		final List<NpcStat> out = new ArrayList<>();
+		for (NpcStat stat : ledger.allTimeSorted())
+		{
+			if (stat.totalSince(window.days) > 0)
+			{
+				out.add(stat);
+			}
+		}
+		out.sort(Comparator.comparingInt((NpcStat s) -> s.totalSince(window.days)).reversed());
+		return out;
+	}
+
+	private int countFor(NpcStat stat)
+	{
+		return window == Window.SESSION || window == Window.ALL
+			? stat.total()
+			: stat.totalSince(window.days);
+	}
+
 	private JPanel row(NpcStat stat)
 	{
-		final boolean hasSkills = stat.xpBySkill != null && !stat.xpBySkill.isEmpty();
+		// the per-skill split is all-time and session only. day buckets keep a total,
+		// not a breakdown, so a windowed row has nothing honest to expand into.
+		final boolean windowed = window != Window.ALL && window != Window.SESSION;
+		final boolean hasSkills = !windowed && stat.xpBySkill != null && !stat.xpBySkill.isEmpty();
 		final boolean open = expanded.contains(stat.npcId);
 
 		final JPanel p = new JPanel(new BorderLayout());
@@ -245,7 +327,7 @@ public class EverykillPanel extends PluginPanel
 		name.setFont(FontManager.getRunescapeSmallFont());
 		name.setForeground(ColorScheme.TEXT_COLOR);
 
-		final JLabel count = new JLabel(String.valueOf(stat.total()));
+		final JLabel count = new JLabel(String.valueOf(countFor(stat)));
 		count.setFont(FontManager.getRunescapeSmallFont());
 		count.setForeground(Color.WHITE);
 

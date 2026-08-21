@@ -248,6 +248,10 @@ public class LocalLedger
 			stat.xpBySkill = new HashMap<>();
 		}
 		stat.xpBySkill.merge(skill, xp, Long::sum);
+
+		// xp lands on today's bucket. it arrives a tick before the hitsplat, not a day
+		// before, so "now" is right even for a kill that straddles midnight.
+		stat.dayOf(System.currentTimeMillis()).xp += xp;
 	}
 
 	public NpcStat get(int npcId)
