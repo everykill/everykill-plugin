@@ -15,6 +15,7 @@ import net.runelite.api.Client;
 import net.runelite.api.Hitsplat;
 import net.runelite.api.MenuAction;
 import net.runelite.api.NPC;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
@@ -109,7 +110,7 @@ public class KillDetector
 		final NPC npc = (NPC) actor;
 		final int tick = client.getTickCount();
 		machine.damage(keyFor(npc), npc.getId(), npc.getName(), npc.getCombatLevel(),
-			hitsplat.getAmount(), mine, tick);
+			regionOf(npc), hitsplat.getAmount(), mine, tick);
 
 		if (mine && damageListener != null)
 		{
@@ -197,5 +198,16 @@ public class KillDetector
 	private int keyFor(NPC npc)
 	{
 		return actorKeys.computeIfAbsent(npc, n -> ++nextActorKey);
+	}
+
+	/**
+	 * Region we engaged in. Only ever the NPC's own square — never the player's, and
+	 * never finer than a region, which keeps it a "where was this fought" tag rather
+	 * than a movement trace.
+	 */
+	private static int regionOf(NPC npc)
+	{
+		final WorldPoint location = npc.getWorldLocation();
+		return location == null ? -1 : location.getRegionID();
 	}
 }

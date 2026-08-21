@@ -26,10 +26,14 @@ Official OSRS hiscores cover ~90 bosses and nothing else. Regular monsters — e
 
 ## Current state
 
-- Plugin compiles, loads, config panel renders
-- Dev client login working; developer mode available via `--developer-mode`
-- Steps 1–3 done and confirmed in-game (see `docs/FINDINGS.md`)
-- Step 4 (NpcChanged phase handling) is next
+- Source tree is now `com.everykill`. The old `everykill` package — including the legacy
+  JSON-snapshot writer and its GitHub gist upload — was deleted on 2026-08-20.
+- Steps 1–4 confirmed in-game before the rewrite (see `docs/FINDINGS.md`).
+- Step 5 is **built but unproven**: XP is measured from `StatChanged` and allocated by
+  damage share. The step was rewritten — the old "derive XP from damage" design was
+  wrong, see `docs/GAME-MECHANICS.md`.
+- Compiles against RuneLite 1.12.35 with no warnings, 34/34 tests pass. **Nothing in
+  the rewritten tree has run in a game client.** That is the next gate.
 - No backend, no site, no upload. Client-side only.
 
 ## Hard constraints — do not violate
@@ -40,7 +44,12 @@ See the imported conventions for the full list. Project-specific additions:
 2. **Never display anything mid-fight that could inform the next action.** Record in the client, analyse on the website.
 3. **Never collect data about other players.** Recording *that* foreign damage occurred is fine as an integrity signal; recording who, what they wore, or where they stood is not. `scene_has_other_players` is a boolean only.
 4. **Upload is opt-in and off by default**, with the exact warning text required by the imported config rules. The plugin must remain fully useful with upload disabled.
-5. **Config group name:** currently `everykill-plugin`, will become `everykill`. Not yet.
+5. **Config group name:** now `everykill`, changed 2026-08-20 with the package rewrite.
+   No migration was written and none was needed — the old `everykilltracker` group held
+   only settings for the deleted snapshot/gist features, there was never a ledger in
+   config, and `settings.properties` contained no keys under the old group at all.
+   Verified before the change, not assumed. **This was the one free moment to do it:
+   any rename after real user data exists needs a read-the-old-group migration.**
 
 ## Core rules the code must enforce
 
@@ -87,6 +96,7 @@ Plugin Hub install distribution is steep — the top plugin has ~595k, the 250th
 - `docs/BUILD-ORDER.md` — **the task list. Start here.**
 - `docs/INTEGRITY.md` — **testing and data-integrity standards. Read before marking any step complete.**
 - `docs/WORKING-AGREEMENT.md` — **report format and reasoning failure modes.**
+- `docs/GAME-MECHANICS.md` — **every game fact the code depends on, with a wiki URL and a date. No game-mechanic claim enters code without a row here.**
 - `docs/FINDINGS.md` — append-only log of verified empirical results
 - `docs/spec-kill-detection.md` · `docs/spec-drop-attribution.md` · `docs/spec-data-model.md` · `docs/spec-performance.md`
 - `docs/STANDING-ASSUMPTIONS.md` — external facts this project depends on, when each was last verified against a primary source, and how often to re-check

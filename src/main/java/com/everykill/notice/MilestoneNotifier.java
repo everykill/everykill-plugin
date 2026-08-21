@@ -8,8 +8,6 @@ import com.everykill.EverykillConfig;
 import com.everykill.model.KillRecord;
 import com.everykill.model.NpcStat;
 import java.awt.Color;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.Getter;
@@ -27,10 +25,13 @@ import net.runelite.client.chat.QueuedMessage;
  * Ranks and first-ever notices are tiers 2 and 3; they arrive as server-rendered
  * strings in the upload response, in P3.
  *
- * <p>Two rules here. <b>Announce at the strict grade</b> — milestones count
- * {@code EXACT} only, so the website's number is never smaller than the one the
- * player was congratulated for. <b>Suppression is a display choice</b> — a held-back
- * notice still lands in {@link #getHistory()}.
+ * <p><b>Announce at the strict grade</b> — milestones count {@code EXACT} only, so the
+ * website's number is never smaller than the one the player was congratulated for.
+ *
+ * <p><b>Suppression is a display choice, never a data choice.</b> Holding a notice
+ * back changes nothing about what was recorded: the kill and the milestone both live
+ * in the ledger either way. Only the count of what was held back is surfaced, so a
+ * quiet notice level never looks like a broken plugin.
  */
 @Singleton
 public class MilestoneNotifier
@@ -45,9 +46,6 @@ public class MilestoneNotifier
 
 	private final ChatMessageManager chatMessageManager;
 	private final EverykillConfig config;
-
-	@Getter
-	private final Deque<Notice> history = new ArrayDeque<>();
 
 	@Getter
 	private int suppressedThisSession;
@@ -74,7 +72,7 @@ public class MilestoneNotifier
 	{
 		if (firstEverForThisNpc)
 		{
-			raise(new Notice(Notice.Kind.FIRST_KILL, kill.npcName,
+			raise(new Notice(Notice.Kind.FIRST_KILL,
 				"first " + kill.npcName + " kill recorded", 1));
 			return;
 		}
@@ -90,7 +88,7 @@ public class MilestoneNotifier
 		{
 			if (exact == rung)
 			{
-				raise(new Notice(Notice.Kind.MILESTONE, kill.npcName,
+				raise(new Notice(Notice.Kind.MILESTONE,
 					format(rung) + " " + kill.npcName + " kills", rung));
 				return;
 			}
@@ -99,12 +97,6 @@ public class MilestoneNotifier
 
 	private void raise(Notice notice)
 	{
-		history.addFirst(notice);
-		while (history.size() > 50)
-		{
-			history.removeLast();
-		}
-
 		if (!shouldShow(notice))
 		{
 			suppressedThisSession++;
@@ -169,8 +161,8 @@ public class MilestoneNotifier
 		return String.valueOf(n);
 	}
 
-	/** One notice, shown or suppressed. The panel renders these either way. */
-	public static final class Notice
+	/** One notice, on its way to being shown or suppressed. */
+	private static final class Notice
 	{
 		public enum Kind
 		{
@@ -178,19 +170,17 @@ public class MilestoneNotifier
 			FIRST_KILL
 		}
 
-		public final Kind kind;
-		public final String npcName;
-		public final String text;
-		public final int weight;
-		public final long whenMillis;
+		private final Kind kind;
+		private final String text;
 
-		Notice(Kind kind, String npcName, String text, int weight)
+		/** Which rung of the ladder, so the notice level can filter by size. */
+		private final int weight;
+
+		Notice(Kind kind, String text, int weight)
 		{
 			this.kind = kind;
-			this.npcName = npcName;
 			this.text = text;
 			this.weight = weight;
-			this.whenMillis = System.currentTimeMillis();
 		}
 	}
 }

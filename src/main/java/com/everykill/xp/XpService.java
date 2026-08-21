@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Skill;
@@ -24,7 +23,6 @@ public class XpService
 {
 	private final Client client;
 
-	@Getter
 	private final XpAttributor attributor = new XpAttributor();
 
 	@Inject

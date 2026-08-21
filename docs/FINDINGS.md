@@ -228,3 +228,51 @@ Append-only record of everything empirically established during development. Pas
 **Finding:** `CombatRecord` now tracks `attacksCount`/`hitsCount`/`maxHit` from every `isMine()` hitsplat (zero-damage included), and both fields plus `weaponSpeedTicks` are on every `Kill:` log line. The first three were straightforward - pure counting from data already flowing through `onHitsplatApplied`. `weaponSpeedTicks` is not: this plugin has no weapon-speed data source at all yet. No loadout/equipment tracking exists in the real (non-legacy) pipeline, and RuneLite's `ItemComposition` doesn't expose attack speed directly the way it exposes other item stats - it needs its own small data source, the same shape of problem as the Step 0a NPC stat table but for weapons.
 **Consequence:** `CombatRecord.weaponSpeedTicks` is left at `-1` (unknown) rather than guessed or left off the schema. The field exists in code and in `spec-data-model.md`'s `kill_event` shape now, per the "cannot be backfilled" urgency, but populating it is a genuinely open task - not decided here, not silently deferred either. Needs a decision: extend Step 0a/0b's Bucket API pull to cover weapon speed, or a separate small Step 0d.
 **Source:** none — code change plus an honest gap, not an external claim.
+
+---
+
+## 2026-08-20 — The com.everykill rewrite compiles and passes its tests against the real client jar
+
+**Status:** verified
+**Method:** `javac --release 11` over all 16 main sources against `client-1.12.35.jar` and `runelite-api-1.12.35.jar` from the local Gradle cache, then the two test classes compiled and run under real JUnit 4.12.
+**Finding:** The rewrite was delivered having never been compiled — 92 API symbols had been checked by grepping a RuneLite source clone, and the 34 tests had only ever run against a hand-written JUnit shim. Against the real jars it compiles with **zero errors** and the tests pass **34/34**. Two symbols flagged as likely breakages beforehand — `MenuAction.WIDGET_TARGET_ON_NPC` and `MenuEntry.getNpc()` — both exist and resolve. IntelliJ's own compiler agrees.
+**Consequence:** `./gradlew build` is now a confirmation step rather than the first real gate. This validates API surface and logic only: Guice wiring, event-bus dispatch and all in-game behaviour remain entirely unproven.
+**Source:** none — local toolchain against the pinned client jar.
+
+---
+
+## 2026-08-20 — `MenuAction.ITEM_USE_ON_NPC` is deprecated; `WIDGET_TARGET_ON_NPC` is the live opcode
+
+**Status:** verified
+**Method:** Compiler deprecation warning on `KillDetector`, then read `MenuAction.java` in `runelite-api-1.12.35-sources.jar` and grepped the full client source for both constants.
+**Finding:** Every `ITEM_*` opcode in `MenuAction` carries `@Deprecated` while its `WIDGET_TARGET_*` twin does not — the inventory is itself a widget, so using an item on an NPC now arrives as opcode 8, not opcode 7. Core RuneLite references `ITEM_USE_ON_NPC` **nowhere outside the enum declaration**; `InteractHighlightOverlay`, `InteractHighlightPlugin` and `WikiPlugin` all switch on `WIDGET_TARGET_ON_NPC` alone.
+**Consequence:** The transform-death path was never broken — it matched both, and the live branch carries it. The deprecated branch was removed from `KillDetector.onMenuOptionClicked`, which would otherwise have broken the build whenever RuneLite drops the constant. Still untested in game: whether a rock hammer on a gargoyle actually produces this event is the open half.
+**Source:** `net/runelite/api/MenuAction.java` and core plugin sources, RuneLite 1.12.35.
+
+---
+
+## 2026-08-20 — Keying kill state on `npc.getIndex()` silently discards kills when the game recycles a slot
+
+**Status:** verified
+**Method:** Direct probe against `KillStateMachine` — resolve a kill on key 5, then damage and kill a different NPC on key 5 at increasing tick gaps, and count emissions.
+**Finding:** The second kill is **discarded with no log line** at every gap up to and including `EMITTED_TICKS`, with a clean cliff immediately after:
+
+```
+gap= 1,3,5,8,10 ticks -> 1 kill emitted   (second kill lost)
+gap=11,15       ticks -> 2 kills emitted
+```
+
+The double-fire suppression window cannot tell a recycled index from the actor that previously held it. This is a silent undercount — the failure mode this project ranks worst — and it would be invisible in play except as counts that quietly read low.
+**Consequence:** `KillDetector` now mints an opaque per-actor key from an `IdentityHashMap<NPC, Integer>` and the state machine never sees an index. Keys are minted only for NPCs we damage and dropped on despawn. The machine keeps zero RuneLite imports. The repo's pre-rewrite code had used actor identity for exactly this reason; the rewrite lost it, and this restores it.
+**Open, deliberately not measured:** how quickly OSRS actually recycles an NPC index. Keying on identity makes the question moot, which is a better answer than a measurement.
+**Source:** none — probe against our own state machine.
+
+---
+
+## 2026-08-20 — `weaponSpeedTicks` dropped rather than carried across (supersedes the 2026-08-14 entry above)
+
+**Status:** verified (decision, with the reasoning stated)
+**Method:** Review of the field during the `com.everykill` merge.
+**Finding:** The 2026-08-14 entry added `weaponSpeedTicks` to `CombatRecord` as a schema placeholder under `spec-performance.md` §2's "record it now or lose it permanently" rule, and recorded honestly that it was never populated. It sat at `-1` for its whole life with twelve lines of comment explaining why.
+**Consequence:** Not carried into `KillRecord`. "Record it now or lose it" protects **observations**, and a field that has never held one is not an observation — it is a comment. The other five perf fields were carried: `regionId`, `attacksCount`, `hitsCount` and `maxHit` are stored, and `damageTotalSinceEngaged` became the derived `KillRecord.totalDamage()`, since the machine already tracks our damage and other players' damage separately. The caveat that it proves nothing about damage taken *before* we engaged is carried across verbatim. Reversible; the data source problem it flagged is still open and still needs its own step.
+**Source:** supersedes the 2026-08-14 `our_attacks/our_hits/our_max_hit` entry above.

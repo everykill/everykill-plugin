@@ -8,6 +8,7 @@ import com.everykill.ledger.LocalLedger;
 import com.everykill.model.Confidence;
 import com.everykill.model.NpcStat;
 import com.everykill.notice.MilestoneNotifier;
+import com.everykill.xp.XpService;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -40,21 +41,24 @@ public class EverykillPanel extends PluginPanel
 
 	private final LocalLedger ledger;
 	private final MilestoneNotifier notifier;
+	private final XpService xpService;
 
 	private final JLabel sessionKills = new JLabel("0");
 	private final JLabel sessionSub = new JLabel("kills");
 	private final JLabel sessionGrades = new JLabel(" ");
+	private final JLabel unallocated = new JLabel(" ");
 	private final GradeBar sessionBar = new GradeBar();
 	private final JPanel monsterList = new JPanel();
 	private final JLabel monsterHeader = new JLabel("ALL TIME");
 	private final JLabel noticeLabel = new JLabel(" ");
 
 	@Inject
-	EverykillPanel(LocalLedger ledger, MilestoneNotifier notifier)
+	EverykillPanel(LocalLedger ledger, MilestoneNotifier notifier, XpService xpService)
 	{
 		super(false);
 		this.ledger = ledger;
 		this.notifier = notifier;
+		this.xpService = xpService;
 
 		setLayout(new BorderLayout());
 		setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
@@ -88,6 +92,12 @@ public class EverykillPanel extends PluginPanel
 		sessionGrades.setFont(FontManager.getRunescapeSmallFont());
 		sessionGrades.setForeground(SUBTLE);
 
+		// Experience that arrived with no damage on record. Shown rather than folded
+		// into the nearest monster — a rising number here means the allocator is
+		// wrong, and burying it would hide exactly the bug worth catching.
+		unallocated.setFont(FontManager.getRunescapeSmallFont());
+		unallocated.setForeground(Confidence.INFERRED.getColor());
+
 		sessionBar.setPreferredSize(new Dimension(200, 3));
 		sessionBar.setMaximumSize(new Dimension(Short.MAX_VALUE, 3));
 
@@ -98,6 +108,7 @@ public class EverykillPanel extends PluginPanel
 		box.add(sessionBar);
 		box.add(javax.swing.Box.createVerticalStrut(4));
 		box.add(sessionGrades);
+		box.add(unallocated);
 
 		return box;
 	}
@@ -180,6 +191,9 @@ public class EverykillPanel extends PluginPanel
 			}
 			sessionGrades.setText(sb.append("</html>").toString());
 		}
+
+		final long stray = xpService.getUnallocatedXp();
+		unallocated.setText(stray == 0L ? " " : shortXp(stray) + " xp unattributed");
 
 		monsterList.removeAll();
 		final List<NpcStat> all = ledger.allTimeSorted();

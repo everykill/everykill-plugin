@@ -29,10 +29,14 @@ import java.util.Map;
  *
  * So the client's updates are the measurement — already correct for overkill,
  * bonuses and rounding — and damage only answers which monster it came from.
- * {@link XpModel} survives as a checksum, never as a published figure.
+ *
+ * <p>A derived figure is still worth computing as a checksum that can flag a bad
+ * allocation, but it needs the player's attack style, which nothing reads yet. The
+ * rates it would use are recorded in {@code docs/GAME-MECHANICS.md}; build it when
+ * Step 5 needs it rather than carrying an unused copy here.
  *
  * <p>XP arriving with no damage on record is never forced onto the nearest monster;
- * it accumulates in {@link #getUnallocatedXp()} and is reported.
+ * it accumulates in {@link #getUnallocatedXp()} and is surfaced on the panel.
  */
 public class XpAttributor
 {

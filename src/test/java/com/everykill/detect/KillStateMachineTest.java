@@ -35,7 +35,7 @@ public class KillStateMachineTest
 
 	private void hit(int index, int amount, boolean mine, int tick)
 	{
-		machine.damage(index, 415, "Abyssal demon", 124, amount, mine, tick);
+		machine.damage(index, 415, "Abyssal demon", 124, 12363, amount, mine, tick);
 	}
 
 	// ------------------------------------------------------------------

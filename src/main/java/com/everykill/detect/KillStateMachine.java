@@ -72,19 +72,34 @@ public class KillStateMachine
 	// ------------------------------------------------------------------
 
 	/**
-	 * @param mine true if we dealt it, false if another player did
+	 * @param regionId where we engaged, recorded once on the first hitsplat
+	 * @param mine     true if we dealt it, false if another player did
 	 */
-	public void damage(int key, int npcId, String name, int combatLevel, int amount, boolean mine, int tick)
+	public void damage(int key, int npcId, String name, int combatLevel, int regionId,
+		int amount, boolean mine, int tick)
 	{
-		final Record r = tracked.computeIfAbsent(key, i -> new Record(npcId, name, combatLevel, tick));
+		final Record r = tracked.computeIfAbsent(key,
+			i -> new Record(npcId, name, combatLevel, regionId, tick));
+
 		if (mine)
 		{
 			r.myDamage += amount;
+
+			// A zero-damage splat is an attempt, not noise — a block or a magic splash
+			// is exactly what makes observed accuracy meaningful, so it counts as an
+			// attack even though it adds no damage.
+			r.attacksCount++;
+			if (amount > 0)
+			{
+				r.hitsCount++;
+				r.maxHit = Math.max(r.maxHit, amount);
+			}
 		}
 		else
 		{
 			r.othersDamage += amount;
 		}
+
 		r.lastTick = tick;
 	}
 
@@ -204,10 +219,14 @@ public class KillStateMachine
 			r.npcId,
 			r.name == null ? "Unknown NPC " + r.npcId : r.name,
 			r.combatLevel,
+			r.regionId,
 			grade,
 			signal,
 			r.myDamage,
 			r.othersDamage,
+			r.attacksCount,
+			r.hitsCount,
+			r.maxHit,
 			System.currentTimeMillis()));
 	}
 
@@ -216,15 +235,20 @@ public class KillStateMachine
 		private int npcId;
 		private String name;
 		private int combatLevel;
+		private final int regionId;
 		private int myDamage;
 		private int othersDamage;
+		private int attacksCount;
+		private int hitsCount;
+		private int maxHit;
 		private int lastTick;
 
-		private Record(int npcId, String name, int combatLevel, int tick)
+		private Record(int npcId, String name, int combatLevel, int regionId, int tick)
 		{
 			this.npcId = npcId;
 			this.name = name;
 			this.combatLevel = combatLevel;
+			this.regionId = regionId;
 			this.lastTick = tick;
 		}
 	}

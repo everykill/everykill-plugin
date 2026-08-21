@@ -56,13 +56,31 @@ Unknown NPCs despawning at low HP after our damage → log to a review queue, **
 
 ---
 
-## Step 5 — Derived XP + reconciliation
+## Step 5 — Measured XP, allocated by damage share
 
-**Build:** Derive each NPC's XP from its own damage record using the rates in `spec-kill-detection.md`. Compare against `StatChanged` deltas and **log divergences**.
+**This step was called "Derived XP + reconciliation" and had the roles the wrong way round.** It said to derive each NPC's XP from its damage record and demote `StatChanged` to a checksum. XP *is* paid per point of damage, so the reframe was half right — that part dissolves the merged-tick problem. But derivation cannot be the source of truth, for three reasons verified against the wiki on 2026-08-16 and recorded in `GAME-MECHANICS.md`:
 
-**Requires:** the NPC stat table (Step 0a) for the multiplier.
+- **Overkill grants no XP.** It is paid on damage *applied*, capped at the target's remaining hitpoints, while hitsplats report damage *rolled*. Every killing blow overstates, and the bias is one-directional — it does not average out.
+- **The per-monster bonus cannot be computed.** Manual overrides ignore the published formula: Vorkath computes to +20% against a listed +0%. It has to be read from the P0 reference table, which does not exist yet.
+- **Rounding is undocumented.** XP is stored in tenths, and 1.33 per damage is not representable in tenths.
 
-**Acceptance:** Divergences are read and understood before the model is trusted. Measure the XP settle window (how many ticks until the delta lands) and the residual noise floor from real data. **Report both numbers** — the spec deliberately leaves them unset.
+**So the roles swap.** The client's XP updates are the **measurement** — already correct for overkill, per-monster bonuses and rounding, because the game did the arithmetic. Damage is only the **allocator**, answering which monster the experience came from when several were being hit. This needs no multiplier table, carries no overkill error and accumulates no rounding drift, so it is strictly better than the original plan.
+
+**Build:** *(done — `XpAttributor`, merged 2026-08-20)* Pool our damage per tick per `npc_id`. On each combat-skill `StatChanged`, split the delta across that pool by damage share, using largest-remainder so the parts sum exactly to the whole. XP that arrives with no damage on record is **never** forced onto the nearest monster — it accumulates as unallocated and is surfaced on the panel.
+
+**Requires:** nothing. That is the point — the old Step 5 was blocked on Step 0a for the multiplier, and this is not.
+
+**Still to do, and it needs real play:**
+
+- Measure the **XP settle window** — how many ticks after the hitsplat the delta actually lands. `SETTLE_TICKS = 2` is desk-chosen.
+- Measure the **residual noise floor**.
+- **Report both numbers.** The spec deliberately leaves them unset.
+
+**Acceptance:** Per-monster XP on a hand-counted task is within the measured noise floor of the skill totals the client reports, and unallocated XP stays near zero during ordinary combat. A rising unallocated figure means the allocator is wrong and is the signal to chase.
+
+**Note on the checksum.** A derived figure is still worth having as a check on the allocator, but it needs the player's attack style, which nothing reads yet. `XpModel` was delivered for this and deleted in the merge: it had no caller, and every rate it encoded is in `GAME-MECHANICS.md`. Rebuild it from the doc when this step needs it rather than resurrecting untested code.
+
+**Slayer XP must never go through this allocator.** It is granted per kill, equal to the monster's hitpoints — not per damage. `CombatSkill` excludes it deliberately.
 
 ---
 
