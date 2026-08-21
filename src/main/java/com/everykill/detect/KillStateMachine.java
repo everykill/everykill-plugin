@@ -12,6 +12,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * All the kill detection rules, in plain java with no client anywhere near it.
@@ -32,6 +33,7 @@ import java.util.function.Consumer;
  * <p>Keys come from {@link KillDetector}, stable per actor and never reissued. Don't
  * "simplify" them back to getIndex() - it eats kills every time a slot gets recycled.
  */
+@Slf4j
 public class KillStateMachine
 {
 	/** Ticks of silence after which a damage record is abandoned. Provisional. */
@@ -52,11 +54,19 @@ public class KillStateMachine
 	static final int DEATH_CONFIRM_TICKS = 5;
 
 	/**
-	 * How recently an item-use must have happened for an unflagged despawn to count
-	 * as a transform death. Tight on purpose — widen it and the rule starts claiming
-	 * NPCs that merely wandered off. Provisional; measure on a gargoyle task.
+	 * How recently an item-use must have happened for an unflagged despawn to count as
+	 * a transform death.
+	 *
+	 * <p>Was 3, "tight on purpose" so the rule couldn't claim things that merely
+	 * wandered off. That reasoning held while isDead() was still catching these as a
+	 * fallback. It isn't any more - we stopped believing it, correctly - so this window
+	 * is now the only route to counting a transform kill, and at 3 it dropped a real
+	 * one on the floor. Salt early and the health bar never empties, so there is no
+	 * death signal and no dead flag either.
+	 *
+	 * <p>Provisional at 5. See the discard log below for the real gap.
 	 */
-	static final int FINISH_WINDOW_TICKS = 3;
+	static final int FINISH_WINDOW_TICKS = 5;
 
 	private final Map<Integer, Record> tracked = new HashMap<>();
 	private final Map<Integer, Integer> emitted = new HashMap<>();
@@ -186,6 +196,15 @@ public class KillStateMachine
 			return;
 		}
 
+		// we damaged it, an item was used on it, and we still binned it. that's a real
+		// kill going missing, so say so with the number that caused it.
+		if (r != null && r.myDamage > 0 && finishedAt != null)
+		{
+			log.debug("Discarded a finished npc: npc_id={} name={} itemUsedAt={} despawnedAt={} gap={} window={} flaggedDead={} revoked={}",
+				r.npcId, r.name, finishedAt, tick, tick - finishedAt, FINISH_WINDOW_TICKS,
+				flaggedDead, r.deathSignalRevoked);
+		}
+
 		tracked.remove(key);
 	}
 
@@ -217,9 +236,13 @@ public class KillStateMachine
 				it.remove();
 			}
 		}
+		// keep these well past FINISH_WINDOW_TICKS. despawn() enforces the window itself,
+		// and purging on the window means a late despawn arrives with the item-use
+		// already forgotten - so we can't tell "wandered off" from "we missed it by two
+		// ticks", which is the one thing worth knowing here.
 		for (Iterator<Map.Entry<Integer, Integer>> it = finishingActions.entrySet().iterator(); it.hasNext(); )
 		{
-			if (now - it.next().getValue() > FINISH_WINDOW_TICKS)
+			if (now - it.next().getValue() > STALE_TICKS)
 			{
 				it.remove();
 			}
