@@ -320,3 +320,18 @@ tick=86   damage amount=7  <- the hitsplat arrives
 
 **Consequence:** Seeding moved to the first `GameTick` while logged in, guarded by `isPrimed()` — confirmed in play, one `primed xp baselines` line instead of four, and unallocated now starts near zero. Ledger loading is guarded by a `ledgerLoaded` flag reset on `LOGIN_SCREEN`. The deleted `everykill` code seeded on the first tick and said why in a comment; this is the third regression today where the rewrite lost something the old code had learned in-game.
 **Source:** none — measured against the live client.
+
+---
+
+## 2026-08-20 — Zero foreign damage detected in multicombat; the blind spot is pre-engagement, not `isOthers()`
+
+**Status:** unverified-assumption (hypothesis with supporting evidence, test named below)
+**Method:** Thirteen live kills in Kourend Catacombs, all graded `EXACT` with `dmg=X/X`, while the game printed *"As an Ironman, you might not receive kill-credit for this monster."* Cross-read against core RuneLite's use of the same API.
+**Finding:** `Hitsplat.isOthers()` is not broken. Core's `DpsCounterPlugin` is the only core consumer and it depends on foreign hitsplats arriving — it adds them to the fight total and filters with `actor != player.getInteracting()`. It also broadcasts the local player's own damage over the party service, because `isOthers()` reports *that* someone hit the target, never *who*.
+
+The likely explanation is structural: a combat record opens on the first hitsplat **we witness**, so damage dealt before we engaged is invisible. The ironman warning is pre-emptive — it fires on attacking a target another player already has a claim on, which includes damage that landed before we arrived. So the message and our zero readings are consistent, and the grade was not lying about what it measured; it was measuring "nobody else hit it *after we turned up*" and labelling that `EXACT`.
+
+**Consequence:** `EXACT` currently overstates. Candidate signal is `Actor.getHealthRatio()` / `getHealthScale()` at first contact — an NPC already below full was hurt by someone. Two known obstacles: our own hitsplat may already be reflected by the time `HitsplatApplied` fires, and apportioning the drop needs the monster's max HP, which is the P0 reference data that does not exist. **Diagnostic added** (`First contact:` log line) rather than a guessed fix.
+
+**The test that settles it:** kill in a busy multicombat area and compare `First contact` ratios against `healthScale` and against the ironman messages. If contested targets read below full at first contact and uncontested ones read full or -1, the signal is usable.
+**Source:** `DpsCounterPlugin`, `Actor.getHealthRatio()` javadoc, RuneLite 1.12.36.

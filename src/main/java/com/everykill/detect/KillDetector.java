@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.Hitsplat;
@@ -46,6 +47,7 @@ import net.runelite.api.events.NpcDespawned;
  * They can extend that list whenever they like, so hold the trigger rule rather than
  * the current wording.
  */
+@Slf4j
 @Singleton
 public class KillDetector
 {
@@ -181,7 +183,21 @@ public class KillDetector
 
 	private int keyFor(NPC npc)
 	{
-		return actorKeys.computeIfAbsent(npc, n -> ++nextActorKey);
+		final Integer existing = actorKeys.get(npc);
+		if (existing != null)
+		{
+			return existing;
+		}
+
+		// temp: is the thing already hurt when we first touch it? if so somebody else
+		// got there first and we're about to call that kill EXACT, which it isn't.
+		// -1 means no health bar. server never sends real hp, only ratio/scale.
+		log.debug("First contact: npc_id={} name={} healthRatio={} healthScale={} tick={}",
+			npc.getId(), npc.getName(), npc.getHealthRatio(), npc.getHealthScale(), client.getTickCount());
+
+		final int key = ++nextActorKey;
+		actorKeys.put(npc, key);
+		return key;
 	}
 
 	// npc's square, never the player's, never finer than a region. keep it that way,
