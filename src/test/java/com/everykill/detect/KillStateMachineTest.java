@@ -254,6 +254,35 @@ public class KillStateMachineTest
 	}
 
 	@Test
+	public void anAbandonedMonsterAtZeroHpIsNotAKill()
+	{
+		// Run in play 2026-08-21: hit a rockslug to 0 hp, don't salt it, walk away. It
+		// despawns when it leaves the scene, isDead() is true because the health ratio
+		// is zero, and we counted a monster that is still standing there.
+		hit(1, 27, true, 0);
+		machine.death(1, 1, emitted::add);
+		machine.tick(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1);
+
+		// walked out of range some time later
+		machine.despawn(1, true, 40, emitted::add);
+
+		Assert.assertTrue("it lied about dying once; isDead() is the same lie",
+			emitted.isEmpty());
+	}
+
+	@Test
+	public void anHonestDespawnWhileDeadStillCounts()
+	{
+		// Nothing revoked here - no ActorDeath ever fired, it just left flagged dead.
+		// The guard must not swallow this one.
+		hit(1, 30, true, 0);
+		machine.despawn(1, true, 2, emitted::add);
+
+		Assert.assertEquals(1, emitted.size());
+		Assert.assertEquals(DeathSignal.DESPAWN_WHILE_DEAD, emitted.get(0).signal);
+	}
+
+	@Test
 	public void anItemFinishBeatsALyingDeathSignal()
 	{
 		// Salt after the health bar empties. ActorDeath already fired and lied; the

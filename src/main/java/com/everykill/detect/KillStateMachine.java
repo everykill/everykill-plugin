@@ -176,7 +176,11 @@ public class KillStateMachine
 			return;
 		}
 
-		if (flaggedDead)
+		// isDead() is the same zero health ratio ActorDeath reads, so if this thing
+		// already lied about dying we don't get to believe it a second time. measured
+		// 2026-08-21: a rockslug left at 0 hp and abandoned despawned when the player
+		// walked off, flaggedDead was true, and we counted a monster still standing.
+		if (flaggedDead && r != null && !r.deathSignalRevoked)
 		{
 			resolve(key, DeathSignal.DESPAWN_WHILE_DEAD, tick, sink);
 			return;
@@ -198,6 +202,7 @@ public class KillStateMachine
 			if (r.deathSignalledAt >= 0 && now - r.deathSignalledAt > DEATH_CONFIRM_TICKS)
 			{
 				r.deathSignalledAt = -1;
+				r.deathSignalRevoked = true;
 			}
 
 			if (now - r.lastTick > STALE_TICKS)
@@ -283,6 +288,11 @@ public class KillStateMachine
 
 		/** tick ActorDeath fired, -1 if it hasn't. believed until it isn't. */
 		private int deathSignalledAt = -1;
+
+		// it claimed to be dead and then didn't leave. we've caught it lying once, so
+		// isDead() on the despawn doesn't get the benefit of the doubt either - it's
+		// the same zero health ratio telling the same fib.
+		private boolean deathSignalRevoked;
 
 		private int attacksCount;
 		private int hitsCount;
