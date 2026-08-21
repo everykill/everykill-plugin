@@ -4,6 +4,8 @@
  */
 package com.everykill.model;
 
+import java.util.Map;
+
 // all-time totals for one npc. grades stay as separate counts - collapse them into
 // one number here and the site can never break them apart again.
 public class NpcStat
@@ -21,6 +23,11 @@ public class NpcStat
 
 	/** measured from the client, split by damage share. see XpAttributor */
 	public long xp;
+
+	// per-skill breakdown behind that total. keyed by skill name rather than the enum
+	// so the stored json stays readable and gson doesn't need help. absent on rows
+	// recorded before this existed - that's fine, it fills in on the next kill.
+	public Map<String, Long> xpBySkill;
 
 	public long firstKillMillis;
 	public long lastKillMillis;

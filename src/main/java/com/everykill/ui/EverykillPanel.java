@@ -10,10 +10,16 @@ import com.everykill.model.NpcStat;
 import com.everykill.notice.MilestoneNotifier;
 import com.everykill.xp.XpService;
 import java.awt.BorderLayout;
+import java.awt.Cursor;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -50,6 +56,9 @@ public class EverykillPanel extends PluginPanel
 	private final JPanel monsterList = new JPanel();
 	private final JLabel monsterHeader = new JLabel("ALL TIME");
 	private final JLabel noticeLabel = new JLabel(" ");
+
+	// npc ids whose skill breakdown is open. panel state, never persisted.
+	private final Set<Integer> expanded = new HashSet<>();
 
 	@Inject
 	EverykillPanel(LocalLedger ledger, MilestoneNotifier notifier, XpService xpService)
@@ -225,11 +234,14 @@ public class EverykillPanel extends PluginPanel
 
 	private JPanel row(NpcStat stat)
 	{
+		final boolean hasSkills = stat.xpBySkill != null && !stat.xpBySkill.isEmpty();
+		final boolean open = expanded.contains(stat.npcId);
+
 		final JPanel p = new JPanel(new BorderLayout());
 		p.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		p.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
 
-		final JLabel name = new JLabel(label(stat));
+		final JLabel name = new JLabel((hasSkills ? (open ? "▾ " : "▸ ") : "") + label(stat));
 		name.setFont(FontManager.getRunescapeSmallFont());
 		name.setForeground(ColorScheme.TEXT_COLOR);
 
@@ -258,7 +270,48 @@ public class EverykillPanel extends PluginPanel
 			wrap.add(bar);
 		}
 
+		if (hasSkills)
+		{
+			p.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+			p.addMouseListener(new MouseAdapter()
+			{
+				@Override
+				public void mouseClicked(MouseEvent e)
+				{
+					if (!expanded.remove(stat.npcId))
+					{
+						expanded.add(stat.npcId);
+					}
+					rebuild();
+				}
+			});
+
+			if (open)
+			{
+				// biggest first. nobody scans an alphabetical list looking for where
+				// their xp went.
+				stat.xpBySkill.entrySet().stream()
+					.sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+					.forEach(e -> wrap.add(skillLine(e.getKey(), e.getValue())));
+			}
+		}
+
 		return wrap;
+	}
+
+	private static JLabel skillLine(String skill, long xp)
+	{
+		final JLabel l = new JLabel(pretty(skill) + "  " + shortXp(xp));
+		l.setFont(FontManager.getRunescapeSmallFont());
+		l.setForeground(SUBTLE);
+		l.setBorder(BorderFactory.createEmptyBorder(0, 10, 1, 0));
+		return l;
+	}
+
+	/** HITPOINTS -> Hitpoints. The enum shouts; the panel shouldn't. */
+	private static String pretty(String skill)
+	{
+		return skill.charAt(0) + skill.substring(1).toLowerCase();
 	}
 
 	/** "Dagannoth (74)" — two ids, one name, and no way to tell them apart without this. */

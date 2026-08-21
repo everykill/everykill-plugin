@@ -211,7 +211,7 @@ public class XpAttributorTest
 		xp.damage(ABYSSAL_DEMON, 10, 100);
 		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 100);
 
-		Assert.assertEquals(40L, (long) xp.drain().get(ABYSSAL_DEMON));
+		Assert.assertEquals(40L, (long) xp.drain().get(ABYSSAL_DEMON).get(CombatSkill.ATTACK));
 		Assert.assertEquals("the buffer is empty after a drain", 0L, xp.xpFor(ABYSSAL_DEMON));
 		Assert.assertTrue(xp.drain().isEmpty());
 	}

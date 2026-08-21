@@ -8,6 +8,7 @@ import com.everykill.EverykillConfig;
 import com.everykill.model.Confidence;
 import com.everykill.model.KillRecord;
 import com.everykill.model.NpcStat;
+import com.everykill.xp.CombatSkill;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
@@ -62,7 +63,7 @@ public class LocalLedger
 
 	// xp for a monster we haven't killed yet. the fight's xp all arrives before the
 	// kill that makes the row, so binning it meant every first kill read xp=0.
-	private final Map<Integer, Long> xpBeforeFirstKill = new HashMap<>();
+	private final Map<Integer, Map<String, Long>> xpBeforeFirstKill = new HashMap<>();
 
 	// kills we read at load. saving fewer than this means we're about to eat history.
 	private int loadedKills;
@@ -190,11 +191,14 @@ public class LocalLedger
 		sessionGrades.merge(kill.grade, 1, Integer::sum);
 
 		// the fight's xp landed before this row existed. claim it now.
-		final Long held = xpBeforeFirstKill.remove(kill.npcId);
+		final Map<String, Long> held = xpBeforeFirstKill.remove(kill.npcId);
 		if (held != null)
 		{
-			stat.xp += held;
-			sessionStat.xp += held;
+			for (Map.Entry<String, Long> e : held.entrySet())
+			{
+				applyNamed(stat, e.getKey(), e.getValue());
+				applyNamed(sessionStat, e.getKey(), e.getValue());
+			}
 		}
 
 		save();
@@ -206,7 +210,7 @@ public class LocalLedger
 	// no row, no xp - a monster we never killed getting xp means the allocation is
 	// wrong, and a zero-kill row would hide that. but the whole fight's xp arrives
 	// BEFORE the kill that creates the row, so hold it rather than bin it.
-	public void addXp(int npcId, long xp)
+	public void addXp(int npcId, CombatSkill skill, long xp)
 	{
 		if (xp <= 0L)
 		{
@@ -216,18 +220,34 @@ public class LocalLedger
 		final NpcStat stat = allTime.get(String.valueOf(npcId));
 		if (stat == null)
 		{
-			xpBeforeFirstKill.merge(npcId, xp, Long::sum);
+			xpBeforeFirstKill.computeIfAbsent(npcId, k -> new HashMap<>())
+				.merge(skill.name(), xp, Long::sum);
 			return;
 		}
 
-		stat.xp += xp;
+		apply(stat, skill, xp);
 		dirty = true;
 
 		final NpcStat sessionStat = session.get(npcId);
 		if (sessionStat != null)
 		{
-			sessionStat.xp += xp;
+			apply(sessionStat, skill, xp);
 		}
+	}
+
+	private static void apply(NpcStat stat, CombatSkill skill, long xp)
+	{
+		applyNamed(stat, skill.name(), xp);
+	}
+
+	private static void applyNamed(NpcStat stat, String skill, long xp)
+	{
+		stat.xp += xp;
+		if (stat.xpBySkill == null)
+		{
+			stat.xpBySkill = new HashMap<>();
+		}
+		stat.xpBySkill.merge(skill, xp, Long::sum);
 	}
 
 	public NpcStat get(int npcId)

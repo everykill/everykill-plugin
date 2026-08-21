@@ -73,16 +73,24 @@ public class XpService
 		attributor.xpChanged(skill, event.getXp(), client.getTickCount());
 	}
 
+	/** npcId, skill, amount. */
+	public interface XpSink
+	{
+		void accept(int npcId, CombatSkill skill, long xp);
+	}
+
 	/** Move accumulated experience into the ledger and clear the buffer. */
-	public void drain(BiConsumer<Integer, Long> sink)
+	public void drain(XpSink sink)
 	{
 		// match up anything still waiting on its hitsplat before handing over
 		attributor.settle(client.getTickCount());
 
-		final Map<Integer, Long> drained = attributor.drain();
-		for (Map.Entry<Integer, Long> e : drained.entrySet())
+		for (Map.Entry<Integer, Map<CombatSkill, Long>> npc : attributor.drain().entrySet())
 		{
-			sink.accept(e.getKey(), e.getValue());
+			for (Map.Entry<CombatSkill, Long> skill : npc.getValue().entrySet())
+			{
+				sink.accept(npc.getKey(), skill.getKey(), skill.getValue());
+			}
 		}
 	}
 
