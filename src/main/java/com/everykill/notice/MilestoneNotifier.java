@@ -17,21 +17,18 @@ import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 
 /**
- * Tier-1 notices: the ones the plugin can work out by itself — a KC milestone, a
- * first kill. No network, no cross-player data, no drop rates, so they work offline
- * and with uploads off. That is what makes the plugin worth having <i>before</i> it
- * asks for the upload toggle.
+ * Notices we can work out on our own - kc milestones, first kills. No network, no
+ * other players, no drop rates. Works offline with uploads off, which is the whole
+ * reason anyone would install this before we ever ask them to turn upload on.
  *
- * Ranks and first-ever notices are tiers 2 and 3; they arrive as server-rendered
- * strings in the upload response, in P3.
+ * <p>Ranks and first-ever-on-the-site notices are P3, rendered server side.
  *
- * <p><b>Announce at the strict grade</b> — milestones count {@code EXACT} only, so the
- * website's number is never smaller than the one the player was congratulated for.
+ * <p>Milestones count EXACT only. Congratulate someone on 500 and then show them 480
+ * on the site because half were contested and you've lost them for good.
  *
- * <p><b>Suppression is a display choice, never a data choice.</b> Holding a notice
- * back changes nothing about what was recorded: the kill and the milestone both live
- * in the ledger either way. Only the count of what was held back is surfaced, so a
- * quiet notice level never looks like a broken plugin.
+ * <p>Suppressing a notice changes nothing about what got recorded - the kill and the
+ * milestone are both in the ledger regardless. We surface the suppressed count so a
+ * quiet notice level doesn't look like a broken plugin.
  */
 @Singleton
 public class MilestoneNotifier

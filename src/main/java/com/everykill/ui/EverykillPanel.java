@@ -26,14 +26,14 @@ import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 
 /**
- * The side panel, at RuneLite's fixed 225px.
+ * Side panel. RuneLite gives us 225px and that's that.
  *
- * Native {@link ColorScheme} chrome, not the website's palette — what crosses between
- * plugin and site is meaning, not skin, and the three grade colours are the whole
- * shared vocabulary.
+ * <p>Native {@link ColorScheme} chrome, not the site's palette. What we share with the
+ * site is meaning, not styling - the three grade colours are the entire shared
+ * vocabulary and that's deliberate.
  *
- * <p>The panel counts and stops. Rates, ranks and dry streaks need a denominator or
- * another player's data, so they become links rather than numbers.
+ * <p>It counts and then stops. Rates, ranks, dry streaks all need a denominator or
+ * someone else's data, so they're links, not numbers.
  */
 public class EverykillPanel extends PluginPanel
 {

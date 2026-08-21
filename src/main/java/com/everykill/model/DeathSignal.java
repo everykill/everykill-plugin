@@ -4,22 +4,15 @@
  */
 package com.everykill.model;
 
-/**
- * How a death was learned about. The grade says how much to trust a kill; the
- * signal says why, which is what makes the P1 divergence log readable.
- */
+// how we found out it died. the grade says how much to trust it, this says why.
 public enum DeathSignal
 {
-	/** The client reported the actor died, and we had damage on it. */
+	/** client said it died and we'd hit it */
 	OBSERVED,
 
-	/** It left the scene while flagged dead. Deduced, not watched. */
+	/** left the scene already flagged dead. worked out, not witnessed */
 	DESPAWN_WHILE_DEAD,
 
-	/**
-	 * Vanished without a death flag, right after the player used an item on it —
-	 * rock hammer on a gargoyle, salt on a rockslug. Evidence, not assumption:
-	 * a targeted action on that NPC, then it left. Never a hardcoded monster list.
-	 */
+	/** vanished with no death flag right after we used an item on it - gargoyles etc */
 	TRANSFORM_FINISH
 }

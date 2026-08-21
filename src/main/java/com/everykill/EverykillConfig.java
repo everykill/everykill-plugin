@@ -132,14 +132,13 @@ public interface EverykillConfig extends Config
 	String uploadSection = "uploadSection";
 
 	/**
-	 * Off by default, and gated behind RuneLite's own confirmation dialog.
+	 * Off by default, behind RuneLite's own confirmation dialog.
 	 *
-	 * The warning string is the exact text RuneLite requires for any feature that
-	 * contacts a third-party server. It is reproduced verbatim and must not be
-	 * reworded — see the plugin-hub rules.
+	 * <p>That warning string is hub-mandated, word for word, for anything touching a
+	 * third-party server. Do not reword it, do not tidy it, do not "improve" it.
 	 *
-	 * Nothing reads this flag yet. Upload lands in P3, after the delete and export
-	 * endpoints are live, and the toggle exists now so it can never be forgotten.
+	 * <p>Nothing reads this yet - upload is P3, after delete and export exist. It's
+	 * here now purely so nobody can ship the feature and forget the disclosure.
 	 */
 	@ConfigItem(
 		keyName = "uploadEnabled",
@@ -175,9 +174,8 @@ public interface EverykillConfig extends Config
 		}
 
 		/**
-		 * Lowest milestone that may raise a notice at this level. Everything below
-		 * is still recorded and still lands in the notice history — suppression is
-		 * a display choice, never a data choice.
+		 * Smallest milestone allowed to say anything at this level. Everything below
+		 * still gets recorded - shutting up isn't the same as not counting.
 		 */
 		public int milestoneFloor()
 		{

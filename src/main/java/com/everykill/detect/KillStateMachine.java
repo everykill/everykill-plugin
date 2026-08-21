@@ -14,25 +14,23 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
- * The kill detection rules, in plain Java. {@link KillDetector} is the adapter that
- * maps client events onto these calls; keeping the judgement here is what makes it
- * directly testable.
+ * All the kill detection rules, in plain java with no client anywhere near it.
+ * {@link KillDetector} does the translating. That split is why these are testable.
  *
  * <ol>
- *   <li>A kill needs a death signal <b>and</b> our own damage. Either alone is
- *       discarded — the failure to avoid is silent overcount, which inflates every
- *       downstream number with no visible symptom.</li>
- *   <li>Another player's damage downgrades to {@link Confidence#AMBIGUOUS}.</li>
- *   <li>Observed death is {@link Confidence#EXACT}; anything deduced is
- *       {@link Confidence#INFERRED}.</li>
- *   <li>A composition change carries damage forward and emits nothing.</li>
- *   <li>A despawn not flagged dead is discarded, unless the player used an item on
- *       that NPC within {@link #FINISH_WINDOW_TICKS} — a transform death.</li>
- *   <li>One key cannot emit twice within {@link #EMITTED_TICKS}.</li>
+ *   <li>Kill = a death signal AND our own damage. One without the other gets binned.
+ *       Overcounting is the thing to be scared of - it inflates everything downstream
+ *       and looks completely fine while doing it</li>
+ *   <li>Someone else's damage drops it to {@link Confidence#AMBIGUOUS}</li>
+ *   <li>Saw it die = {@link Confidence#EXACT}. Worked it out = {@link Confidence#INFERRED}</li>
+ *   <li>Composition change carries the damage over and emits nothing</li>
+ *   <li>Despawn with no death flag is binned, unless we used an item on it within
+ *       {@link #FINISH_WINDOW_TICKS} - that's a transform death</li>
+ *   <li>One key can't emit twice inside {@link #EMITTED_TICKS}</li>
  * </ol>
  *
- * <p>Keys come from {@link KillDetector} - stable per actor, never reissued. Don't
- * "simplify" them back to getIndex(), it drops kills whenever a slot gets recycled.
+ * <p>Keys come from {@link KillDetector}, stable per actor and never reissued. Don't
+ * "simplify" them back to getIndex() - it eats kills every time a slot gets recycled.
  */
 public class KillStateMachine
 {

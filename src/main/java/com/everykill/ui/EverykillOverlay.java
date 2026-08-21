@@ -20,13 +20,13 @@ import net.runelite.client.ui.overlay.components.LineComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
 
 /**
- * The session counter on the game canvas: kills, current focus, grade split.
+ * Session counter on the canvas - kills, what you're farming, grade split.
  *
- * The kill count is the trust mechanism — a player who cannot see it move assumes
- * the plugin is broken. Compact mode collapses to one line; both stay under 160px.
+ * <p>The number moving is the whole trust mechanism. If a player can't watch it tick
+ * up they assume we're broken, and they're not wrong to.
  *
- * <p>{@code TOP_LEFT} on {@code ABOVE_SCENE}: above the world, below every game
- * widget, so it can never cover an interface. Repositioning is RuneLite's alt-drag.
+ * <p>TOP_LEFT on ABOVE_SCENE: over the world, under every game widget, so it can't
+ * cover an interface. Alt-drag to move it, that's RuneLite's job not ours.
  */
 public class EverykillOverlay extends OverlayPanel
 {

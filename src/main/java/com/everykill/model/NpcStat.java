@@ -4,12 +4,8 @@
  */
 package com.everykill.model;
 
-/**
- * All-time local totals for one NPC.
- *
- * Grades stay as separate counts rather than one total: collapsing them here would
- * make the website's confidence lens impossible.
- */
+// all-time totals for one npc. grades stay as separate counts - collapse them into
+// one number here and the site can never break them apart again.
 public class NpcStat
 {
 	public int npcId;
@@ -19,7 +15,7 @@ public class NpcStat
 	public int inferred;
 	public int ambiguous;
 
-	/** Measured from the client, allocated by damage share. See XpAttributor. */
+	/** measured from the client, split by damage share. see XpAttributor */
 	public long xp;
 
 	public long firstKillMillis;

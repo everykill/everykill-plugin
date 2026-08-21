@@ -39,19 +39,18 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.ImageUtil;
 
 /**
- * Everykill — kill counts for every monster, not just the ~90 on the hiscores.
+ * Kill counts for every monster, not just the ~90 on the hiscores.
  *
- * The plugin <b>records</b>; it does not analyse. Rates, percentiles, ranks and
- * streaks are server-side, which keeps Plugin Hub review trivial and lets the site
- * grow without a plugin release. The rule for anything proposed here: <i>could it be
- * displayed with no network call?</i> If not, it does not belong in the client.
+ * <p>This thing records. It does not analyse. Rates, ranks, dry streaks - all server
+ * side. Before adding anything here ask: can it be shown with no network call? No?
+ * Then it's not a client feature, and hub review stays boring, which is the point.
  *
- * <p>It runs <b>alongside</b> Loot Tracker, which already holds per-NPC counts — but
- * only for kills that dropped something, and it infers ownership from loot rather
- * than damage. Counting from damage is what makes lootless kills visible.
+ * <p>Runs alongside Loot Tracker rather than replacing it. That counts kills that
+ * dropped something and guesses ownership from the loot. We count from damage, which
+ * is the only way a lootless kill ever shows up.
  *
- * <p><b>P1: local only.</b> The upload toggle exists, is off, and nothing reads it —
- * it ships early so the required disclosure cannot be forgotten.
+ * <p>P1 is local only. The upload toggle exists, is off, and nothing reads it - it's
+ * there early so the disclosure can't get forgotten later.
  */
 @Slf4j
 @PluginDescriptor(

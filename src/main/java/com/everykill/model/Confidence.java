@@ -6,22 +6,18 @@ package com.everykill.model;
 
 import java.awt.Color;
 
-/**
- * Kill confidence, on every recorded kill.
- *
- * Classify, never fabricate: there is no way to express "probably a kill" other than
- * a grade. Ranks and rates read {@link #EXACT} only; totals read everything.
- * Colours are shared verbatim with the website.
- */
+// every kill carries one of these. there's no way to say "probably a kill" here and
+// there isn't going to be - grade it or don't record it. ranks read EXACT only,
+// totals read the lot. colours match the site exactly, don't touch them.
 public enum Confidence
 {
-	/** We saw it die, we damaged it, nobody else did. */
+	/** saw it die, we hit it, nobody else did */
 	EXACT("exact", new Color(0x5f, 0x9e, 0x5f)),
 
-	/** Death deduced, not observed — despawn while dead, or a transform finish. */
+	/** worked out rather than witnessed - despawned dead, or a transform finish */
 	INFERRED("inferred", new Color(0xc9, 0x91, 0x3c)),
 
-	/** Another player damaged it too. Counted in totals, out of denominators. */
+	/** someone else hit it too. counts in totals, never in a denominator */
 	AMBIGUOUS("ambiguous", new Color(0xb4, 0x52, 0x52));
 
 	private final String label;

@@ -4,13 +4,9 @@
  */
 package com.everykill.xp;
 
-/**
- * The skills combat damage pays into. Our own enum rather than
- * {@code net.runelite.api.Skill} so the XP classes stay client-free and testable.
- *
- * <p>Slayer is absent on purpose: it is paid per kill, equal to the monster's
- * hitpoints, so a damage-proportional allocator would be silently wrong.
- */
+// our own enum, not net.runelite.api.Skill, so the xp classes stay client-free.
+// slayer is missing on purpose: it pays per kill, not per damage, so shoving it
+// through a damage-share allocator would be wrong and wouldn't look wrong.
 public enum CombatSkill
 {
 	ATTACK,
