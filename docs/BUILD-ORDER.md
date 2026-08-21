@@ -36,13 +36,25 @@ Maintain our own collection keyed by actor, driven by spawn/despawn and hitsplat
 
 ## Step 3 — Transform deaths
 
-**Build:** On `NpcDespawned` without `isDead()`, check the transform-death ID list. If matched **and** an item spawned coincident with the despawn → emit a kill graded `inferred`.
+**Built differently, and verified in play 2026-08-21.** This originally said to check a hardcoded transform-death ID list and look for an item spawning coincident with the despawn. **There is no list.** The evidence is the player's own targeted action: `WIDGET_TARGET_ON_NPC` on that specific NPC, then that NPC leaving within `FINISH_WINDOW_TICKS`. No monster list, no item list, so it works on whatever ships next with the same mechanic.
 
-Use `net.runelite.api.gameval` NPC ID constants for the list — no magic numbers.
+Getting it right took three separate corrections, all of them the same underlying mistake — **believing the client when it says something is dead**:
 
-Unknown NPCs despawning at low HP after our damage → log to a review queue, **never auto-count**.
+1. `ActorDeath` fires at health-ratio-zero, not at death. Six of eight rockslugs graded `EXACT` off that lie, and one got counted twice, the second time off a single point of damage. Emission moved to despawn.
+2. `isDead()` on the despawn reads the *same zero health ratio*. An abandoned slug at 0 hp despawned when the player walked away and we recorded a phantom kill. Now a record whose death signal was revoked doesn't get to use `isDead()` either.
+3. `FINISH_WINDOW_TICKS` at 3 was sized while `isDead()` was quietly covering for it. Once that crutch was correctly removed, a salt landing before the health bar emptied produced **no kill at all**. Widened to 5.
 
-**Acceptance:** Test on **rockslugs (20 Slayer)** and **desert lizards (22 Slayer)** — both accessible on this account. Kill some with the finishing item, and deliberately leave one rockslug at low HP *without* salting it. The unsalted one must **not** be counted. Gargoyles need 75 Slayer and cannot be tested yet.
+**Acceptance — met.** All three cases run deliberately on rockslugs:
+
+| case | result |
+|---|---|
+| Salt after 0 hp | `INFERRED` / `TRANSFORM_FINISH` |
+| Salt before 0 hp | `INFERRED` / `TRANSFORM_FINISH` |
+| Left unsalted, walked away | **nothing recorded** |
+
+The third is the one that matters. Full detail in `FINDINGS.md`, 2026-08-21.
+
+**Still untested:** desert lizards, zygomites, and gargoyles (75 Slayer). The mechanism is generic so they should follow, but "should" is not "did".
 
 ---
 
