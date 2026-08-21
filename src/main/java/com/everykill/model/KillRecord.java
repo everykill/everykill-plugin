@@ -34,13 +34,13 @@ public class KillRecord
 	public final int othersDamage;
 
 	/**
-	 * Our own hitsplats, <b>including zero-damage ones</b> — blocks and magic splashes.
-	 * Attempts are what make observed accuracy meaningful, and unlike damage they
-	 * cannot be reconstructed after the fact, so they are recorded at the kill.
+	 * Our own hitsplats, <b>zero-damage ones included</b> — blocks and splashes.
+	 * Attempts are the denominator for accuracy and can't be reconstructed later, so
+	 * they get recorded at the kill or not at all.
 	 *
-	 * <p>Our attacks only. Counting the NPC's would be an attack counter, which Jagex
-	 * names explicitly in the prohibited list — see {@code KillDetector}'s compliance
-	 * note before extending this.
+	 * <p><b>Ours only.</b> Count the NPC's attacks instead and it becomes an attack
+	 * counter, which Jagex prohibits by name. Read {@code KillDetector}'s compliance
+	 * note before touching this.
 	 */
 	public final int attacksCount;
 
@@ -72,13 +72,12 @@ public class KillRecord
 	}
 
 	/**
-	 * Player damage this fight, ours and other players' alike.
+	 * Player damage this fight, ours and everyone else's.
 	 *
-	 * <p><b>Since we engaged, not the NPC's lifetime.</b> The record opens on the first
-	 * hitsplat we see, so any damage the NPC took before that is invisible here. A
-	 * future {@code exact} grade meaning "we dealt 100% of the damage" must not compare
-	 * this against the NPC's max HP as though it were a lifetime total — it can only
-	 * ever prove we dealt all the damage *after* we arrived.
+	 * <p><b>Since we engaged. Not the NPC's lifetime.</b> The record opens on the first
+	 * hitsplat we witness, so anything it took before we showed up simply isn't in
+	 * here. Do not compare this to the NPC's max HP and conclude we did 100% of the
+	 * damage — all it can prove is that nobody else hit it *after we arrived*.
 	 */
 	public int totalDamage()
 	{

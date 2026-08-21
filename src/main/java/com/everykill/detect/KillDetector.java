@@ -27,22 +27,24 @@ import net.runelite.api.events.NpcDespawned;
  * Adapter: maps RuneLite client events onto {@link KillStateMachine}, which holds
  * all the judgement.
  *
- * <h2>Compliance — read before adding a subscription</h2>
+ * <h2>Compliance — read this before adding a subscription</h2>
  *
- * Jagex's prohibited list covers features that aid boss fights (attack counters,
- * prayer switch indicators, next-attack prediction). Kill counts are not on it — the
- * game publishes them itself and core's Slayer plugin ships one by default. What
- * keeps us clear is <b>the trigger</b>, not the fact that the output is a number:
+ * Jagex prohibits things that help you win a fight: attack counters, prayer switch
+ * indicators, next-attack prediction. Kill counts aren't on that list — the game
+ * publishes them itself and core's Slayer plugin ships one on by default. What keeps
+ * us on the right side is <b>the trigger</b>, not that the output happens to be a
+ * number:
  *
  * <ul>
- *   <li>Nothing subscribes to an NPC's animation, projectile, graphic, or incoming
- *       hitsplat. Counters move after something has already died</li>
- *   <li>No per-boss branch. Multi-phase handling is generic {@code NpcChanged}
- *       carry-forward — identity bookkeeping, not mechanics advice</li>
+ *   <li>Nothing subscribes to an NPC's animation, projectile, graphic or incoming
+ *       hitsplat. Our counters only move once something is already dead</li>
+ *   <li>No per-boss branch, anywhere. Phase handling is generic {@code NpcChanged}
+ *       carry-forward — bookkeeping about identity, not advice about mechanics</li>
  *   <li>Nothing is drawn on or near an NPC</li>
  * </ul>
  *
- * Jagex can add to that list, so design to the trigger rule, not the wording.
+ * They can extend that list whenever they like, so hold the trigger rule rather than
+ * the current wording.
  */
 @Singleton
 public class KillDetector
@@ -59,13 +61,14 @@ public class KillDetector
 	/**
 	 * Actor identity to the key the state machine tracks it by.
 	 *
-	 * <p>Not {@code npc.getIndex()}: the game recycles an index as soon as its slot
-	 * frees, so a fresh NPC can inherit the previous occupant's suppression window and
-	 * have its kill discarded — silently, which is the worst way to lose one. Verified
-	 * 2026-08-20 against {@link KillStateMachine}: every reuse within
-	 * {@code EMITTED_TICKS} dropped the second kill. Actor identity never recycles.
+	 * <p><b>Not {@code npc.getIndex()}.</b> The game recycles indices the second a slot
+	 * frees up, so the next NPC inherits the dead one's suppression window and its kill
+	 * just disappears. No exception, no log line, nothing — just a number that reads
+	 * low forever and looks perfectly reasonable. Measured 2026-08-20: every single
+	 * reuse inside {@code EMITTED_TICKS} ate the second kill. Object identity doesn't
+	 * recycle. Use it.
 	 *
-	 * <p>Keys are minted only for NPCs we damage, and dropped when they despawn.
+	 * <p>Keys minted only for NPCs we damage, dropped when they despawn.
 	 */
 	private final Map<NPC, Integer> actorKeys = new IdentityHashMap<>();
 	private int nextActorKey;
@@ -159,15 +162,14 @@ public class KillDetector
 	 * entire gargoyle task counts as zero. The item is never inspected — no list of
 	 * finishing items, so the rule survives new content.
 	 *
-	 * <p>{@code WIDGET_TARGET_ON_NPC} is the whole story: the inventory is itself a
-	 * widget, so using an item on an NPC arrives as opcode 8. The older
-	 * {@code ITEM_USE_ON_NPC} (opcode 7) is deprecated and core RuneLite references it
-	 * nowhere outside the enum declaration, so matching it only invited a build break
-	 * when it is finally removed.
+	 * <p>{@code WIDGET_TARGET_ON_NPC} only. The inventory is a widget, so item-on-NPC
+	 * comes through as opcode 8. {@code ITEM_USE_ON_NPC} is deprecated and core
+	 * RuneLite mentions it nowhere but the enum itself — matching it just queues up a
+	 * build break for whenever they finally delete it.
 	 *
-	 * <p>Only NPCs we have already damaged are considered — a transform death needs
-	 * our damage regardless, and minting a key for every shopkeeper we click would
-	 * leak actors we never see die.
+	 * <p>Only NPCs we've already damaged. Transform deaths need our damage anyway, and
+	 * minting a key every time someone clicks a shopkeeper leaks actors we never see
+	 * die.
 	 */
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
@@ -201,9 +203,9 @@ public class KillDetector
 	}
 
 	/**
-	 * Region we engaged in. Only ever the NPC's own square — never the player's, and
-	 * never finer than a region, which keeps it a "where was this fought" tag rather
-	 * than a movement trace.
+	 * Region we engaged in. The NPC's square, never the player's, never finer than a
+	 * region. Keep it that way — it's a "where was this fought" tag, and anything more
+	 * precise turns it into a movement trace.
 	 */
 	private static int regionOf(NPC npc)
 	{

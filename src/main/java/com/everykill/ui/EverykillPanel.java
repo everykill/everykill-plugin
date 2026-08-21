@@ -92,9 +92,9 @@ public class EverykillPanel extends PluginPanel
 		sessionGrades.setFont(FontManager.getRunescapeSmallFont());
 		sessionGrades.setForeground(SUBTLE);
 
-		// Experience that arrived with no damage on record. Shown rather than folded
-		// into the nearest monster — a rising number here means the allocator is
-		// wrong, and burying it would hide exactly the bug worth catching.
+		// XP that turned up with no damage on record. Shown, not quietly folded into
+		// the nearest monster — this number climbing is the allocator being broken,
+		// and hiding it hides the one bug worth catching.
 		unallocated.setFont(FontManager.getRunescapeSmallFont());
 		unallocated.setForeground(Confidence.INFERRED.getColor());
 

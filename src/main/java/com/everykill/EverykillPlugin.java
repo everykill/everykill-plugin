@@ -197,9 +197,8 @@ public class EverykillPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		// One full tick after login has passed, so the client's skill data has arrived
-		// and the login XP burst is over. GameStateChanged is too early — see
-		// XpService.prime().
+		// A tick has passed, so the skill data is actually here and the login burst is
+		// done. GameStateChanged is too early — see XpService.prime().
 		if (!xpService.isPrimed() && client.getGameState() == GameState.LOGGED_IN)
 		{
 			xpService.prime();
@@ -210,14 +209,14 @@ public class EverykillPlugin extends Plugin
 	}
 
 	/**
-	 * <b>Diagnostic only, P1.</b> The game tells an ironman outright when another
-	 * player has damaged their target — authoritative ground truth for exactly the
-	 * contest our {@code AMBIGUOUS} grade is supposed to catch. Logging it beside our
-	 * own grade turns "we think attribution is wrong" into a measured miss rate.
+	 * <b>Diagnostic only, P1.</b> The game flat-out tells an ironman when someone else
+	 * damaged their target — free ground truth for the exact contest AMBIGUOUS is
+	 * meant to catch, and we were getting it wrong. Logging it next to our grade turns
+	 * a suspicion into a miss rate.
 	 *
-	 * <p>Nothing branches on this. It reads no player's name and records nothing about
-	 * anyone else — it is our own client's message to us. Remove once the miss rate is
-	 * understood, or promote it to a real signal if it proves reliable.
+	 * <p>Nothing branches on it. No player names, nothing about anyone else — it's our
+	 * own client talking to us. Delete it once we understand the miss rate, or promote
+	 * it if it holds up.
 	 */
 	@Subscribe
 	public void onChatMessage(ChatMessage event)
@@ -259,9 +258,8 @@ public class EverykillPlugin extends Plugin
 			ledger.load();
 			panel.refresh();
 
-			// XP baselines are deliberately NOT seeded here — see XpService.prime().
-			// This event fires on every scene load, and the first one lands before the
-			// client has any skill data.
+			// No XP seeding here, no matter how much this looks like the right spot.
+			// Fires on every scene load, and too early. See XpService.prime().
 		}
 		else if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
@@ -284,10 +282,9 @@ public class EverykillPlugin extends Plugin
 
 		final NpcStat after = ledger.record(kill);
 
-		// One line per recorded kill, at debug. This is the audit trail a hand count is
-		// checked against — without it a wrong total is a number with no explanation,
-		// and there is no way to tell a missed kill from a double-count from a
-		// misgrade. Run the dev client with --debug to see it.
+		// The audit trail a hand count gets checked against. Without it a wrong total
+		// is just a wrong number — no way to tell a missed kill from a double-count
+		// from a misgrade. Needs --debug.
 		log.debug("Kill: npc_id={} name={} grade={} signal={} region={} dmg={}/{} attacks={} hits={} maxHit={} kc={} xp={} sessionKills={} unallocatedXp={}",
 			kill.npcId, kill.npcName, kill.grade, kill.signal, kill.regionId,
 			kill.myDamage, kill.totalDamage(), kill.attacksCount, kill.hitsCount, kill.maxHit,

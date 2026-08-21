@@ -13,31 +13,19 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Per-monster experience: <b>measured from the client, allocated by damage share.</b>
  *
- * The attribution-maths doc proposed the reverse — deriving XP from damage and
- * demoting the client's updates to a checksum. XP is indeed paid per damage point,
- * but derivation cannot be the source of truth (verified 2026-08-16, wiki):
+ * <p>Do not "fix" this by computing XP from damage. Yes, XP is paid per damage point.
+ * No, it doesn't work: overkill pays nothing while hitsplats happily report the full
+ * roll, the per-monster bonus has hand-edited overrides that ignore the published
+ * formula entirely (Vorkath computes +20% against a listed +0%), and the rounding into
+ * tenths is documented nowhere. The client already did this arithmetic correctly.
+ * Stop trying to redo it.
  *
- * <ol>
- *   <li><b>Overkill grants no XP.</b> It is paid on damage applied, capped at
- *       remaining HP; hitsplats report damage rolled. Every killing blow overstates,
- *       in one direction.</li>
- *   <li><b>The per-monster bonus cannot be computed.</b> 0.025x–2.875x, and manual
- *       overrides ignore the published formula — Vorkath computes +20% against a
- *       listed +0%. It needs the P0 reference table, which does not exist yet.</li>
- *   <li><b>Rounding is undocumented.</b> XP is stored in tenths; 1.33 per damage
- *       cannot be represented in tenths.</li>
- * </ol>
+ * <p>So the client's updates are the measurement; damage only says which monster it
+ * belongs to. Sources and dates in {@code docs/GAME-MECHANICS.md}.
  *
- * So the client's updates are the measurement — already correct for overkill,
- * bonuses and rounding — and damage only answers which monster it came from.
- *
- * <p>A derived figure is still worth computing as a checksum that can flag a bad
- * allocation, but it needs the player's attack style, which nothing reads yet. The
- * rates it would use are recorded in {@code docs/GAME-MECHANICS.md}; build it when
- * Step 5 needs it rather than carrying an unused copy here.
- *
- * <p>XP arriving with no damage on record is never forced onto the nearest monster;
- * it accumulates in {@link #getUnallocatedXp()} and is surfaced on the panel.
+ * <p>XP with no damage on record is <b>never</b> shoved onto the nearest monster. It
+ * piles up in {@link #getUnallocatedXp()} where the panel shows it, because a bad
+ * allocation should be visible rather than plausible.
  */
 @Slf4j
 public class XpAttributor
@@ -97,9 +85,10 @@ public class XpAttributor
 	// ------------------------------------------------------------------
 
 	/**
-	 * Record damage we dealt. Zero is not damage: RuneLite reports a block as ours
-	 * with amount zero, and admitting one creates a zero-total tick that swallows the
-	 * experience owed to the tick before it.
+	 * Record damage we dealt. Zero is not damage. RuneLite reports blocks as ours with
+	 * amount zero, and if you let one through it creates a zero-total tick that eats
+	 * the experience owed to the tick before it. XP just goes missing, no error, no
+	 * symptom. Took ages to find. Leave the guard alone.
 	 */
 	public void damage(int npcId, int amount, int tick)
 	{
@@ -180,9 +169,9 @@ public class XpAttributor
 
 		if (pool == null)
 		{
-			// Diagnostic, P1. Unallocated XP was climbing with nothing landing on any
-			// monster, and the cause was not obvious from reading. Print the whole
-			// decision so the reason is observed rather than theorised.
+			// Diagnostic, P1. Unallocated kept climbing while not a single point landed
+			// on any monster, and staring at the code explained precisely nothing.
+			// Dump the whole decision so we can stop guessing at it.
 			log.debug("XP unallocated: xp={} tick={} currentTick={} currentPool={}({}) previousTick={} previousPool={}({}) settle={}",
 				xp, tick, currentTick, currentTickDamage.size(), sum(currentTickDamage),
 				previousTick, previousTickDamage.size(), sum(previousTickDamage), SETTLE_TICKS);

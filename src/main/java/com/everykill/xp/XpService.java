@@ -37,16 +37,18 @@ public class XpService
 	}
 
 	/**
-	 * Seed every combat skill's total, before any damage is attributed.
+	 * Seed every combat skill's total before anything gets attributed.
 	 *
-	 * <p><b>Call this from a game tick, never from {@code GameStateChanged}.</b>
-	 * Verified 2026-08-20: {@code LOGGED_IN} fires on every scene load — four times in
-	 * 32 seconds during one login — and the first one arrives before the client holds
-	 * your skill data, so {@code getSkillExperience} returns zero for everything. A
-	 * zero baseline is worse than none at all: {@link XpAttributor} treats a missing
-	 * baseline as "record it, attribute nothing", which is right, while a zero one
-	 * makes the player's entire combat history read as one gain. Re-priming mid-session
-	 * also silently swallows whatever gain was in flight.
+	 * <p><b>From a game tick. NOT from GameStateChanged.</b> LOGGED_IN is not a login
+	 * event, whatever the damn name suggests — it fires on every scene load, four times
+	 * in 32 seconds when we measured it, and the first one arrives before the client
+	 * has your skill data. So it hands back zeros, cheerfully, with no error.
+	 *
+	 * <p>And zero is the one answer that actually hurts. No baseline is fine, the
+	 * attributor just records the first value and moves on. A zero baseline says the
+	 * player earned their entire combat career in one hit — 2.3m xp straight into
+	 * unallocated on the first bloody kill. Every re-prime after that quietly eats
+	 * whatever gain was in flight too.
 	 */
 	public void prime()
 	{
@@ -69,9 +71,9 @@ public class XpService
 	/** Our own damage on an NPC. Fed from the kill detector's hitsplat handling. */
 	public void damage(int npcId, int amount, int tick)
 	{
-		// Diagnostic, P1: proves the listener is actually wired. If no line appears
-		// while kills are still being recorded, damage never reaches the attributor
-		// and every XP drop lands unallocated by definition.
+		// Diagnostic, P1. Proves this gets called at all. Kills logging but no lines
+		// here means the listener was never wired, which explains every unallocated
+		// drop by itself.
 		log.debug("xp damage in: npc_id={} amount={} tick={}", npcId, amount, tick);
 		attributor.damage(npcId, amount, tick);
 	}

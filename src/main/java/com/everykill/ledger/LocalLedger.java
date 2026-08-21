@@ -109,10 +109,10 @@ public class LocalLedger
 	/**
 	 * Persist experience accrued since the last kill.
 	 *
-	 * <p>Kills save as they happen; experience arrives every tick and cannot, so it
-	 * rides along with the next kill's save. Whatever is measured after the final kill
-	 * of a session has nothing to ride on — without this it is simply lost. Call on
-	 * logout and shutdown.
+	 * <p>Kills save themselves. Experience turns up every tick and obviously can't, so
+	 * it hitches a ride on the next kill's save — except for everything after the last
+	 * kill of the session, which had nothing to ride on and was just quietly binned.
+	 * Call on logout and shutdown.
 	 */
 	public void flush()
 	{
