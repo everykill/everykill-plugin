@@ -451,3 +451,46 @@ This collapses two emission points into one, so the double-count becomes structu
 
 **Second guard, needs P0:** damage far below a monster's max HP should never grade above `AMBIGUOUS`. Third independent argument for the max-HP table in two days.
 **Source:** none — reproduced live, RuneLite 1.12.36.
+
+---
+
+## 2026-08-21 — Transform-death detection validated in play, all three cases
+
+**Status:** verified
+**Method:** Rockslugs in the Fremennik Slayer Dungeon, three cases run deliberately, outcomes read off the kill log and cross-checked against `First contact` counts.
+**Finding:** After moving emission from `ActorDeath` to despawn, adding the revoked-signal guard, and widening `FINISH_WINDOW_TICKS` to 5:
+
+| case | before | after |
+|---|---|---|
+| Salt after 0 hp | `EXACT` / `OBSERVED` (6 of 8) | `TRANSFORM_FINISH` |
+| Salt before 0 hp | **kill lost entirely** | `TRANSFORM_FINISH` |
+| Abandoned at 0 hp | **phantom kill recorded** | nothing, correctly |
+
+The abandoned case is the one worth reading twice. The discard log shows why it works:
+
+```
+Discarded a finished npc: npc_id=421 itemUsedAt=144 despawnedAt=204
+  gap=60 window=5 flaggedDead=true revoked=true
+```
+
+**`flaggedDead=true`** — `isDead()` told the same lie it told the previous run, when it produced a phantom kill. `revoked=true` is what stopped it. And `gap=60` is useful calibration: 36 seconds between item-use and despawn is unambiguously "walked away", not "missed the window by two ticks", so 5 is not too tight.
+
+**Objective marker for which case a kill was.** Rockslug max HP is 27 (`infobox_monster`, ids 421/14423). So `dmg=27` means the health bar emptied before the salt landed; `dmg<27` means the salt got there first. Reading this off the log beats asking, and beats guessing — three of the cases run were initially mis-attributed by eye.
+
+**Second monster validating the observed-HP approach.** Wiki says 27; every clean rockslug kill logged 26–27. Same exact agreement as the dagannoths at 70 and 120, from a completely different monster family. `spec-reference-data.md` §4.
+**Source:** OSRS Wiki `infobox_monster` bucket; the rest measured live against RuneLite 1.12.36.
+
+---
+
+## 2026-08-21 — `Hitsplat.isOthers()` works; the Catacombs zero was real absence, not blindness
+
+**Status:** verified
+**Method:** Six `First contact` lines for cockatrices being killed by another player in the same dungeon, with no kills recorded against them.
+**Finding:** `KillDetector.keyFor()` is called for **any** hitsplat, ours or another player's, so a `First contact` line does not mean we hit anything. Those six were a stranger's kills, correctly watched and correctly not counted.
+
+The useful part is what it proves: **we do receive other players' hitsplats.** The earlier Catacombs session logged thirteen kills with zero foreign damage while the game printed the ironman kill-credit warning, and it was not possible to tell whether the `AMBIGUOUS` path was broken or simply unexercised. It is unexercised. The detection fires.
+
+**Consequence:** the remaining gap is confirmed to be the pre-engagement blind spot and nothing else — damage dealt before our record opened, which no hitsplat subscription can ever see. That is what the max-HP arithmetic in `spec-reference-data.md` §1 is for, and it is now the only known route to it.
+
+**Instrumentation fixed:** the log line now prints `by=us` or `by=other`. It read as six missed kills for several minutes before the code path was checked.
+**Source:** none — observed live.

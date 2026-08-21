@@ -106,7 +106,7 @@ public class KillDetector
 
 		final NPC npc = (NPC) actor;
 		final int tick = client.getTickCount();
-		machine.damage(keyFor(npc), npc.getId(), npc.getName(), npc.getCombatLevel(),
+		machine.damage(keyFor(npc, mine), npc.getId(), npc.getName(), npc.getCombatLevel(),
 			regionOf(npc), hitsplat.getAmount(), mine, tick);
 
 		if (mine && damageListener != null)
@@ -181,7 +181,7 @@ public class KillDetector
 		machine.tick(client.getTickCount());
 	}
 
-	private int keyFor(NPC npc)
+	private int keyFor(NPC npc, boolean mine)
 	{
 		final Integer existing = actorKeys.get(npc);
 		if (existing != null)
@@ -192,8 +192,13 @@ public class KillDetector
 		// temp: is the thing already hurt when we first touch it? if so somebody else
 		// got there first and we're about to call that kill EXACT, which it isn't.
 		// -1 means no health bar. server never sends real hp, only ratio/scale.
-		log.debug("First contact: npc_id={} name={} healthRatio={} healthScale={} tick={}",
-			npc.getId(), npc.getName(), npc.getHealthRatio(), npc.getHealthScale(), client.getTickCount());
+		//
+		// by= matters. this fires on anyone's hitsplat, not just ours, so a line here
+		// does NOT mean we hit it. six cockatrices someone else was killing read like
+		// six kills we'd missed until that got straightened out.
+		log.debug("First contact: npc_id={} name={} by={} healthRatio={} healthScale={} tick={}",
+			npc.getId(), npc.getName(), mine ? "us" : "other",
+			npc.getHealthRatio(), npc.getHealthScale(), client.getTickCount());
 
 		final int key = ++nextActorKey;
 		actorKeys.put(npc, key);
