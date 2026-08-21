@@ -1,7 +1,3 @@
-@docs/CONVENTIONS.md
-
----
-
 # Everykill
 
 RuneLite plugin + companion hiscore website that tracks **per-monster** XP, kill counts and drops.

@@ -92,7 +92,7 @@ Real example: a summarised wiki fetch mislabelled `SLAYER_ROCKSLUG_BABY` as the 
 
 ## 4. The context asymmetry
 
-This project runs across two workstreams: one here with the repository, and one in a separate chat holding the full design history, external research, and the reasoning behind decisions in these docs. A human relays between them.
+This project runs across two workstreams: one here with the repository, and one holding the full design history, external research, and the reasoning behind decisions in these docs. Notes get relayed between them by hand.
 
 That means:
 
