@@ -11,6 +11,10 @@ public class NpcStat
 	public int npcId;
 	public String name;
 
+	// two dagannoths, both called "Dagannoth", 40 and 30 kills, no way to tell which
+	// is which. we've been capturing this on every kill and binning it.
+	public int combatLevel;
+
 	public int exact;
 	public int inferred;
 	public int ambiguous;

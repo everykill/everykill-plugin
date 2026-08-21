@@ -13,7 +13,6 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
-import java.awt.GridLayout;
 import java.util.List;
 import javax.inject.Inject;
 import javax.swing.BorderFactory;
@@ -230,7 +229,7 @@ public class EverykillPanel extends PluginPanel
 		p.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		p.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
 
-		final JLabel name = new JLabel(stat.name == null ? "Unknown" : stat.name);
+		final JLabel name = new JLabel(label(stat));
 		name.setFont(FontManager.getRunescapeSmallFont());
 		name.setForeground(ColorScheme.TEXT_COLOR);
 
@@ -241,16 +240,75 @@ public class EverykillPanel extends PluginPanel
 		p.add(name, BorderLayout.WEST);
 		p.add(count, BorderLayout.EAST);
 
-		final JPanel wrap = new JPanel(new GridLayout(2, 1, 0, 1));
+		final JPanel wrap = new JPanel();
+		wrap.setLayout(new BoxLayout(wrap, BoxLayout.Y_AXIS));
 		wrap.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		wrap.setToolTipText(tooltip(stat));
 		wrap.add(p);
 
-		final GradeBar bar = new GradeBar();
-		bar.set(stat.exact, stat.inferred, stat.ambiguous);
-		bar.setPreferredSize(new Dimension(200, 3));
-		wrap.add(bar);
+		// only draw the bar when the grades actually differ. a solid green line under
+		// every row is decoration; drawing it only for mixed rows makes the ones worth
+		// looking at jump out instead of hiding in a wall of identical bars.
+		if (isMixed(stat))
+		{
+			final GradeBar bar = new GradeBar();
+			bar.set(stat.exact, stat.inferred, stat.ambiguous);
+			bar.setPreferredSize(new Dimension(200, 3));
+			bar.setMaximumSize(new Dimension(Short.MAX_VALUE, 3));
+			wrap.add(bar);
+		}
 
 		return wrap;
+	}
+
+	/** "Dagannoth (74)" — two ids, one name, and no way to tell them apart without this. */
+	private static String label(NpcStat stat)
+	{
+		final String name = stat.name == null ? "Unknown" : stat.name;
+		return stat.combatLevel > 0 ? name + " (" + stat.combatLevel + ")" : name;
+	}
+
+	private static boolean isMixed(NpcStat stat)
+	{
+		int grades = 0;
+		if (stat.exact > 0)
+		{
+			grades++;
+		}
+		if (stat.inferred > 0)
+		{
+			grades++;
+		}
+		if (stat.ambiguous > 0)
+		{
+			grades++;
+		}
+		return grades > 1;
+	}
+
+	/** Raw npc_id lives here rather than in the row. Available, not in the way. */
+	private static String tooltip(NpcStat stat)
+	{
+		final StringBuilder sb = new StringBuilder("<html>");
+		sb.append("npc_id ").append(stat.npcId);
+		if (stat.combatLevel > 0)
+		{
+			sb.append(" &middot; level ").append(stat.combatLevel);
+		}
+		sb.append("<br>").append(span(Confidence.EXACT, stat.exact + " exact"));
+		if (stat.inferred > 0)
+		{
+			sb.append("<br>").append(span(Confidence.INFERRED, stat.inferred + " inferred"));
+		}
+		if (stat.ambiguous > 0)
+		{
+			sb.append("<br>").append(span(Confidence.AMBIGUOUS, stat.ambiguous + " ambiguous"));
+		}
+		if (stat.xp > 0)
+		{
+			sb.append("<br>").append(shortXp(stat.xp)).append(" xp");
+		}
+		return sb.append("</html>").toString();
 	}
 
 	private static String shortXp(long xp)
