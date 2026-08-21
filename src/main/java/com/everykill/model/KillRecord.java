@@ -33,15 +33,10 @@ public class KillRecord
 	/** Damage other players dealt. Non-zero forces {@link Confidence#AMBIGUOUS}. */
 	public final int othersDamage;
 
-	/**
-	 * Our own hitsplats, <b>zero-damage ones included</b> — blocks and splashes.
-	 * Attempts are the denominator for accuracy and can't be reconstructed later, so
-	 * they get recorded at the kill or not at all.
-	 *
-	 * <p><b>Ours only.</b> Count the NPC's attacks instead and it becomes an attack
-	 * counter, which Jagex prohibits by name. Read {@code KillDetector}'s compliance
-	 * note before touching this.
-	 */
+	// our hitsplats, blocks and splashes included. attempts are the accuracy
+	// denominator and can't be rebuilt later, so it's now or never.
+	// ours only - counting the npc's attacks makes this an attack counter, which
+	// jagex prohibits by name. see KillDetector's compliance note.
 	public final int attacksCount;
 
 	/** Our own hitsplats that dealt more than zero. See {@link #attacksCount}. */
@@ -71,14 +66,9 @@ public class KillRecord
 		this.timestampMillis = timestampMillis;
 	}
 
-	/**
-	 * Player damage this fight, ours and everyone else's.
-	 *
-	 * <p><b>Since we engaged. Not the NPC's lifetime.</b> The record opens on the first
-	 * hitsplat we witness, so anything it took before we showed up simply isn't in
-	 * here. Do not compare this to the NPC's max HP and conclude we did 100% of the
-	 * damage — all it can prove is that nobody else hit it *after we arrived*.
-	 */
+	// ours + everyone else's, but only since we engaged - the record opens on the
+	// first hitsplat we see. don't compare this to max hp and call it 100%, all it
+	// proves is nobody else hit it after we turned up.
 	public int totalDamage()
 	{
 		return myDamage + othersDamage;

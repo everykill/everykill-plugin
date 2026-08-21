@@ -58,18 +58,10 @@ public class KillDetector
 	private final Client client;
 	private final KillStateMachine machine = new KillStateMachine();
 
-	/**
-	 * Actor identity to the key the state machine tracks it by.
-	 *
-	 * <p><b>Not {@code npc.getIndex()}.</b> The game recycles indices the second a slot
-	 * frees up, so the next NPC inherits the dead one's suppression window and its kill
-	 * just disappears. No exception, no log line, nothing — just a number that reads
-	 * low forever and looks perfectly reasonable. Measured 2026-08-20: every single
-	 * reuse inside {@code EMITTED_TICKS} ate the second kill. Object identity doesn't
-	 * recycle. Use it.
-	 *
-	 * <p>Keys minted only for NPCs we damage, dropped when they despawn.
-	 */
+	// actor identity -> state machine key. NOT getIndex(), the game recycles those
+	// instantly and the next npc inherits the dead one's suppression window. kill just
+	// vanishes, no error, count quietly reads low. tested, every single time.
+	// minted only for npcs we damage, dropped on despawn
 	private final Map<NPC, Integer> actorKeys = new IdentityHashMap<>();
 	private int nextActorKey;
 
@@ -157,20 +149,11 @@ public class KillDetector
 		}
 	}
 
-	/**
-	 * The transform-death signal: the player used an item on an NPC. Without this an
-	 * entire gargoyle task counts as zero. The item is never inspected — no list of
-	 * finishing items, so the rule survives new content.
-	 *
-	 * <p>{@code WIDGET_TARGET_ON_NPC} only. The inventory is a widget, so item-on-NPC
-	 * comes through as opcode 8. {@code ITEM_USE_ON_NPC} is deprecated and core
-	 * RuneLite mentions it nowhere but the enum itself — matching it just queues up a
-	 * build break for whenever they finally delete it.
-	 *
-	 * <p>Only NPCs we've already damaged. Transform deaths need our damage anyway, and
-	 * minting a key every time someone clicks a shopkeeper leaks actors we never see
-	 * die.
-	 */
+	// transform-death signal: player used an item on an npc. without this a whole
+	// gargoyle task counts as zero. never look at which item - no list, so it still
+	// works on whatever they add next.
+	// WIDGET_TARGET_ON_NPC only. inventory is a widget, so item-on-npc is opcode 8.
+	// ITEM_USE_ON_NPC is deprecated and core references it nowhere.
 	public void onMenuOptionClicked(MenuOptionClicked event)
 	{
 		if (event.getMenuAction() != MenuAction.WIDGET_TARGET_ON_NPC)
@@ -196,17 +179,13 @@ public class KillDetector
 		machine.tick(client.getTickCount());
 	}
 
-	/** Mints a key on first sight. Called only where we know the NPC is ours to track. */
 	private int keyFor(NPC npc)
 	{
 		return actorKeys.computeIfAbsent(npc, n -> ++nextActorKey);
 	}
 
-	/**
-	 * Region we engaged in. The NPC's square, never the player's, never finer than a
-	 * region. Keep it that way — it's a "where was this fought" tag, and anything more
-	 * precise turns it into a movement trace.
-	 */
+	// npc's square, never the player's, never finer than a region. keep it that way,
+	// anything more precise is a movement trace.
 	private static int regionOf(NPC npc)
 	{
 		final WorldPoint location = npc.getWorldLocation();

@@ -197,8 +197,8 @@ public class EverykillPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		// A tick has passed, so the skill data is actually here and the login burst is
-		// done. GameStateChanged is too early — see XpService.prime().
+		// a tick has passed so the skill data is actually here and the login burst is
+		// over. GameStateChanged is too early, see prime().
 		if (!xpService.isPrimed() && client.getGameState() == GameState.LOGGED_IN)
 		{
 			xpService.prime();
@@ -208,16 +208,9 @@ public class EverykillPlugin extends Plugin
 		xpService.drain(ledger::addXp);
 	}
 
-	/**
-	 * <b>Diagnostic only, P1.</b> The game flat-out tells an ironman when someone else
-	 * damaged their target — free ground truth for the exact contest AMBIGUOUS is
-	 * meant to catch, and we were getting it wrong. Logging it next to our grade turns
-	 * a suspicion into a miss rate.
-	 *
-	 * <p>Nothing branches on it. No player names, nothing about anyone else — it's our
-	 * own client talking to us. Delete it once we understand the miss rate, or promote
-	 * it if it holds up.
-	 */
+	// temp: the game just tells ironmen when someone else damaged their target. free
+	// ground truth for the contest AMBIGUOUS is supposed to catch, and we were missing
+	// it. nothing branches on this, no player names. bin it once we know the miss rate.
 	@Subscribe
 	public void onChatMessage(ChatMessage event)
 	{
@@ -282,9 +275,8 @@ public class EverykillPlugin extends Plugin
 
 		final NpcStat after = ledger.record(kill);
 
-		// The audit trail a hand count gets checked against. Without it a wrong total
-		// is just a wrong number — no way to tell a missed kill from a double-count
-		// from a misgrade. Needs --debug.
+		// what a hand count gets checked against. without it a wrong total is just a
+		// wrong number. needs --debug.
 		log.debug("Kill: npc_id={} name={} grade={} signal={} region={} dmg={}/{} attacks={} hits={} maxHit={} kc={} xp={} sessionKills={} unallocatedXp={}",
 			kill.npcId, kill.npcName, kill.grade, kill.signal, kill.regionId,
 			kill.myDamage, kill.totalDamage(), kill.attacksCount, kill.hitsCount, kill.maxHit,

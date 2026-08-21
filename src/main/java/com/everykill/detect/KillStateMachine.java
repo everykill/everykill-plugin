@@ -31,10 +31,8 @@ import java.util.function.Consumer;
  *   <li>One key cannot emit twice within {@link #EMITTED_TICKS}.</li>
  * </ol>
  *
- * <p><b>On keys.</b> Every method takes an opaque per-actor key from
- * {@link KillDetector}. Stable for one actor's lifetime, never reissued. An NPC index
- * is neither and drops kills on the floor the moment the game recycles a slot, so do
- * not "simplify" this back to getIndex(). It'll look tidier and it'll be wrong.
+ * <p>Keys come from {@link KillDetector} - stable per actor, never reissued. Don't
+ * "simplify" them back to getIndex(), it drops kills whenever a slot gets recycled.
  */
 public class KillStateMachine
 {
@@ -85,8 +83,8 @@ public class KillStateMachine
 		{
 			r.myDamage += amount;
 
-			// A zero splat is an attempt, not noise. Blocks and splashes are the whole
-			// point of tracking accuracy — don't filter them out for being "empty".
+			// a zero splat is still an attempt. blocks and splashes are the whole point
+			// of tracking accuracy, don't filter them for being "empty"
 			r.attacksCount++;
 			if (amount > 0)
 			{

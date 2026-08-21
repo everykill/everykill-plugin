@@ -11,21 +11,15 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Per-monster experience: <b>measured from the client, allocated by damage share.</b>
+ * Per-monster xp: measured from the client, allocated by damage share.
  *
- * <p>Do not "fix" this by computing XP from damage. Yes, XP is paid per damage point.
- * No, it doesn't work: overkill pays nothing while hitsplats happily report the full
- * roll, the per-monster bonus has hand-edited overrides that ignore the published
- * formula entirely (Vorkath computes +20% against a listed +0%), and the rounding into
- * tenths is documented nowhere. The client already did this arithmetic correctly.
- * Stop trying to redo it.
+ * <p>Don't "fix" this by deriving xp from damage. Overkill pays nothing but hitsplats
+ * report the full roll, the per-monster bonus has hand-edited overrides (Vorkath
+ * computes +20% against a listed +0%), and the tenths rounding is documented nowhere.
+ * The client already did the maths. Sources in docs/GAME-MECHANICS.md.
  *
- * <p>So the client's updates are the measurement; damage only says which monster it
- * belongs to. Sources and dates in {@code docs/GAME-MECHANICS.md}.
- *
- * <p>XP with no damage on record is <b>never</b> shoved onto the nearest monster. It
- * piles up in {@link #getUnallocatedXp()} where the panel shows it, because a bad
- * allocation should be visible rather than plausible.
+ * <p>Unmatched xp is never dumped on the nearest monster - it piles up in
+ * {@link #getUnallocatedXp()} and the panel shows it. Bad allocation should look bad.
  */
 @Slf4j
 public class XpAttributor
@@ -84,12 +78,8 @@ public class XpAttributor
 
 	// ------------------------------------------------------------------
 
-	/**
-	 * Record damage we dealt. Zero is not damage. RuneLite reports blocks as ours with
-	 * amount zero, and if you let one through it creates a zero-total tick that eats
-	 * the experience owed to the tick before it. XP just goes missing, no error, no
-	 * symptom. Took ages to find. Leave the guard alone.
-	 */
+	// zero is not damage. blocks come through as ours with amount 0, and one of those
+	// makes a zero-total tick that eats the xp owed to the tick before. leave the guard.
 	public void damage(int npcId, int amount, int tick)
 	{
 		rollTo(tick);
@@ -169,9 +159,8 @@ public class XpAttributor
 
 		if (pool == null)
 		{
-			// Diagnostic, P1. Unallocated kept climbing while not a single point landed
-			// on any monster, and staring at the code explained precisely nothing.
-			// Dump the whole decision so we can stop guessing at it.
+			// temp: unallocated kept climbing and nothing landed anywhere. dump the
+			// whole decision, reading the code got us nowhere.
 			log.debug("XP unallocated: xp={} tick={} currentTick={} currentPool={}({}) previousTick={} previousPool={}({}) settle={}",
 				xp, tick, currentTick, currentTickDamage.size(), sum(currentTickDamage),
 				previousTick, previousTickDamage.size(), sum(previousTickDamage), SETTLE_TICKS);
