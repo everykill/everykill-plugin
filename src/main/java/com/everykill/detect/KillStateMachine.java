@@ -1,0 +1,231 @@
+/*
+ * Copyright (c) 2026, Everykill contributors
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+package com.everykill.detect;
+
+import com.everykill.model.Confidence;
+import com.everykill.model.DeathSignal;
+import com.everykill.model.KillRecord;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Consumer;
+
+/**
+ * The kill detection rules, in plain Java. {@link KillDetector} is the adapter that
+ * maps client events onto these calls; keeping the judgement here is what makes it
+ * directly testable.
+ *
+ * <ol>
+ *   <li>A kill needs a death signal <b>and</b> our own damage. Either alone is
+ *       discarded — the failure to avoid is silent overcount, which inflates every
+ *       downstream number with no visible symptom.</li>
+ *   <li>Another player's damage downgrades to {@link Confidence#AMBIGUOUS}.</li>
+ *   <li>Observed death is {@link Confidence#EXACT}; anything deduced is
+ *       {@link Confidence#INFERRED}.</li>
+ *   <li>A composition change carries damage forward and emits nothing.</li>
+ *   <li>A despawn not flagged dead is discarded, unless the player used an item on
+ *       that NPC within {@link #FINISH_WINDOW_TICKS} — a transform death.</li>
+ *   <li>One key cannot emit twice within {@link #EMITTED_TICKS}.</li>
+ * </ol>
+ *
+ * <p><b>On keys.</b> Every method takes an opaque per-actor key minted by
+ * {@link KillDetector}. It must be stable for one actor's lifetime and never be
+ * reissued — an NPC index is neither, and using one drops kills silently when the
+ * game recycles a slot.
+ */
+public class KillStateMachine
+{
+	/** Ticks of silence after which a damage record is abandoned. Provisional. */
+	static final int STALE_TICKS = 100;
+
+	/** Suppression window for double-fire (ActorDeath then NpcDespawned). */
+	static final int EMITTED_TICKS = 10;
+
+	/**
+	 * How recently an item-use must have happened for an unflagged despawn to count
+	 * as a transform death. Tight on purpose — widen it and the rule starts claiming
+	 * NPCs that merely wandered off. Provisional; measure on a gargoyle task.
+	 */
+	static final int FINISH_WINDOW_TICKS = 3;
+
+	private final Map<Integer, Record> tracked = new HashMap<>();
+	private final Map<Integer, Integer> emitted = new HashMap<>();
+
+	/** Actor key to the tick at which the player last used an item on it. */
+	private final Map<Integer, Integer> finishingActions = new HashMap<>();
+
+	public void reset()
+	{
+		tracked.clear();
+		emitted.clear();
+		finishingActions.clear();
+	}
+
+	public int trackedCount()
+	{
+		return tracked.size();
+	}
+
+	// ------------------------------------------------------------------
+
+	/**
+	 * @param mine true if we dealt it, false if another player did
+	 */
+	public void damage(int key, int npcId, String name, int combatLevel, int amount, boolean mine, int tick)
+	{
+		final Record r = tracked.computeIfAbsent(key, i -> new Record(npcId, name, combatLevel, tick));
+		if (mine)
+		{
+			r.myDamage += amount;
+		}
+		else
+		{
+			r.othersDamage += amount;
+		}
+		r.lastTick = tick;
+	}
+
+	/** A multi-phase boss changing form. Carries forward; emits nothing. */
+	public void composition(int key, int npcId, String name, int combatLevel, int tick)
+	{
+		final Record r = tracked.get(key);
+		if (r == null)
+		{
+			return;
+		}
+		r.npcId = npcId;
+		r.name = name;
+		r.combatLevel = combatLevel;
+		r.lastTick = tick;
+	}
+
+	public void death(int key, int tick, Consumer<KillRecord> sink)
+	{
+		resolve(key, DeathSignal.OBSERVED, tick, sink);
+	}
+
+	/**
+	 * The player used an item on an NPC. Recorded without interpretation; it only
+	 * matters if that NPC then vanishes unflagged — see {@link #despawn}.
+	 */
+	public void finishingAction(int key, int tick)
+	{
+		finishingActions.put(key, tick);
+	}
+
+	public void despawn(int key, boolean flaggedDead, int tick, Consumer<KillRecord> sink)
+	{
+		if (flaggedDead)
+		{
+			resolve(key, DeathSignal.DESPAWN_WHILE_DEAD, tick, sink);
+			finishingActions.remove(key);
+			return;
+		}
+
+		// Unflagged, but the player used an item on this exact NPC a moment ago and
+		// it is now gone: a transform death. No monster list and no item list — the
+		// evidence is the targeted action, so the rule survives new content.
+		final Integer finishedAt = finishingActions.remove(key);
+		if (finishedAt != null && tick - finishedAt <= FINISH_WINDOW_TICKS)
+		{
+			resolve(key, DeathSignal.TRANSFORM_FINISH, tick, sink);
+			return;
+		}
+
+		tracked.remove(key);
+	}
+
+	/** Bounded memory. Without this a busy area accumulates records forever. */
+	public void tick(int now)
+	{
+		for (Iterator<Map.Entry<Integer, Record>> it = tracked.entrySet().iterator(); it.hasNext(); )
+		{
+			if (now - it.next().getValue().lastTick > STALE_TICKS)
+			{
+				it.remove();
+			}
+		}
+		for (Iterator<Map.Entry<Integer, Integer>> it = emitted.entrySet().iterator(); it.hasNext(); )
+		{
+			if (now - it.next().getValue() > EMITTED_TICKS)
+			{
+				it.remove();
+			}
+		}
+		for (Iterator<Map.Entry<Integer, Integer>> it = finishingActions.entrySet().iterator(); it.hasNext(); )
+		{
+			if (now - it.next().getValue() > FINISH_WINDOW_TICKS)
+			{
+				it.remove();
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------
+
+	private void resolve(int key, DeathSignal signal, int tick, Consumer<KillRecord> sink)
+	{
+		final Integer already = emitted.get(key);
+		if (already != null && tick - already <= EMITTED_TICKS)
+		{
+			return;
+		}
+
+		final Record r = tracked.remove(key);
+		if (r == null || r.myDamage <= 0)
+		{
+			// Somebody else's kill, or nothing we can evidence. Silence is correct.
+			return;
+		}
+
+		final Confidence grade;
+		if (r.othersDamage > 0)
+		{
+			grade = Confidence.AMBIGUOUS;
+		}
+		else if (signal == DeathSignal.OBSERVED)
+		{
+			grade = Confidence.EXACT;
+		}
+		else
+		{
+			// Despawn-while-dead and transform finish are both deductions, so they
+			// grade the same; the signal keeps them apart in the log.
+			grade = Confidence.INFERRED;
+		}
+
+		emitted.put(key, tick);
+
+		sink.accept(new KillRecord(
+			UUID.randomUUID().toString(),
+			r.npcId,
+			r.name == null ? "Unknown NPC " + r.npcId : r.name,
+			r.combatLevel,
+			grade,
+			signal,
+			r.myDamage,
+			r.othersDamage,
+			System.currentTimeMillis()));
+	}
+
+	private static final class Record
+	{
+		private int npcId;
+		private String name;
+		private int combatLevel;
+		private int myDamage;
+		private int othersDamage;
+		private int lastTick;
+
+		private Record(int npcId, String name, int combatLevel, int tick)
+		{
+			this.npcId = npcId;
+			this.name = name;
+			this.combatLevel = combatLevel;
+			this.lastTick = tick;
+		}
+	}
+}

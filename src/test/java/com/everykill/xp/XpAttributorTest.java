@@ -1,0 +1,190 @@
+/*
+ * Copyright (c) 2026, Everykill contributors
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+package com.everykill.xp;
+
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
+
+/**
+ * Experience allocation, as executable statements.
+ *
+ * The rule under test throughout: <b>XP is measured, damage only allocates it.</b>
+ * The failure modes that matter are inventing experience, losing experience in a
+ * split, and silently assigning experience that belongs to nothing we tracked.
+ */
+public class XpAttributorTest
+{
+	private static final int ABYSSAL_DEMON = 415;
+	private static final int BLOODVELD = 484;
+
+	private XpAttributor xp;
+
+	@Before
+	public void setUp()
+	{
+		xp = new XpAttributor();
+		xp.prime(CombatSkill.ATTACK, 1_000_000);
+		xp.prime(CombatSkill.HITPOINTS, 500_000);
+	}
+
+	@Test
+	public void singleMonsterGetsAllTheExperience()
+	{
+		xp.damage(ABYSSAL_DEMON, 10, 100);
+		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 100);
+
+		Assert.assertEquals(40L, xp.xpFor(ABYSSAL_DEMON));
+		Assert.assertEquals(0L, xp.getUnallocatedXp());
+	}
+
+	@Test
+	public void experienceSplitsByDamageShare()
+	{
+		xp.damage(ABYSSAL_DEMON, 30, 100);
+		xp.damage(BLOODVELD, 10, 100);
+		xp.xpChanged(CombatSkill.ATTACK, 1_000_160, 100);
+
+		Assert.assertEquals("three quarters of the damage, three quarters of the xp",
+			120L, xp.xpFor(ABYSSAL_DEMON));
+		Assert.assertEquals(40L, xp.xpFor(BLOODVELD));
+	}
+
+	@Test
+	public void aSplitNeverInventsOrLosesExperience()
+	{
+		// 7 xp across 3 monsters does not divide evenly. The parts must still sum
+		// to exactly 7 — a naive per-share round would leak or fabricate.
+		xp.damage(1, 1, 100);
+		xp.damage(2, 1, 100);
+		xp.damage(3, 1, 100);
+		xp.xpChanged(CombatSkill.ATTACK, 1_000_007, 100);
+
+		final long sum = xp.xpFor(1) + xp.xpFor(2) + xp.xpFor(3);
+		Assert.assertEquals("allocation must conserve the total", 7L, sum);
+		Assert.assertEquals(0L, xp.getUnallocatedXp());
+	}
+
+	@Test
+	public void experienceWithNoDamageIsNotForcedOntoAMonster()
+	{
+		// Cooking, thieving, an xp lamp, anything at all — if we have no damage on
+		// record it must not be attributed to whatever was killed last.
+		xp.xpChanged(CombatSkill.ATTACK, 1_050_000, 100);
+
+		Assert.assertEquals(0L, xp.xpFor(ABYSSAL_DEMON));
+		Assert.assertEquals("it is reported, not buried", 50_000L, xp.getUnallocatedXp());
+	}
+
+	@Test
+	public void experienceArrivingOneTickLateStillLands()
+	{
+		xp.damage(ABYSSAL_DEMON, 10, 100);
+		xp.damage(BLOODVELD, 5, 101);
+		xp.xpChanged(CombatSkill.ATTACK, 1_000_020, 101);
+
+		Assert.assertEquals("current tick wins when it has damage", 20L, xp.xpFor(BLOODVELD));
+	}
+
+	@Test
+	public void aBlockedHitDoesNotStrandThePreviousTicksExperience()
+	{
+		// RuneLite reports a block as ours with an amount of zero. If that were let
+		// into the pool, tick 101 would have a total damage of zero and would swallow
+		// the experience owed to tick 100's real hit.
+		xp.damage(ABYSSAL_DEMON, 10, 100);
+		xp.damage(ABYSSAL_DEMON, 0, 101);
+		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 101);
+
+		Assert.assertEquals(40L, xp.xpFor(ABYSSAL_DEMON));
+		Assert.assertEquals(0L, xp.getUnallocatedXp());
+	}
+
+	@Test
+	public void experienceFallsBackToThePreviousTickWhenNothingWasHitSince()
+	{
+		xp.damage(ABYSSAL_DEMON, 10, 100);
+		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 101);
+
+		Assert.assertEquals(40L, xp.xpFor(ABYSSAL_DEMON));
+	}
+
+	@Test
+	public void staleDamageCannotClaimLaterExperience()
+	{
+		xp.damage(ABYSSAL_DEMON, 10, 100);
+		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 100 + XpAttributor.SETTLE_TICKS + 5);
+
+		Assert.assertEquals(0L, xp.xpFor(ABYSSAL_DEMON));
+		Assert.assertEquals(40L, xp.getUnallocatedXp());
+	}
+
+	@Test
+	public void anUnprimedSkillAttributesNothing()
+	{
+		// Magic was never primed. Its first update is a total, not a gain — treating
+		// it as a delta would credit one monster with the player's whole history.
+		xp.damage(ABYSSAL_DEMON, 10, 100);
+		final long attributed = xp.xpChanged(CombatSkill.MAGIC, 8_000_000, 100);
+
+		Assert.assertEquals(0L, attributed);
+		Assert.assertEquals(0L, xp.xpFor(ABYSSAL_DEMON));
+	}
+
+	@Test
+	public void theSecondUpdateOfAPreviouslyUnprimedSkillWorks()
+	{
+		xp.damage(ABYSSAL_DEMON, 10, 100);
+		xp.xpChanged(CombatSkill.MAGIC, 8_000_000, 100);
+
+		xp.damage(ABYSSAL_DEMON, 10, 101);
+		xp.xpChanged(CombatSkill.MAGIC, 8_000_020, 101);
+
+		Assert.assertEquals(20L, xp.xpFor(ABYSSAL_DEMON));
+	}
+
+	@Test
+	public void multipleSkillsAccumulateOntoTheSameMonster()
+	{
+		xp.damage(ABYSSAL_DEMON, 10, 100);
+		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 100);
+		xp.xpChanged(CombatSkill.HITPOINTS, 500_013, 100);
+
+		Assert.assertEquals("attack plus hitpoints", 53L, xp.xpFor(ABYSSAL_DEMON));
+	}
+
+	@Test
+	public void aDecreaseIsIgnored()
+	{
+		// Dying, or a stat drain, must never subtract from a monster's total.
+		xp.damage(ABYSSAL_DEMON, 10, 100);
+		xp.xpChanged(CombatSkill.ATTACK, 999_000, 100);
+
+		Assert.assertEquals(0L, xp.xpFor(ABYSSAL_DEMON));
+	}
+
+	@Test
+	public void drainHandsOverAndClears()
+	{
+		xp.damage(ABYSSAL_DEMON, 10, 100);
+		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 100);
+
+		Assert.assertEquals(40L, (long) xp.drain().get(ABYSSAL_DEMON));
+		Assert.assertEquals("the buffer is empty after a drain", 0L, xp.xpFor(ABYSSAL_DEMON));
+		Assert.assertTrue(xp.drain().isEmpty());
+	}
+
+	@Test
+	public void resetClearsBaselinesToo()
+	{
+		xp.damage(ABYSSAL_DEMON, 10, 100);
+		xp.reset();
+		xp.damage(ABYSSAL_DEMON, 10, 100);
+		final long attributed = xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 100);
+
+		Assert.assertEquals("after a reset the first update is a baseline again", 0L, attributed);
+		Assert.assertTrue(!xp.isPrimed());
+	}
+}
