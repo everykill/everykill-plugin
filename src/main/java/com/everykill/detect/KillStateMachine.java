@@ -37,8 +37,19 @@ public class KillStateMachine
 	/** Ticks of silence after which a damage record is abandoned. Provisional. */
 	static final int STALE_TICKS = 100;
 
-	/** Suppression window for double-fire (ActorDeath then NpcDespawned). */
+	/**
+	 * Belt and braces now that only despawn emits. Was load-bearing when ActorDeath
+	 * emitted too, and it wasn't up to the job - a rockslug got counted twice nine
+	 * seconds apart, which is well outside this.
+	 */
 	static final int EMITTED_TICKS = 10;
+
+	/**
+	 * How long a death signal is believed before the corpse has to show for it.
+	 * Provisional. Too short and a slow despawn downgrades EXACT to INFERRED, which is
+	 * a grade we can live with. Too long and a lie gets believed, which we can't.
+	 */
+	static final int DEATH_CONFIRM_TICKS = 5;
 
 	/**
 	 * How recently an item-use must have happened for an unflagged despawn to count
@@ -112,9 +123,26 @@ public class KillStateMachine
 		r.lastTick = tick;
 	}
 
+	/**
+	 * The client says it died. <b>We don't believe it yet.</b>
+	 *
+	 * <p>ActorDeath fires when the health ratio hits zero, which is not the same thing
+	 * as dying. A rockslug at 0 hp is still standing there waiting for salt. A boss
+	 * mid-phase is about to get back up. Emitting here counted eight rockslugs as
+	 * seven kills, one of them off a single point of damage, because the same slug got
+	 * counted twice - once on the lie, once on the real despawn.
+	 *
+	 * <p>So record it and wait. A real kill despawns a tick or two later and
+	 * {@link #despawn} emits it. A lie leaves the npc standing and {@link #tick} throws
+	 * the flag away. No monster list needed - the corpse either leaves or it doesn't.
+	 */
 	public void death(int key, int tick, Consumer<KillRecord> sink)
 	{
-		resolve(key, DeathSignal.OBSERVED, tick, sink);
+		final Record r = tracked.get(key);
+		if (r != null)
+		{
+			r.deathSignalledAt = tick;
+		}
 	}
 
 	/**
@@ -126,22 +154,31 @@ public class KillStateMachine
 		finishingActions.put(key, tick);
 	}
 
+	/** The actor left. This is where kills actually get emitted. */
 	public void despawn(int key, boolean flaggedDead, int tick, Consumer<KillRecord> sink)
 	{
-		if (flaggedDead)
-		{
-			resolve(key, DeathSignal.DESPAWN_WHILE_DEAD, tick, sink);
-			finishingActions.remove(key);
-			return;
-		}
-
-		// Unflagged, but the player used an item on this exact NPC a moment ago and
-		// it is now gone: a transform death. No monster list and no item list — the
-		// evidence is the targeted action, so the rule survives new content.
+		final Record r = tracked.get(key);
 		final Integer finishedAt = finishingActions.remove(key);
+
+		// item first, even if ActorDeath also fired. on a transform monster ActorDeath
+		// is the lie and the item is what actually finished it, so calling that
+		// OBSERVED would be claiming we watched something we deduced.
 		if (finishedAt != null && tick - finishedAt <= FINISH_WINDOW_TICKS)
 		{
 			resolve(key, DeathSignal.TRANSFORM_FINISH, tick, sink);
+			return;
+		}
+
+		// death signal we've been holding, now confirmed by the corpse leaving
+		if (r != null && r.deathSignalledAt >= 0 && tick - r.deathSignalledAt <= DEATH_CONFIRM_TICKS)
+		{
+			resolve(key, DeathSignal.OBSERVED, tick, sink);
+			return;
+		}
+
+		if (flaggedDead)
+		{
+			resolve(key, DeathSignal.DESPAWN_WHILE_DEAD, tick, sink);
 			return;
 		}
 
@@ -153,7 +190,17 @@ public class KillStateMachine
 	{
 		for (Iterator<Map.Entry<Integer, Record>> it = tracked.entrySet().iterator(); it.hasNext(); )
 		{
-			if (now - it.next().getValue().lastTick > STALE_TICKS)
+			final Record r = it.next().getValue();
+
+			// it said it died and it's still standing there. it was lying - drop the
+			// flag and carry on, because this thing is going to die again properly and
+			// we are not counting it twice.
+			if (r.deathSignalledAt >= 0 && now - r.deathSignalledAt > DEATH_CONFIRM_TICKS)
+			{
+				r.deathSignalledAt = -1;
+			}
+
+			if (now - r.lastTick > STALE_TICKS)
 			{
 				it.remove();
 			}
@@ -233,6 +280,10 @@ public class KillStateMachine
 		private final int regionId;
 		private int myDamage;
 		private int othersDamage;
+
+		/** tick ActorDeath fired, -1 if it hasn't. believed until it isn't. */
+		private int deathSignalledAt = -1;
+
 		private int attacksCount;
 		private int hitsCount;
 		private int maxHit;

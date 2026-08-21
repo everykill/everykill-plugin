@@ -48,6 +48,7 @@ public class KillStateMachineTest
 		hit(1, 20, true, 0);
 		hit(1, 18, true, 2);
 		machine.death(1, 3, emitted::add);
+		machine.despawn(1, true, 4, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
 		Assert.assertEquals(Confidence.EXACT, emitted.get(0).grade);
@@ -90,6 +91,7 @@ public class KillStateMachineTest
 		hit(1, 25, true, 0);
 		hit(1, 12, false, 1);
 		machine.death(1, 2, emitted::add);
+		machine.despawn(1, true, 3, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
 		Assert.assertEquals(Confidence.AMBIGUOUS, emitted.get(0).grade);
@@ -102,6 +104,7 @@ public class KillStateMachineTest
 		hit(1, 100, true, 0);
 		hit(1, 1, false, 1);
 		machine.death(1, 2, emitted::add);
+		machine.despawn(1, true, 3, emitted::add);
 
 		Assert.assertEquals("one splat from someone else is enough to contest it",
 			Confidence.AMBIGUOUS, emitted.get(0).grade);
@@ -130,6 +133,7 @@ public class KillStateMachineTest
 		Assert.assertTrue(emitted.isEmpty());
 
 		machine.death(1, 4, emitted::add);
+		machine.despawn(1, true, 5, emitted::add);
 
 		Assert.assertEquals("three phases, one kill", 1, emitted.size());
 		Assert.assertEquals("damage across phases accumulates", 75, emitted.get(0).myDamage);
@@ -208,9 +212,61 @@ public class KillStateMachineTest
 	{
 		hit(1, 30, true, 0);
 		machine.death(1, 1, emitted::add);
+		machine.despawn(1, true, 2, emitted::add);
 
 		Assert.assertEquals(DeathSignal.OBSERVED, emitted.get(0).signal);
 		Assert.assertEquals(Confidence.EXACT, emitted.get(0).grade);
+	}
+
+	@Test
+	public void aDeathSignalThatNeverDespawnsIsNotAKill()
+	{
+		// A rockslug at 0 hp is still standing there waiting for salt. ActorDeath
+		// fires anyway. Measured 2026-08-21: eight slugs, seven counted off this lie,
+		// one of them twice.
+		hit(1, 27, true, 0);
+		machine.death(1, 1, emitted::add);
+
+		Assert.assertTrue("a death signal on its own proves nothing", emitted.isEmpty());
+
+		machine.tick(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1);
+
+		Assert.assertTrue("and it stays nothing once the corpse fails to show",
+			emitted.isEmpty());
+	}
+
+	@Test
+	public void aLyingDeathSignalDoesNotDoubleCountTheRealOne()
+	{
+		// The kc=3 / kc=4 pair: emitted once on the lie, then again nine seconds later
+		// on the real despawn, off a single point of damage. One emission point now.
+		hit(1, 27, true, 0);
+		machine.death(1, 1, emitted::add);
+		machine.tick(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1);
+
+		final int later = 20;
+		hit(1, 1, true, later);
+		machine.finishingAction(1, later + 1);
+		machine.despawn(1, false, later + 2, emitted::add);
+
+		Assert.assertEquals("one slug, one kill", 1, emitted.size());
+		Assert.assertEquals(DeathSignal.TRANSFORM_FINISH, emitted.get(0).signal);
+	}
+
+	@Test
+	public void anItemFinishBeatsALyingDeathSignal()
+	{
+		// Salt after the health bar empties. ActorDeath already fired and lied; the
+		// item is what actually finished it, so claiming OBSERVED would be claiming we
+		// watched something we deduced.
+		hit(1, 27, true, 0);
+		machine.death(1, 1, emitted::add);
+		machine.finishingAction(1, 2);
+		machine.despawn(1, false, 3, emitted::add);
+
+		Assert.assertEquals(1, emitted.size());
+		Assert.assertEquals(DeathSignal.TRANSFORM_FINISH, emitted.get(0).signal);
+		Assert.assertEquals(Confidence.INFERRED, emitted.get(0).grade);
 	}
 
 	// ------------------------------------------------------------------
@@ -244,7 +300,9 @@ public class KillStateMachineTest
 		hit(1, 30, true, 0);
 		hit(2, 30, true, 0);
 		machine.death(1, 1, emitted::add);
+		machine.despawn(1, true, 2, emitted::add);
 		machine.death(2, 1, emitted::add);
+		machine.despawn(2, true, 2, emitted::add);
 
 		Assert.assertEquals(2, emitted.size());
 	}
@@ -254,10 +312,12 @@ public class KillStateMachineTest
 	{
 		hit(1, 30, true, 0);
 		machine.death(1, 1, emitted::add);
+		machine.despawn(1, true, 2, emitted::add);
 
 		final int later = KillStateMachine.EMITTED_TICKS + 5;
 		hit(1, 30, true, later);
 		machine.death(1, later + 1, emitted::add);
+		machine.despawn(1, true, later + 2, emitted::add);
 
 		Assert.assertEquals("NPC indexes are recycled; a later kill is a real one",
 			2, emitted.size());
