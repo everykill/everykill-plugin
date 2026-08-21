@@ -74,8 +74,45 @@ public class XpAttributorTest
 		// record it must not be attributed to whatever was killed last.
 		xp.xpChanged(CombatSkill.ATTACK, 1_050_000, 100);
 
+		// held first, in case the hitsplat is still on its way. written off once the
+		// window closes with nothing to explain it.
+		xp.settle(100 + XpAttributor.SETTLE_TICKS + 1);
+
 		Assert.assertEquals(0L, xp.xpFor(ABYSSAL_DEMON));
 		Assert.assertEquals("it is reported, not buried", 50_000L, xp.getUnallocatedXp());
+	}
+
+	@Test
+	public void experienceArrivingBeforeItsDamageStillLands()
+	{
+		// The real ordering, measured in the catacombs 2026-08-20: the client pays the
+		// xp on one tick and the hitsplat turns up on the next. Reaching backwards for
+		// a pool can never match this, which is why nothing allocated at all.
+		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 100);
+		Assert.assertEquals("nothing to match yet, so it waits", 0L, xp.xpFor(ABYSSAL_DEMON));
+
+		xp.damage(ABYSSAL_DEMON, 10, 101);
+		xp.settle(101);
+
+		Assert.assertEquals(40L, xp.xpFor(ABYSSAL_DEMON));
+		Assert.assertEquals(0L, xp.getUnallocatedXp());
+	}
+
+	@Test
+	public void heldExperienceGoesToTheMonsterThatWasActuallyHit()
+	{
+		// Two monsters, one tick apart. The xp at 100 belongs to the demon hit at 101,
+		// not the bloodveld hit at 99 - widening the window instead of looking forward
+		// would pay the wrong one and never say so.
+		xp.damage(BLOODVELD, 10, 99);
+		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 99);
+
+		xp.xpChanged(CombatSkill.ATTACK, 1_000_080, 100);
+		xp.damage(ABYSSAL_DEMON, 10, 101);
+		xp.settle(101);
+
+		Assert.assertEquals(40L, xp.xpFor(BLOODVELD));
+		Assert.assertEquals(40L, xp.xpFor(ABYSSAL_DEMON));
 	}
 
 	@Test
@@ -114,8 +151,11 @@ public class XpAttributorTest
 	@Test
 	public void staleDamageCannotClaimLaterExperience()
 	{
+		final int late = 100 + XpAttributor.SETTLE_TICKS + 5;
+
 		xp.damage(ABYSSAL_DEMON, 10, 100);
-		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 100 + XpAttributor.SETTLE_TICKS + 5);
+		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, late);
+		xp.settle(late + XpAttributor.SETTLE_TICKS + 1);
 
 		Assert.assertEquals(0L, xp.xpFor(ABYSSAL_DEMON));
 		Assert.assertEquals(40L, xp.getUnallocatedXp());

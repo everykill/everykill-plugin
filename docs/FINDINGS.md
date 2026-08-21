@@ -276,3 +276,47 @@ The double-fire suppression window cannot tell a recycled index from the actor t
 **Finding:** The 2026-08-14 entry added `weaponSpeedTicks` to `CombatRecord` as a schema placeholder under `spec-performance.md` §2's "record it now or lose it permanently" rule, and recorded honestly that it was never populated. It sat at `-1` for its whole life with twelve lines of comment explaining why.
 **Consequence:** Not carried into `KillRecord`. "Record it now or lose it" protects **observations**, and a field that has never held one is not an observation — it is a comment. The other five perf fields were carried: `regionId`, `attacksCount`, `hitsCount` and `maxHit` are stored, and `damageTotalSinceEngaged` became the derived `KillRecord.totalDamage()`, since the machine already tracks our damage and other players' damage separately. The caveat that it proves nothing about damage taken *before* we engaged is carried across verbatim. Reversible; the data source problem it flagged is still open and still needs its own step.
 **Source:** supersedes the 2026-08-14 `our_attacks/our_hits/our_max_hit` entry above.
+
+---
+
+## 2026-08-20 — Combat XP is credited one tick BEFORE its hitsplat is dispatched
+
+**Status:** contradicted-spec
+**Method:** Diagnostic logging in `XpAttributor.allocate()` during a Kourend Catacombs dagannoth task, six independent samples, arithmetic cross-checked against the published rates.
+**Finding:** `XpAttributor` assumed *"experience normally lands on the same tick as the hitsplat or the one after"* and only ever looked **backwards** for a damage pool. The real ordering is the opposite:
+
+```
+tick=85   xp=28, xp=9      <- the client pays
+tick=86   damage amount=7  <- the hitsplat arrives
+```
+
+28 and 9 is a 7-damage hit (4x7=28 to the combat skill, 1.33x7=9.31->9 to Hitpoints), confirming the pairing. With a 4-tick weapon the pool is therefore *always* exactly 3 ticks stale by the time the next drop lands — permanently one tick outside a 2-tick window. **The allocator never allocated anything, ever.** Six of six kills logged `xp=0`; unallocated climbed monotonically.
+
+**Consequence:** The allocator now parks incoming XP and settles it when the damage arrives — own tick, then forward, then backward, with a pool claimable by exactly one XP-arrival tick so a later drop cannot steal the previous one's damage. Two new tests lock the ordering in; a third caught the pool-stealing bug during the fix.
+
+**Do not "fix" this by widening `SETTLE_TICKS`.** Observed: an XP drop at tick 105 whose pool was 3 ticks old at `SETTLE_TICKS = 2`. Bumping it to 3 makes that allocate — to the *previous* hit's damage. With one monster the total survives by luck; with two it silently pays the wrong one, which is strictly worse than the current loud failure.
+**Source:** none — measured against the live client, RuneLite 1.12.36.
+
+---
+
+## 2026-08-20 — Kourend Catacombs dagannoths are npc_ids 7257, 7259 and 7260
+
+**Status:** verified
+**Method:** `npc_id` on kill and damage lines across two live sessions.
+**Finding:** Three distinct "Dagannoth" ids in the Catacombs. Damage totals cluster tightly per id — 7260 consistently 123–124, 7259 consistently 72–73 — which is two different HP pools and independently corroborates that hitsplat accumulation is accurate, since nothing else in the plugin would produce that clustering. The client carries **sixteen** ids named plain "Dagannoth" before counting Mother/Prime/Rex/Supreme, so per-id rows are expected.
+**Consequence:** A slayer task shows as multiple panel rows that must be summed before comparing against the in-game task counter. This is `docs/PROJECT.md`'s "store raw npc_id forever, display grouping is a read-time concern" behaving exactly as designed, but it is confusing in the panel and argues for a display-only rollup that leaves the ids intact.
+**Source:** `net/runelite/api/NpcID.java`, RuneLite 1.12.36.
+
+---
+
+## 2026-08-20 — `GameStateChanged(LOGGED_IN)` fires on every scene load, not once per login
+
+**Status:** verified
+**Method:** Timestamped log lines across a login and several loading zones.
+**Finding:** Four `LOGGED_IN` events in 32 seconds during a single login. Two separate bugs rode on the assumption that it means "the player just logged in":
+
+1. `XpService.prime()` ran on it, and the first one arrives **before the client holds skill data**, so `getSkillExperience` returned zero for every skill. A zero baseline is worse than none — the attributor handles a missing baseline correctly by recording it and attributing nothing, while a zero one read the player's entire combat history as one gain: **2,348,432 xp into unallocated on the first kill.**
+2. `LocalLedger.load()` ran on it, replacing the in-memory map wholesale and discarding any XP accrued since the last kill saved.
+
+**Consequence:** Seeding moved to the first `GameTick` while logged in, guarded by `isPrimed()` — confirmed in play, one `primed xp baselines` line instead of four, and unallocated now starts near zero. Ledger loading is guarded by a `ledgerLoaded` flag reset on `LOGIN_SCREEN`. The deleted `everykill` code seeded on the first tick and said why in a comment; this is the third regression today where the rewrite lost something the old code had learned in-game.
+**Source:** none — measured against the live client.

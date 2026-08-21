@@ -4,9 +4,12 @@
  */
 package com.everykill.xp;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 
@@ -33,13 +36,16 @@ public class XpAttributor
 
 	private final Map<CombatSkill, Integer> lastKnownXp = new EnumMap<>(CombatSkill.class);
 
-	/** npcId to damage, for the tick currently being accumulated. */
-	private final Map<Integer, Integer> currentTickDamage = new LinkedHashMap<>();
-	private int currentTick = Integer.MIN_VALUE;
+	// tick -> npcId -> damage. keeps a few ticks because the xp shows up before the
+	// bloody hitsplat does, so it has to wait for damage that hasn't happened yet.
+	private final Map<Integer, Map<Integer, Integer>> damageByTick = new LinkedHashMap<>();
 
-	/** The previous tick's damage, kept so a late XP drop can still be placed. */
-	private final Map<Integer, Integer> previousTickDamage = new LinkedHashMap<>();
-	private int previousTick = Integer.MIN_VALUE;
+	// xp with no damage to explain it yet. settled when the hitsplat turns up, written
+	// off if it never does.
+	private final List<Pending> pending = new ArrayList<>();
+
+	// pool tick -> the xp arrival tick that claimed it, so a pool can't pay twice
+	private final Map<Integer, Integer> poolClaimedBy = new HashMap<>();
 
 	/** npcId to total attributed XP. */
 	private final Map<Integer, Long> xpByNpc = new HashMap<>();
@@ -67,10 +73,9 @@ public class XpAttributor
 	public void reset()
 	{
 		lastKnownXp.clear();
-		currentTickDamage.clear();
-		previousTickDamage.clear();
-		currentTick = Integer.MIN_VALUE;
-		previousTick = Integer.MIN_VALUE;
+		damageByTick.clear();
+		poolClaimedBy.clear();
+		pending.clear();
 		xpByNpc.clear();
 		unallocatedXp = 0L;
 		primed = false;
@@ -78,30 +83,43 @@ public class XpAttributor
 
 	// ------------------------------------------------------------------
 
-	// zero is not damage. blocks come through as ours with amount 0, and one of those
-	// makes a zero-total tick that eats the xp owed to the tick before. leave the guard.
+	// zero is not damage. blocks come through as ours with amount 0, and an empty pool
+	// would soak up xp that belongs to a real hit. leave the guard.
 	public void damage(int npcId, int amount, int tick)
 	{
-		rollTo(tick);
-		if (amount > 0)
-		{
-			currentTickDamage.merge(npcId, amount, Integer::sum);
-		}
-	}
-
-	private void rollTo(int tick)
-	{
-		if (tick == currentTick)
+		if (amount <= 0)
 		{
 			return;
 		}
 
-		previousTickDamage.clear();
-		previousTickDamage.putAll(currentTickDamage);
-		previousTick = currentTick;
+		damageByTick.computeIfAbsent(tick, t -> new LinkedHashMap<>()).merge(npcId, amount, Integer::sum);
+		settle(tick);
+	}
 
-		currentTickDamage.clear();
-		currentTick = tick;
+	/**
+	 * Match parked xp against damage, and write off anything too old to explain.
+	 * Call every tick.
+	 */
+	public void settle(int now)
+	{
+		for (Iterator<Pending> it = pending.iterator(); it.hasNext(); )
+		{
+			final Pending p = it.next();
+
+			if (allocateAt(p.xp, p.tick))
+			{
+				it.remove();
+			}
+			else if (now - p.tick > SETTLE_TICKS)
+			{
+				log.debug("XP written off: xp={} arrivedAt={} now={} pools={}", p.xp, p.tick, now, damageByTick.keySet());
+				unallocatedXp += p.xp;
+				it.remove();
+			}
+		}
+
+		damageByTick.keySet().removeIf(t -> now - t > SETTLE_TICKS + 1);
+		poolClaimedBy.keySet().removeIf(t -> now - t > SETTLE_TICKS + 1);
 	}
 
 	/**
@@ -132,45 +150,62 @@ public class XpAttributor
 
 	private void allocate(long xp, int tick)
 	{
-		// This tick first, then the one before. A pool must be recent and carry real
-		// damage; an empty or zero-total one falls through rather than absorbing.
-		Map<Integer, Integer> pool = null;
-		int totalDamage = 0;
-
-		if (tick - currentTick <= SETTLE_TICKS)
+		if (!allocateAt(xp, tick))
 		{
-			final int sum = sum(currentTickDamage);
-			if (sum > 0)
+			pending.add(new Pending(xp, tick));
+		}
+	}
+
+	// own tick, then forward, then back. order matters: xp lands early so the damage
+	// ahead of it is its own and the damage behind belongs to the last drop. flip these
+	// (or just crank SETTLE_TICKS till something sticks) and you pay the wrong monster.
+	private boolean allocateAt(long xp, int tick)
+	{
+		for (int t = tick; t <= tick + SETTLE_TICKS; t++)
+		{
+			if (split(xp, t, tick))
 			{
-				pool = currentTickDamage;
-				totalDamage = sum;
+				return true;
 			}
 		}
 
-		if (pool == null && tick - previousTick <= SETTLE_TICKS)
+		for (int t = tick - 1; t >= tick - SETTLE_TICKS; t--)
 		{
-			final int sum = sum(previousTickDamage);
-			if (sum > 0)
+			if (split(xp, t, tick))
 			{
-				pool = previousTickDamage;
-				totalDamage = sum;
+				return true;
 			}
 		}
 
+		return false;
+	}
+
+	private boolean split(long xp, int poolTick, int xpTick)
+	{
+		final Map<Integer, Integer> pool = damageByTick.get(poolTick);
 		if (pool == null)
 		{
-			// temp: unallocated kept climbing and nothing landed anywhere. dump the
-			// whole decision, reading the code got us nowhere.
-			log.debug("XP unallocated: xp={} tick={} currentTick={} currentPool={}({}) previousTick={} previousPool={}({}) settle={}",
-				xp, tick, currentTick, currentTickDamage.size(), sum(currentTickDamage),
-				previousTick, previousTickDamage.size(), sum(previousTickDamage), SETTLE_TICKS);
-
-			unallocatedXp += xp;
-			return;
+			return false;
 		}
 
-		// Largest remainder, so the parts sum exactly to the whole. A naive round
-		// would leak or invent experience on every split.
+		// one pool, one xp arrival. every skill from a hit lands on the same tick and
+		// shares it. a later drop grabbing it is nicking the last one's damage.
+		final Integer claimedBy = poolClaimedBy.get(poolTick);
+		if (claimedBy != null && claimedBy != xpTick)
+		{
+			return false;
+		}
+
+		final int totalDamage = sum(pool);
+		if (totalDamage <= 0)
+		{
+			return false;
+		}
+
+		poolClaimedBy.put(poolTick, xpTick);
+
+		// largest remainder, so the parts add up to the whole. rounding each share
+		// independently leaks or invents xp on every split.
 		long assigned = 0L;
 		int biggestShareNpc = 0;
 		int biggestShare = -1;
@@ -193,6 +228,8 @@ public class XpAttributor
 		{
 			xpByNpc.merge(biggestShareNpc, remainder, Long::sum);
 		}
+
+		return true;
 	}
 
 	private static int sum(Map<Integer, Integer> pool)
@@ -203,6 +240,18 @@ public class XpAttributor
 			total += d;
 		}
 		return total;
+	}
+
+	private static final class Pending
+	{
+		private final long xp;
+		private final int tick;
+
+		private Pending(long xp, int tick)
+		{
+			this.xp = xp;
+			this.tick = tick;
+		}
 	}
 
 	// ------------------------------------------------------------------

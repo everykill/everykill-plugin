@@ -59,8 +59,6 @@ public class XpService
 	/** Our own damage on an NPC. Fed from the kill detector's hitsplat handling. */
 	public void damage(int npcId, int amount, int tick)
 	{
-		// temp: no lines here but kills still logging = listener never wired
-		log.debug("xp damage in: npc_id={} amount={} tick={}", npcId, amount, tick);
 		attributor.damage(npcId, amount, tick);
 	}
 
@@ -77,6 +75,9 @@ public class XpService
 	/** Move accumulated experience into the ledger and clear the buffer. */
 	public void drain(BiConsumer<Integer, Long> sink)
 	{
+		// match up anything still waiting on its hitsplat before handing over
+		attributor.settle(client.getTickCount());
+
 		final Map<Integer, Long> drained = attributor.drain();
 		for (Map.Entry<Integer, Long> e : drained.entrySet())
 		{

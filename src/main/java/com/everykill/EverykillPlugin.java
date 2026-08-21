@@ -93,6 +93,9 @@ public class EverykillPlugin extends Plugin
 
 	private NavigationButton navButton;
 
+	// guards against reloading the ledger on every loading zone
+	private boolean ledgerLoaded;
+
 	@Provides
 	EverykillConfig provideConfig(ConfigManager configManager)
 	{
@@ -103,6 +106,7 @@ public class EverykillPlugin extends Plugin
 	protected void startUp()
 	{
 		ledger.load();
+		ledgerLoaded = true;
 		ledger.startSession();
 		notifier.startSession();
 		detector.reset();
@@ -247,17 +251,24 @@ public class EverykillPlugin extends Plugin
 	{
 		if (event.getGameState() == GameState.LOGGED_IN)
 		{
-			// The RS profile may have changed under us; counts are profile-scoped.
-			ledger.load();
+			// once per login, NOT per scene load. this fires at every loading zone and
+			// load() replaces the map wholesale, so reloading here threw away any xp
+			// that had accrued since the last kill saved.
+			if (!ledgerLoaded)
+			{
+				ledger.load();
+				ledgerLoaded = true;
+			}
 			panel.refresh();
 
-			// No XP seeding here, no matter how much this looks like the right spot.
-			// Fires on every scene load, and too early. See XpService.prime().
+			// no xp seeding here either, however much it looks like the right spot.
+			// see XpService.prime().
 		}
 		else if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
-			// Experience measured since the last kill has nothing to ride out on now.
+			// xp since the last kill has nothing to ride out on now
 			ledger.flush();
+			ledgerLoaded = false;
 
 			// Partial fights do not survive a logout. XP baselines go with them: a
 			// stale one would read the whole gap as a single enormous gain.
