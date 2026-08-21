@@ -196,13 +196,17 @@ public class KillStateMachine
 			return;
 		}
 
-		// we damaged it, an item was used on it, and we still binned it. that's a real
-		// kill going missing, so say so with the number that caused it.
-		if (r != null && r.myDamage > 0 && finishedAt != null)
+		// anything we hit and then binned. usually right - it wandered off, or it was
+		// already at 0 hp and lying about it - but a real kill going missing looks
+		// exactly the same from outside, and without this line the two are
+		// indistinguishable. a stranger's monster never reaches here at all, because
+		// it has none of our damage on it.
+		if (r != null && r.myDamage > 0)
 		{
-			log.debug("Discarded a finished npc: npc_id={} name={} itemUsedAt={} despawnedAt={} gap={} window={} flaggedDead={} revoked={}",
-				r.npcId, r.name, finishedAt, tick, tick - finishedAt, FINISH_WINDOW_TICKS,
-				flaggedDead, r.deathSignalRevoked);
+			log.debug("Discarded a despawn we had damage on: npc_id={} name={} myDamage={} flaggedDead={} revoked={} deathAt={} itemAt={} itemGap={} tick={}",
+				r.npcId, r.name, r.myDamage, flaggedDead, r.deathSignalRevoked,
+				r.deathSignalledAt, finishedAt,
+				finishedAt == null ? -1 : tick - finishedAt, tick);
 		}
 
 		tracked.remove(key);
