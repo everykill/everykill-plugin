@@ -335,3 +335,21 @@ The likely explanation is structural: a combat record opens on the first hitspla
 
 **The test that settles it:** kill in a busy multicombat area and compare `First contact` ratios against `healthScale` and against the ironman messages. If contested targets read below full at first contact and uncontested ones read full or -1, the signal is usable.
 **Source:** `DpsCounterPlugin`, `Actor.getHealthRatio()` javadoc, RuneLite 1.12.36.
+
+---
+
+## 2026-08-20 — The ledger silently loaded empty and overwrote 14 kills; a shrink guard now blocks it
+
+**Status:** verified
+**Method:** Live session showed `kc=1` for NPCs stored with 11 and 3. Traced through `startUp()` ordering, confirmed against the stored config value before and after client shutdown.
+**Finding:** `startUp()` runs **before login**, when no RS profile exists, so `getRSProfileConfiguration` returns null and the ledger loads empty. The `ledgerLoaded` flag added earlier the same day — to stop `load()` clobbering unsaved XP on every scene load — then guaranteed it never reloaded once the profile appeared. The plugin ran the whole session on an empty map and flushed it on shutdown: **7260 went 11 to 1, 7259 went 3 to 1.**
+
+The stored value survived until the client closed, because RuneLite batches config writes. Backed up before the flush, and restored afterwards to 12 and 4 — the pre-loss counts plus the two legitimate kills from that session.
+
+**Consequence:** `startUp()` no longer marks the ledger loaded; the first `LOGGED_IN` does the real load and later scene loads still skip it. Two guards added in `save()`, because *detecting* this was pure luck — nothing in the plugin would have noticed:
+
+- **Refuse to save fewer kills than were loaded.** Within a profile, counts only ever increase; a shrink is a bug every time, and it now logs at `error`.
+- **Refuse to save at all if the load threw.** The stored ledger is the only copy, and the old code logged "leave the stored value untouched" without anything enforcing it.
+
+**Wider point:** three regressions in one day came from the rewrite lacking things the deleted code had learned in-game — and this one came from *my own fix* for the previous one. A tracker that quietly writes fewer kills than it read is the exact failure this project exists to avoid, so the guard matters more than the fix.
+**Source:** none — traced against the live client and the stored config.

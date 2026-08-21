@@ -64,6 +64,12 @@ public class LocalLedger
 	// kill that makes the row, so binning it meant every first kill read xp=0.
 	private final Map<Integer, Long> xpBeforeFirstKill = new HashMap<>();
 
+	// kills we read at load. saving fewer than this means we're about to eat history.
+	private int loadedKills;
+
+	// the stored ledger couldn't be parsed. don't write over the only copy.
+	private boolean loadFailed;
+
 	@Inject
 	public LocalLedger(ConfigManager configManager, Gson gson)
 	{
@@ -75,39 +81,73 @@ public class LocalLedger
 
 	public void load()
 	{
+		loadFailed = false;
+
 		try
 		{
 			final String raw = configManager.getRSProfileConfiguration(EverykillConfig.GROUP, LEDGER_KEY);
 			if (raw == null || raw.isEmpty())
 			{
 				allTime = new HashMap<>();
+				loadedKills = 0;
 				return;
 			}
 
 			final Map<String, NpcStat> parsed = gson.fromJson(raw, LEDGER_TYPE);
 			allTime = parsed == null ? new HashMap<>() : parsed;
-			log.debug("loaded ledger, {} npcs", allTime.size());
+			loadedKills = totalKills();
+			log.debug("loaded ledger, {} npcs, {} kills", allTime.size(), loadedKills);
 		}
 		catch (Exception e)
 		{
-			// A corrupt ledger must not take the plugin down. Start empty and leave
-			// the stored value untouched so it can be recovered by hand.
-			log.warn("could not read stored ledger, starting empty", e);
+			// corrupt ledger shouldn't kill the plugin, but it must not get overwritten
+			// either - it's the only copy. loadFailed blocks every save until restart.
+			log.warn("could not read stored ledger, starting empty and refusing to save over it", e);
 			allTime = new HashMap<>();
+			loadedKills = 0;
+			loadFailed = true;
 		}
 	}
 
 	private void save()
 	{
+		// a ledger that reads 11 kills and writes back 1 has eaten someone's history.
+		// that already happened once, from a load that silently returned nothing. kills
+		// only ever go up within a profile, so a shrink is a bug every single time.
+		if (loadFailed)
+		{
+			log.warn("refusing to save: the stored ledger could not be read, and overwriting it would destroy it");
+			return;
+		}
+
+		final int kills = totalKills();
+		if (kills < loadedKills)
+		{
+			log.error("refusing to save: ledger shrank from {} kills to {}. this is a bug - report it, do not clear it",
+				loadedKills, kills);
+			return;
+		}
+
 		try
 		{
 			configManager.setRSProfileConfiguration(EverykillConfig.GROUP, LEDGER_KEY, gson.toJson(allTime));
+			loadedKills = kills;
 			dirty = false;
 		}
 		catch (Exception e)
 		{
 			log.warn("could not persist ledger", e);
 		}
+	}
+
+	private int totalKills()
+	{
+		int total = 0;
+		for (NpcStat stat : allTime.values())
+		{
+			total += stat.total();
+		}
+		return total;
 	}
 
 	// kills save themselves, xp arrives every tick and can't, so it rides the next
