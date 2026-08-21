@@ -30,6 +30,16 @@ dependencies {
 group = 'com.everykill'
 version = '0.1.0'
 
+// Pin the build to Java 11 rather than whatever JDK happens to be on PATH. The Hub
+// requires 11, and Lombok 1.18.30 cannot initialise its annotation processor on
+// recent JDKs at all — on 25 the build dies with ExceptionInInitializerError before
+// compiling a line, which reads like a code fault and is not one.
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(11)
+	}
+}
+
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
 	options.release.set(11)

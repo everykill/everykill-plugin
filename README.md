@@ -159,7 +159,19 @@ once:
 ./gradlew run     # launches a dev client with the plugin loaded
 ```
 
-Java 11, BSD 2-Clause, no third-party dependencies, `build=standard`.
+Java 11, BSD 2-Clause, no third-party dependencies, `build=standard`. Compilation is
+pinned to Java 11 by a toolchain block, so the JDK on your PATH does not affect the
+output.
+
+**Gradle itself must run on JDK 22 or older.** Gradle 8.10 cannot run on JDK 23+, and
+Lombok 1.18.30 cannot initialise its annotation processor there either — the failure
+is `ExceptionInInitializerError` or `Unsupported class file major version`, both of
+which read like code faults and are neither. IntelliJ is fine as shipped (it uses the
+project JDK 17). From a terminal on a newer default JDK, point Gradle at an older one:
+
+```
+JAVA_HOME="/c/Program Files/Java/jdk-17" ./gradlew build
+```
 
 ## Known open items
 
