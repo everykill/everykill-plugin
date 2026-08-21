@@ -60,6 +60,10 @@ public class LocalLedger
 	/** Set by {@link #addXp}, cleared by {@link #save()}. See {@link #flush()}. */
 	private boolean dirty;
 
+	// xp for a monster we haven't killed yet. the fight's xp all arrives before the
+	// kill that makes the row, so binning it meant every first kill read xp=0.
+	private final Map<Integer, Long> xpBeforeFirstKill = new HashMap<>();
+
 	@Inject
 	public LocalLedger(ConfigManager configManager, Gson gson)
 	{
@@ -144,24 +148,37 @@ public class LocalLedger
 		sessionKills++;
 		sessionGrades.merge(kill.grade, 1, Integer::sum);
 
+		// the fight's xp landed before this row existed. claim it now.
+		final Long held = xpBeforeFirstKill.remove(kill.npcId);
+		if (held != null)
+		{
+			stat.xp += held;
+			sessionStat.xp += held;
+		}
+
 		save();
 		return stat;
 	}
 
 	// ------------------------------------------------------------------
 
-	/**
-	 * Add measured experience to an NPC's total. Creates no row of its own — XP for a
-	 * monster we never recorded a kill against means the allocation is wrong, and a
-	 * zero-kill row would bury that.
-	 */
+	// no row, no xp - a monster we never killed getting xp means the allocation is
+	// wrong, and a zero-kill row would hide that. but the whole fight's xp arrives
+	// BEFORE the kill that creates the row, so hold it rather than bin it.
 	public void addXp(int npcId, long xp)
 	{
-		final NpcStat stat = allTime.get(String.valueOf(npcId));
-		if (stat == null || xp <= 0L)
+		if (xp <= 0L)
 		{
 			return;
 		}
+
+		final NpcStat stat = allTime.get(String.valueOf(npcId));
+		if (stat == null)
+		{
+			xpBeforeFirstKill.merge(npcId, xp, Long::sum);
+			return;
+		}
+
 		stat.xp += xp;
 		dirty = true;
 

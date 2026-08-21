@@ -105,8 +105,10 @@ public class EverykillPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
+		// deliberately does NOT set ledgerLoaded. startUp runs before login, there's no
+		// rs profile yet, so this reads nothing. marking it loaded here means we never
+		// pick up the real counts and then save an empty map over them.
 		ledger.load();
-		ledgerLoaded = true;
 		ledger.startSession();
 		notifier.startSession();
 		detector.reset();
