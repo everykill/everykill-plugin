@@ -211,12 +211,6 @@ public class KillStateMachine
 		// walked off, flaggedDead was true, and we counted a monster still standing.
 		if (flaggedDead && r != null && !r.deathSignalRevoked)
 		{
-			// temp: deathAt=-1 here means ActorDeath never fired, so this was never a
-			// tight-window problem and bumping DEATH_CONFIRM_TICKS would fix nothing.
-			// deathAt>=0 would mean the opposite. pair it with the ActorDeath line.
-			log.debug("Fell back to DESPAWN_WHILE_DEAD: npc_id={} name={} deathAt={} revoked={} tick={}",
-				r.npcId, r.name, r.deathSignalledAt, r.deathSignalRevoked, tick);
-
 			resolve(key, DeathSignal.DESPAWN_WHILE_DEAD, tick, sink);
 			return;
 		}

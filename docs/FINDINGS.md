@@ -1087,3 +1087,32 @@ directions on the same problem, both wrong, before anyone read how the reference
 implementation solves it. **When a fix requires guessing a number, check whether the
 problem has a known solution first.** The prior-art table in PROJECT.md exists for this
 and was not consulted.
+
+## 2026-08-21 — the game tells ironmen when a kill was contested. Free ground truth.
+
+**Status:** observed, not yet exploited. Recorded so the idea survives whether or not
+the temporary logging stays.
+
+On an ironman account the game prints a kill-credit message when another player damaged
+the monster you were fighting. That is **the game itself telling us a kill was
+contested** — the exact thing `AMBIGUOUS` exists to detect, from an authoritative source
+rather than our own hitsplat bookkeeping.
+
+Why it matters: a combat record opens on the first hitsplat *we* witness, so foreign
+damage dealt before we engaged is invisible to us. On 2026-08-20 thirteen multicombat
+kills produced zero detected foreign damage while the game printed this warning. Our
+detection missed every one; the game caught all of them.
+
+Two possible uses, in increasing order of ambition:
+
+1. **Measure our miss rate.** Count how often the game reports a contest that our
+   hitsplat tracking did not. That number is a direct, honest measure of how much
+   `UNCONTESTED` overclaims, and it is currently unknown.
+2. **Use it as a signal.** Downgrade a kill to `AMBIGUOUS` when the game says it was
+   contested, regardless of what our own damage tracking saw.
+
+**Constraints if this is built:** ironman-only, so it can never be the primary mechanism
+- it would produce systematically different grades for ironmen than for mains, which is
+worse than a uniformly conservative rule. Read the message only; never parse or store
+the other player's name (PROJECT.md rule 3 - recording *that* foreign damage occurred is
+fine, recording *who* is not).

@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.function.Consumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.Hitsplat;
@@ -48,7 +47,6 @@ import net.runelite.client.game.NpcUtil;
  * They can extend that list whenever they like, so hold the trigger rule rather than
  * the current wording.
  */
-@Slf4j
 @Singleton
 public class KillDetector
 {
@@ -72,7 +70,7 @@ public class KillDetector
 	// actor identity -> state machine key. NOT getIndex(), the game recycles those
 	// instantly and the next npc inherits the dead one's suppression window. the kill
 	// just fucks off into the void, no error, count quietly reads low forever.
-	// minted only for npcs we damage, dropped on despawn
+	// dropped on despawn. strangers get a key too - see keyFor
 	private final Map<NPC, Integer> actorKeys = new IdentityHashMap<>();
 	private int nextActorKey;
 
@@ -116,25 +114,9 @@ public class KillDetector
 
 		final NPC npc = (NPC) actor;
 		final int tick = client.getTickCount();
-		final int key = keyFor(npc, mine);
+		final int key = keyFor(npc);
 		machine.damage(key, npc.getId(), npc.getName(), npc.getCombatLevel(),
 			regionOf(npc), hitsplat.getAmount(), mine, tick);
-
-		// temp: the server sends ratio/scale, never real hp. core solves
-		// healthRatio = 1 + (healthScale - 1) * health / maxHealth  for health, using a
-		// max hp it got from the wiki. we already know the damage, so we can turn it
-		// round and solve for maxHealth instead - jagex's number, no wiki in the chain.
-		//
-		// key= not npc_id. six demons in the room share three ids, so an id-tagged log
-		// interleaves them and the solve fits garbage - it spat out 85 hp for something
-		// we've killed with 80 damage. the plugin keys on actor identity for exactly
-		// this reason; the log has to as well or it throws that away.
-		if (mine)
-		{
-			log.debug("Hit: key={} npc_id={} amount={} healthRatio={} healthScale={} tick={}",
-				key, npc.getId(), hitsplat.getAmount(), npc.getHealthRatio(),
-				npc.getHealthScale(), tick);
-		}
 
 		if (mine && damageListener != null)
 		{
@@ -161,15 +143,9 @@ public class KillDetector
 		// no timer fixes this. a real death and a slug at 0 hp both despawn about six
 		// ticks later, so the two are identical in the only thing a clock can see. it's
 		// per-monster knowledge, and core already curates it.
-		final boolean actuallyDying = npcUtil.isDying(npc);
-
-		// temp: pair with the Fell back to line below.
-		log.debug("ActorDeath: npc_id={} name={} keyed={} dying={} tick={}",
-			npc.getId(), npc.getName(), key != null, actuallyDying, client.getTickCount());
-
 		if (key != null)
 		{
-			machine.death(key, client.getTickCount(), actuallyDying, sink);
+			machine.death(key, client.getTickCount(), npcUtil.isDying(npc), sink);
 		}
 	}
 
@@ -226,7 +202,7 @@ public class KillDetector
 		machine.tick(client.getTickCount());
 	}
 
-	private int keyFor(NPC npc, boolean mine)
+	private int keyFor(NPC npc)
 	{
 		final Integer existing = actorKeys.get(npc);
 		if (existing != null)
@@ -234,20 +210,10 @@ public class KillDetector
 			return existing;
 		}
 
-		// temp: is the thing already hurt when we first touch it? if so somebody else
-		// got there first and we are about to call that kill uncontested, which it isn't.
-		// -1 means no health bar. server never sends real hp, only ratio/scale.
-		//
-		// by= matters. this fires on anyone's hitsplat, not just ours, so a line here
-		// does NOT mean we hit it. six cockatrices someone else was killing read like
-		// six kills we'd missed until that got straightened out.
+		// minted on anyone's hitsplat, not just ours - we need a record open before a
+		// stranger's damage lands or we can't tell a contested kill from a clean one.
 		final int key = ++nextActorKey;
 		actorKeys.put(npc, key);
-
-		log.debug("First contact: key={} npc_id={} name={} by={} healthRatio={} healthScale={} tick={}",
-			key, npc.getId(), npc.getName(), mine ? "us" : "other",
-			npc.getHealthRatio(), npc.getHealthScale(), client.getTickCount());
-
 		return key;
 	}
 
