@@ -109,6 +109,18 @@ public class KillDetector
 		machine.damage(keyFor(npc, mine), npc.getId(), npc.getName(), npc.getCombatLevel(),
 			regionOf(npc), hitsplat.getAmount(), mine, tick);
 
+		// temp: the server sends ratio/scale, never real hp. core solves
+		// healthRatio = 1 + (healthScale - 1) * health / maxHealth  for health, using a
+		// max hp it got from the wiki. we already know the damage, so we can turn it
+		// round and solve for maxHealth instead - jagex's number, no wiki in the chain.
+		// this is the only thing that ends the 79-vs-80 argument.
+		if (mine)
+		{
+			log.debug("Hit: npc_id={} amount={} healthRatio={} healthScale={} tick={}",
+				npc.getId(), hitsplat.getAmount(), npc.getHealthRatio(),
+				npc.getHealthScale(), tick);
+		}
+
 		if (mine && damageListener != null)
 		{
 			damageListener.onOurDamage(npc.getId(), hitsplat.getAmount(), tick);
@@ -124,6 +136,14 @@ public class KillDetector
 		}
 
 		final Integer key = actorKeys.get(actor);
+
+		// temp: every lesser demon graded INFERRED via DESPAWN_WHILE_DEAD, which can
+		// only happen if we never held a death signal at all. so does ActorDeath even
+		// fire for them? keyed=false just means it died and we never touched it, that's
+		// normal. NO line for something we definitely killed is the smoking gun.
+		log.debug("ActorDeath: npc_id={} name={} keyed={} tick={}",
+			((NPC) actor).getId(), actor.getName(), key != null, client.getTickCount());
+
 		if (key != null)
 		{
 			machine.death(key, client.getTickCount(), sink);

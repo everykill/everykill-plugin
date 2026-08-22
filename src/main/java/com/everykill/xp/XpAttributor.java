@@ -235,6 +235,13 @@ public class XpAttributor
 		int biggestShareNpc = 0;
 		int biggestShare = -1;
 
+		// temp: one npc's total ran ~10 xp hot while two others reconciled to the point.
+		// need to see every allocation as it lands - which skill, which npc, how big a
+		// share - because a cumulative total can't tell "incidental xp folded in" from
+		// "combat xp routed to the wrong demon".
+		log.debug("Allocating: skill={} xp={} poolTick={} xpTick={} pool={} totalDamage={}",
+			skill, xp, poolTick, xpTick, pool, totalDamage);
+
 		for (Map.Entry<Integer, Integer> e : pool.entrySet())
 		{
 			final long share = xp * e.getValue() / totalDamage;
