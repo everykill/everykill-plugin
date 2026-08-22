@@ -596,8 +596,9 @@ the hitsplat counter:
 If our damage counter were over-reading by 2, XP would still have reported 79 damage
 worth. It didn't. The game paid for 81.
 
-**Regeneration ruled out.** The 33-second kill and the 20-second kill both took exactly
-81. NPC hitpoint regen over the fight would make the slow kill cost more; it didn't.
+**Regeneration does not explain the 79 -> 81 gap.** The fastest kill (20s, 8 attacks)
+already needed 81, so the base is 81 regardless of regen. See the superseding note
+below — regen is real, it just is not the cause of this gap.
 
 Prediction made before the first kill was 79 damage / 421 xp, from the table. It was
 wrong, and observation corrected it. This is the first time the observed pipeline has
@@ -636,3 +637,42 @@ distribution.
 
 This is the same failure shape as the FINISH_WINDOW_TICKS episode: a tight window
 chosen at a desk, costing real data in the field. Bias the fix toward too generous.
+
+## 2026-08-21 — NPC hitpoint regen is real, and it breaks observed max-HP as an estimator
+
+**Status:** mechanic confirmed against the wiki; rate is undocumented. Supersedes the
+"regeneration ruled out" line in the Lesser demon entry above, which was over-stated.
+
+A sixth Lesser demon (7664) took **82** damage, not 81 — and it was by far the longest
+fight of the set:
+
+| Attacks | Duration | Damage |
+|---|---|---|
+| 8 | 20s | 81 |
+| 9 | ~20s | 81 |
+| 11 | ~28s | 81 |
+| 13 | 33s | 81 |
+| 20 | 49s | **82** |
+
+Measured XP corroborates 82 independently: this kill paid 1300 - 863 = 437, and
+82x4 + 82x1.33 = 437.1. The 81-damage kills paid 431/432.
+
+https://oldschool.runescape.wiki/w/Monster (fetched 2026-08-21) confirms monsters
+regenerate hitpoints, describes the rate only as "fairly slowly", and notes some
+monsters (Banshees) restore faster. **No numeric rate is published.**
+
+**What this changes:**
+
+1. **Total observed damage is an upper bound on max HP, not a measurement.** It drifts
+   up with fight duration, and the bias is worst for monsters players kill slowly —
+   exactly the ones where a good number matters most.
+2. **Estimate max HP from the MINIMUM total damage across kills, never the mean.** The
+   fastest kill leaks the least regen. A mean would bake the bias in permanently.
+3. **The integrity check is untouched.** Conservation is used in one direction only:
+   *dealt less than max HP, therefore someone else contributed*. Regen only pushes
+   observed damage up, so it can never fabricate that accusation. The estimator is
+   affected; fraud detection is not.
+4. The 79-vs-81 disagreement stands. Minimum observed is 81, still above the table.
+
+Do not attempt to model the regen rate to correct for it. It is undocumented, varies by
+monster, and the minimum-based estimator sidesteps it entirely without needing a number.
