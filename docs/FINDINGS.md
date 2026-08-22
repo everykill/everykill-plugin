@@ -759,3 +759,55 @@ the chain.
 That is the experiment that should settle the 79-vs-81 question. Core's own comment
 notes exact health is recoverable when `maxHealth <= healthScale`, so check that
 condition holds for the monster under test before trusting a point estimate.
+
+## 2026-08-21 — regen demonstrated: damage-to-kill steps up monotonically with fight length
+
+**Status:** demonstrated, n=17, single monster. The cleanest empirical result of the
+session. Confirms the minimum-based max-HP estimator.
+
+Seventeen Lesser demon kills (npc_ids 7656/7657/7664, region 5789), all solo, all with
+`dmg=N/N` and no foreign damage. Total damage required, grouped by fight length:
+
+```
+attacks   damage observed
+   8    : 81
+   9    : 81
+  11    : 81 81 81 81
+  13    : 81 81
+  14    : 82 82
+  15    : 82
+  16    : 82
+  17    : 82 83
+  18    : 82
+  20    : 82
+  21    : 83
+
+damage  count
+  81      8
+  82      7
+  83      2
+```
+
+**No overlap between the <=13-attack group (always 81) and the >=14-attack group (never
+81).** A monotonic step, not scatter. Longer fights require strictly more damage.
+
+**Base max HP is 81, and this is a plateau rather than a ramp.** Damage is flat at 81
+across 8, 9, 11 and 13 attacks. If regeneration accrued from the first tick, the
+8-attack kills would have needed less than the 13-attack kills. They needed the same.
+So 81 is the starting hitpoints and everything above it is regen banked during the
+fight.
+
+**Consequences:**
+
+1. **Confirms the minimum estimator empirically**, not just by argument. Mean of this
+   set is 81.6 and would drift further up for slower players; minimum is 81 and is
+   stable. Averaging would have recorded this monster's max HP wrong in a way that gets
+   *worse* as more data arrives.
+2. **Strengthens the 79 disagreement.** The fastest kills in the set still needed 81.
+   There is no fight short enough in this data to reach 79.
+3. **A per-monster max-HP estimate needs fast kills, not many kills.** Sample quality
+   beats sample size here. Worth remembering when designing what the site aggregates.
+
+**Not established:** the regen rate. Do not derive one from this table — attack speed,
+weapon, and the player's setup are all uncontrolled, and the wiki states some monsters
+regenerate faster than others. The minimum estimator does not need the rate.
