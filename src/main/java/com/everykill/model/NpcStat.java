@@ -4,6 +4,8 @@
  */
 package com.everykill.model;
 
+import com.google.gson.annotations.SerializedName;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -25,7 +27,11 @@ public class NpcStat
 	// is which. we've been capturing this on every kill and binning it.
 	public int combatLevel;
 
-	public int exact;
+	// was "exact" until the ceiling came down. alternate= keeps every ledger written
+	// before that readable, so nobody loses a count over a rename.
+	@SerializedName(value = "uncontested", alternate = {"exact"})
+	public int uncontested;
+
 	public int inferred;
 	public int ambiguous;
 
@@ -49,14 +55,15 @@ public class NpcStat
 
 	public static final class DayTally
 	{
-		public int exact;
+		@SerializedName(value = "uncontested", alternate = {"exact"})
+		public int uncontested;
 		public int inferred;
 		public int ambiguous;
 		public long xp;
 
 		public int total()
 		{
-			return exact + inferred + ambiguous;
+			return uncontested + inferred + ambiguous;
 		}
 	}
 
@@ -74,8 +81,8 @@ public class NpcStat
 	{
 		switch (grade)
 		{
-			case EXACT:
-				exact++;
+			case UNCONTESTED:
+				uncontested++;
 				break;
 			case INFERRED:
 				inferred++;
@@ -88,8 +95,8 @@ public class NpcStat
 		final DayTally today = dayOf(whenMillis);
 		switch (grade)
 		{
-			case EXACT:
-				today.exact++;
+			case UNCONTESTED:
+				today.uncontested++;
 				break;
 			case INFERRED:
 				today.inferred++;
@@ -178,8 +185,8 @@ public class NpcStat
 	{
 		switch (grade)
 		{
-			case EXACT:
-				return sum(window, t -> t.exact);
+			case UNCONTESTED:
+				return sum(window, t -> t.uncontested);
 			case INFERRED:
 				return sum(window, t -> t.inferred);
 			default:
@@ -220,6 +227,6 @@ public class NpcStat
 
 	public int total()
 	{
-		return exact + inferred + ambiguous;
+		return uncontested + inferred + ambiguous;
 	}
 }

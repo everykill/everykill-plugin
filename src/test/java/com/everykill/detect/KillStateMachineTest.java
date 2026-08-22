@@ -43,7 +43,7 @@ public class KillStateMachineTest
 	// ------------------------------------------------------------------
 
 	@Test
-	public void ourDamagePlusObservedDeathIsExact()
+	public void ourDamagePlusObservedDeathIsUncontested()
 	{
 		hit(1, 20, true, 0);
 		hit(1, 18, true, 2);
@@ -51,7 +51,7 @@ public class KillStateMachineTest
 		machine.despawn(1, true, 4, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
-		Assert.assertEquals(Confidence.EXACT, emitted.get(0).grade);
+		Assert.assertEquals(Confidence.UNCONTESTED, emitted.get(0).grade);
 		Assert.assertEquals(38, emitted.get(0).myDamage);
 	}
 
@@ -215,7 +215,7 @@ public class KillStateMachineTest
 		machine.despawn(1, true, 2, emitted::add);
 
 		Assert.assertEquals(DeathSignal.OBSERVED, emitted.get(0).signal);
-		Assert.assertEquals(Confidence.EXACT, emitted.get(0).grade);
+		Assert.assertEquals(Confidence.UNCONTESTED, emitted.get(0).grade);
 	}
 
 	@Test

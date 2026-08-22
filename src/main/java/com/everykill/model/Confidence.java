@@ -7,12 +7,21 @@ package com.everykill.model;
 import java.awt.Color;
 
 // every kill carries one of these. there's no way to say "probably a kill" here and
-// there isn't going to be - grade it or don't record it. ranks read EXACT only,
+// there isn't going to be - grade it or don't record it. ranks read the top grade only,
 // totals read the lot. colours match the site exactly, don't touch them.
+//
+// THE CLIENT'S CEILING IS UNCONTESTED, and that is deliberate. There is no EXACT here.
+// A record opens on the first hitsplat WE witness, so damage dealt before we arrived is
+// invisible - we can prove nobody else hit it after we turned up, and nothing more than
+// that. Calling that "exact" was claiming something we cannot see.
+//
+// Proving we dealt ALL of it needs the monster's max hp: deal less than that and it
+// dies anyway, and the difference came from someone else. That's server-side, so if a
+// true EXACT ever exists it gets assigned there. See docs/spec-reference-data.md.
 public enum Confidence
 {
-	/** saw it die, we hit it, nobody else did */
-	EXACT("exact", new Color(0x5f, 0x9e, 0x5f)),
+	/** we hit it, we saw it die, and nobody else touched it while we were watching */
+	UNCONTESTED("uncontested", new Color(0x5f, 0x9e, 0x5f)),
 
 	/** worked out rather than witnessed - despawned dead, or a transform finish */
 	INFERRED("inferred", new Color(0xc9, 0x91, 0x3c)),

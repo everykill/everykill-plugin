@@ -234,7 +234,7 @@ public class EverykillPanel extends PluginPanel
 	private void rebuild()
 	{
 		final int kills = ledger.getSessionKills();
-		final int exact = ledger.sessionCount(Confidence.EXACT);
+		final int uncontested = ledger.sessionCount(Confidence.UNCONTESTED);
 		final int inferred = ledger.sessionCount(Confidence.INFERRED);
 		final int ambiguous = ledger.sessionCount(Confidence.AMBIGUOUS);
 
@@ -244,7 +244,7 @@ public class EverykillPanel extends PluginPanel
 		sessionSub.setText(kills == 1
 			? "kill" + (xp > 0 ? " · " + shortXp(xp) + " xp" : "")
 			: "kills" + (xp > 0 ? " · " + shortXp(xp) + " xp" : ""));
-		sessionBar.set(exact, inferred, ambiguous);
+		sessionBar.set(uncontested, inferred, ambiguous);
 
 		if (kills == 0)
 		{
@@ -253,7 +253,7 @@ public class EverykillPanel extends PluginPanel
 		else
 		{
 			final StringBuilder sb = new StringBuilder("<html>");
-			sb.append(span(Confidence.EXACT, exact + " exact"));
+			sb.append(span(Confidence.UNCONTESTED, uncontested + " uncontested"));
 			if (inferred > 0)
 			{
 				sb.append(" · ").append(span(Confidence.INFERRED, inferred + " inferred"));
@@ -408,7 +408,7 @@ public class EverykillPanel extends PluginPanel
 		if (isMixed(stat))
 		{
 			final GradeBar bar = new GradeBar();
-			bar.set(stat.exact, stat.inferred, stat.ambiguous);
+			bar.set(stat.uncontested, stat.inferred, stat.ambiguous);
 			bar.setPreferredSize(new Dimension(200, 3));
 			bar.setMaximumSize(new Dimension(Short.MAX_VALUE, 3));
 			wrap.add(bar);
@@ -486,7 +486,7 @@ public class EverykillPanel extends PluginPanel
 	private static boolean isMixed(NpcStat stat)
 	{
 		int grades = 0;
-		if (stat.exact > 0)
+		if (stat.uncontested > 0)
 		{
 			grades++;
 		}
@@ -510,7 +510,7 @@ public class EverykillPanel extends PluginPanel
 		{
 			sb.append(" &middot; level ").append(stat.combatLevel);
 		}
-		sb.append("<br>").append(span(Confidence.EXACT, stat.exact + " exact"));
+		sb.append("<br>").append(span(Confidence.UNCONTESTED, stat.uncontested + " uncontested"));
 		if (stat.inferred > 0)
 		{
 			sb.append("<br>").append(span(Confidence.INFERRED, stat.inferred + " inferred"));
@@ -610,7 +610,7 @@ public class EverykillPanel extends PluginPanel
 				// always at least a pixel. a day you killed one thing should still be
 				// visible next to a day you killed two hundred.
 				final int bar = Math.max(1, Math.round(h * (counts[i] / (float) max)));
-				g.setColor(i == counts.length - 1 ? Color.WHITE : Confidence.EXACT.getColor());
+				g.setColor(i == counts.length - 1 ? Color.WHITE : Confidence.UNCONTESTED.getColor());
 				g.fillRect(Math.round(i * step), h - bar, Math.max(1, Math.round(step) - 1), bar);
 			}
 		}
@@ -619,7 +619,7 @@ public class EverykillPanel extends PluginPanel
 	/** The 3px grade split — foundation, not storefront. The count is the headline. */
 	private static final class GradeBar extends JPanel
 	{
-		private int exact;
+		private int uncontested;
 		private int inferred;
 		private int ambiguous;
 
@@ -628,9 +628,9 @@ public class EverykillPanel extends PluginPanel
 			setBackground(new Color(0x14, 0x14, 0x14));
 		}
 
-		private void set(int exact, int inferred, int ambiguous)
+		private void set(int uncontested, int inferred, int ambiguous)
 		{
-			this.exact = exact;
+			this.uncontested = uncontested;
 			this.inferred = inferred;
 			this.ambiguous = ambiguous;
 			repaint();
@@ -641,7 +641,7 @@ public class EverykillPanel extends PluginPanel
 		{
 			super.paintComponent(g);
 
-			final int total = exact + inferred + ambiguous;
+			final int total = uncontested + inferred + ambiguous;
 			if (total <= 0)
 			{
 				return;
@@ -650,8 +650,8 @@ public class EverykillPanel extends PluginPanel
 			final int w = getWidth();
 			int x = 0;
 
-			final int we = Math.round(w * (exact / (float) total));
-			g.setColor(Confidence.EXACT.getColor());
+			final int we = Math.round(w * (uncontested / (float) total));
+			g.setColor(Confidence.UNCONTESTED.getColor());
 			g.fillRect(x, 0, we, getHeight());
 			x += we;
 

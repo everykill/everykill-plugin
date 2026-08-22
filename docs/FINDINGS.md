@@ -517,3 +517,27 @@ Coverage: **15 ids missing hitpoints (0.3%)**, 875 missing experience bonus (20%
 
 **Performance note worth keeping:** the first version ran grep and sed per row and took over five minutes on Windows, where spawning ~19,000 processes was almost the entire runtime. One awk pass does it in under a second. Same output.
 **Source:** OSRS Wiki Bucket API, `infobox_monster`, 2026-08-21.
+
+## 2026-08-21 — the client's top grade is `UNCONTESTED`, not `EXACT`
+
+**Status:** decided, shipped.
+
+`Confidence.EXACT` was renamed to `Confidence.UNCONTESTED` across the plugin. Nothing
+about detection changed — same conditions, same counts — only the claim we make about
+them.
+
+A combat record opens on the first hitsplat *we witness*. Damage dealt before we
+engaged is invisible to us, so the strongest honest statement the client can make is
+"nobody else hit it after we turned up". `EXACT` read as "we earned this kill", which
+is a different and unverifiable claim. Thirteen multicombat kills on 2026-08-20 showed
+zero foreign damage while the game printed the ironman kill-credit warning — the grade
+was wrong and looked fine.
+
+`EXACT` is now reserved for the server, where max HP makes conservation checkable.
+
+`NpcStat.uncontested` and `NpcStat.DayTally.uncontested` carry
+`@SerializedName(value = "uncontested", alternate = {"exact"})`, so ledgers written
+before today still load with their counts intact. Verified: 41/41 tests pass, clean
+compile against RuneLite 1.12.35.
+
+Decision recorded in `docs/spec-reference-data.md` §5.

@@ -94,10 +94,10 @@ public class EverykillOverlay extends OverlayPanel
 		if (config.showGradeSplit() && kills > 0)
 		{
 			panelComponent.getChildren().add(LineComponent.builder()
-				.left("exact")
-				.leftColor(Confidence.EXACT.getColor())
-				.right(String.valueOf(ledger.sessionCount(Confidence.EXACT)))
-				.rightColor(Confidence.EXACT.getColor())
+				.left("uncontested")
+				.leftColor(Confidence.UNCONTESTED.getColor())
+				.right(String.valueOf(ledger.sessionCount(Confidence.UNCONTESTED)))
+				.rightColor(Confidence.UNCONTESTED.getColor())
 				.build());
 
 			final int inferred = ledger.sessionCount(Confidence.INFERRED);

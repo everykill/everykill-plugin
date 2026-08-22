@@ -190,7 +190,7 @@ public class KillDetector
 		}
 
 		// temp: is the thing already hurt when we first touch it? if so somebody else
-		// got there first and we're about to call that kill EXACT, which it isn't.
+		// got there first and we are about to call that kill uncontested, which it isn't.
 		// -1 means no health bar. server never sends real hp, only ratio/scale.
 		//
 		// by= matters. this fires on anyone's hitsplat, not just ours, so a line here

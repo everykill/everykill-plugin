@@ -67,7 +67,7 @@ Separate from kill confidence.
 
 | Grade | Conditions | Used for |
 |---|---|---|
-| `confirmed` | Kill graded `exact` · single kill claiming that tile this tick · no foreign hitsplats · known drop tile | Drop-rate eligible |
+| `confirmed` | Kill graded `uncontested` · single kill claiming that tile this tick · no foreign hitsplats · known drop tile | Drop-rate eligible |
 | `probable` | Kill graded `inferred` · parallel-path-only loot · delayed-loot monster | Totals only |
 | `unknown` | Tile contested · multi-kill on one tile · scene changed before loot resolved | **Excluded from denominators** |
 

@@ -160,7 +160,7 @@ Same Bucket API, drops bucket. Filter rows with rarity **Always**.
 - Store `item_id`, `quantity`, `is_stackable`, `is_countable`
 - **Record quantity carefully** — a monster that always drops 2 bones means 3 corpses produce 6 items
 - **Explicitly flag monsters with no guaranteed drop.** "No guaranteed drop" and "we haven't populated this yet" are different states and must not both be an empty list
-- **Concrete example, verified 2026-08-14:** Rockslug has no 100%/always drop at all — no bones, no ashes, nothing guaranteed (checked against the wiki drop table directly). The corpse counter is simply unavailable for this monster, not a missing-data case. Worth keeping as the reference example when implementing the flag, since it's a transform-death NPC (`spec-kill-detection.md` edge case A) as well as a no-guaranteed-drop one — two independent reasons its kill/loot confidence should never reach `exact`.
+- **Concrete example, verified 2026-08-14:** Rockslug has no 100%/always drop at all — no bones, no ashes, nothing guaranteed (checked against the wiki drop table directly). The corpse counter is simply unavailable for this monster, not a missing-data case. Worth keeping as the reference example when implementing the flag, since it's a transform-death NPC (`spec-kill-detection.md` edge case A) as well as a no-guaranteed-drop one — two independent reasons its kill/loot confidence should never reach `uncontested`.
 
 ### Wrinkles to test
 

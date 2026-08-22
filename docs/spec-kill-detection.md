@@ -35,7 +35,7 @@ Written to every event.
 
 | Grade | Conditions | Used for |
 |---|---|---|
-| `exact` | `ActorDeath` fired · we dealt 100% of damage · single kill that tick · no cannon/thrall · derived XP reconciles | Benchmarks, drop rates |
+| `uncontested` | `ActorDeath` fired · we dealt 100% of damage · single kill that tick · no cannon/thrall · derived XP reconciles | Benchmarks, drop rates |
 | `inferred` | Transform-death fallback · multi-kill tick · plugin loaded mid-fight · partial damage but clearly the killer | Personal totals only |
 | `ambiguous` | Other players dealt damage · cannon/thrall contributed · AoE · scaled-HP instance | Excluded from published rates |
 
@@ -88,7 +88,7 @@ xp_paying_damage = hp_xp_delta / (1.333 * npc_multiplier)
 residual         = our_hitsplat_total - xp_paying_damage - labelled_non_xp_damage
 ```
 
-- Residual near zero → everything accounted for → `exact`
+- Residual near zero → everything accounted for → `uncontested`
 - Residual matches a labelled source → `inferred`
 - Residual unexplained → `ambiguous`, and store the residual as its own field
 

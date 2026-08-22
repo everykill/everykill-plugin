@@ -85,7 +85,7 @@ The earlier plan bucketed by "relevant equipment bonus," which was crude. Observ
 - **Band by observed DPS against that specific `npc_id` + region**
 - **Style is a hard partition** — melee, ranged and magic cohorts never pool
 - Bands are **absolute and computable from a player's own kills**, so a cohort exists immediately rather than waiting for a distribution to form
-- `exact` confidence and `kill_source = self` only
+- `uncontested` confidence and `kill_source = self` only
 - Normal worlds only
 
 **Why this fixes the volume problem:** the band needs nobody else. What needs volume is the *median within the band*, which fills in monster by monster.

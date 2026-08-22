@@ -23,7 +23,7 @@ import net.runelite.client.chat.QueuedMessage;
  *
  * <p>Ranks and first-ever-on-the-site notices are P3, rendered server side.
  *
- * <p>Milestones count EXACT only. Congratulate someone on 500 and then show them 480
+ * <p>Milestones count UNCONTESTED only. Congratulate someone on 500 and then show them 480
  * on the site because half were contested and you've lost them for good.
  *
  * <p>Suppressing a notice changes nothing about what got recorded - the kill and the
@@ -80,10 +80,10 @@ public class MilestoneNotifier
 		}
 
 		// Strict grade only. See the class comment.
-		final int exact = stat.exact;
+		final int uncontested = stat.uncontested;
 		for (int rung : LADDER)
 		{
-			if (exact == rung)
+			if (uncontested == rung)
 			{
 				raise(new Notice(Notice.Kind.MILESTONE,
 					format(rung) + " " + kill.npcName + " kills", rung));

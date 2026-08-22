@@ -194,20 +194,32 @@ interesting and should be visible, not averaged away.
 
 ---
 
-## 5. Open — needs a decision before building
+## 5. Decided — the client's ceiling came down
 
-**`EXACT` overclaims, and where the data lives doesn't fix it.**
+**Decided 2026-08-21: lower the client's ceiling.** `EXACT` overclaimed, and moving the
+data around was never going to fix it.
 
-Two directions, and they lead to different products:
+The client's top grade is now `UNCONTESTED`, and there is no `EXACT` below the server.
+It means what the client can actually see: *nobody else hit it after we turned up*. It
+does not mean we earned the whole kill — without max HP we can't know what happened
+before our first hitsplat.
 
-- **Lower the client's ceiling.** The client can't claim `EXACT` without max HP, so
-  local-only grades top out lower. Honest, and the same kill never gets two grades. Costs
-  the local-only user a meaningful-looking number.
-- **Accept that local and uploaded grades differ**, and say so in the UI. Keeps the local
-  experience, but a player who uploads watches their counts get downgraded, which needs
-  very careful wording to not feel like the site calling them a liar.
+Why this over the alternative (let local and uploaded grades differ, explain it in the UI):
 
-Also open:
+- **One kill, one grade.** A count that drops the moment you upload reads as the site
+  calling you a liar, however carefully it's worded.
+- **The name matches what the code checks.** `UNCONTESTED` is literally the condition in
+  `KillStateMachine` — death signal, our damage, no foreign hitsplats.
+- **It costs a word, not a number.** Nobody's count went down.
+
+`EXACT` is reserved for the server, where max HP is available and conservation can be
+checked for real. If it ever exists it gets assigned there, never in the client.
+
+Shipped in `Confidence`, `NpcStat`, the panel and the overlay. `NpcStat` still reads the
+old `exact` JSON key via `@SerializedName(alternate = ...)`, so no ledger written before
+today loses a count.
+
+Still open:
 
 - Refresh cadence and how a wiki edit war or vandalised infobox is prevented from moving
   anyone's grades.

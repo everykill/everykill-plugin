@@ -23,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
  *       Overcounting is the thing to be scared of - it inflates everything downstream
  *       and looks completely fine while doing it</li>
  *   <li>Someone else's damage drops it to {@link Confidence#AMBIGUOUS}</li>
- *   <li>Saw it die = {@link Confidence#EXACT}. Worked it out = {@link Confidence#INFERRED}</li>
+ *   <li>Saw it die = {@link Confidence#UNCONTESTED}. Worked it out = {@link Confidence#INFERRED}</li>
  *   <li>Composition change carries the damage over and emits nothing</li>
  *   <li>Despawn with no death flag is binned, unless we used an item on it within
  *       {@link #FINISH_WINDOW_TICKS} - that's a transform death</li>
@@ -48,7 +48,7 @@ public class KillStateMachine
 
 	/**
 	 * How long a death signal is believed before the corpse has to show for it.
-	 * Provisional. Too short and a slow despawn downgrades EXACT to INFERRED, which is
+	 * Provisional. Too short and a slow despawn drops UNCONTESTED to INFERRED, which is
 	 * a grade we can live with. Too long and a lie gets believed, which we can't.
 	 */
 	static final int DEATH_CONFIRM_TICKS = 5;
@@ -277,7 +277,7 @@ public class KillStateMachine
 		}
 		else if (signal == DeathSignal.OBSERVED)
 		{
-			grade = Confidence.EXACT;
+			grade = Confidence.UNCONTESTED;
 		}
 		else
 		{

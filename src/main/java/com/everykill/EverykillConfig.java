@@ -93,7 +93,7 @@ public interface EverykillConfig extends Config
 	@ConfigItem(
 		keyName = "milestones",
 		name = "KC milestones",
-		description = "100 / 250 / 500 / 1k / 2.5k / 5k / 10k. Counted at exact grade only.",
+		description = "100 / 250 / 500 / 1k / 2.5k / 5k / 10k. Counted at uncontested grade only.",
 		position = 13,
 		section = noticeSection
 	)
