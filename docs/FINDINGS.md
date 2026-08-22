@@ -859,3 +859,47 @@ falsified the claim took 35s: on the line. So the effect is real and the proxy w
 **Method note for next time:** do not report a clean separation from a first pass on a
 convenience sample. Pick the axis with a physical justification (elapsed time, since
 regen is a clock) before grouping, not after seeing which one looks tidier.
+
+## 2026-08-21 — CORRECTION 2: minimum observed damage fell to 80; "base is 81" was wrong
+
+**Status:** supersedes the "base max HP is 81 / plateau not a ramp" conclusion in the
+regen entries above. The 79-vs-81 disagreement is now in doubt.
+
+A Lesser demon (7657) died on **80** damage after a **21-second** fight. The previous
+fastest kill was 20 seconds and required 81. Same duration, different requirement.
+
+XP corroborates 80 independently: the kill paid 2593 - 2167 = **426**, and
+80 x 5.333 = 426.7. Not a counting error.
+
+**What this breaks.** The earlier entry argued that damage sitting flat at 81 across
+20-35s made 81 a *plateau* rather than the bottom of a ramp, and concluded base max HP
+was 81. That reasoning fails: at ~20 seconds we have now seen both 81 and 80. The flat
+region was an artifact of too few fast kills, not evidence of a floor.
+
+The free-running-clock hypothesis — recorded as a caveat in the previous correction and
+under-weighted — explains it. If the regen timer is not reset by combat, a short fight
+banks 0 or 1 ticks depending on **phase**, not just duration. Then even the fastest
+kills scatter, and the observed minimum descends slowly toward the true value as samples
+accumulate.
+
+**What this means for the estimator.**
+
+1. **The minimum has not converged.** It went 81 -> 80 at n=21 and may fall further.
+   An estimator still moving is not an answer. Any max-HP figure must carry its sample
+   count and be treated as an upper bound until it stops moving.
+2. **"Fast kills, not many kills" was wrong** — it needs both. Phase-dependence means no
+   single fast kill is clean; only the minimum over many is.
+3. **The 79 disagreement is now in doubt and may evaporate.** Observed minimum is 80,
+   one above the table. If it keeps walking down, the wiki was right the whole time and
+   every "the table is wrong" entry above was measuring regeneration.
+
+**Do not treat the 79-vs-81 entry as settled.** It is superseded to "unresolved, trending
+toward the wiki being correct".
+
+**The lesson, since this is the second correction in an hour on the same data.** Both
+errors were the same mistake: reading structure into a convenience sample and committing
+it before the sample could contradict it. Damage-to-kill is a *noisy upper bound* on max
+HP, and no amount of staring at 20 of them substitutes for the direct measurement — the
+healthRatio/healthScale solve recorded earlier, which reads the server's own number and
+needs no minimum at all. Prefer the direct measurement. Stop inferring max HP from
+damage totals.
