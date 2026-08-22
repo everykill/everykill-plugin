@@ -162,17 +162,61 @@ No game access needed. Implement the formulas in `spec-performance.md` §3 as a 
 
 ---
 
-## Deferred — cannot test on this account yet
+## Test access — two accounts
 
-- Cannon multikill (no cannon owned)
-- AoE multikill (Ice Burst needs 70 Magic; currently 66)
-- Gargoyle transform deaths (needs 75 Slayer; currently 49)
-- Raid scaled-HP exclusion (no raid access)
-- Superior slayer monsters — Step 4's separate-spawn behaviour (needs Bigger and Badder, 150 Slayer points; currently 18)
-- Nechryael death spawns — same Step 4 behaviour, alternate route (needs 84 Slayer; currently 49)
-- **True multi-phase bosses (Step 4's core case) — Kalphite Queen, Zulrah, Vorkath, Alchemical Hydra all inaccessible on this account.** This is the case most likely to misbehave: the KQ and Zalcano `ActorDeath`-fires-mid-transition reports already in `FINDINGS.md`/`spec-kill-detection.md` edge case B are exactly what `onNpcChanged`'s false-ActorDeath handling was built to cover, and none of it has been exercised against a real phase boss. Do not treat Step 4 as verified end-to-end until one of these (or an equivalent) is reachable — the rock/sand crab and Scurrius substitutes cover the *mechanism* (id-change carry-forward, separate-spawn isolation) but not this specific, already-flagged failure mode. **Confirmed 2026-08-14, not just assumed:** the crab wake-and-kill test traced 4 kills end-to-end and found `NpcChanged` always completes before the first hitsplat — a dormant rock can't be hit while dormant — so the record-gated carry-forward branch in `onNpcChanged` never ran once, and structurally cannot be exercised by this substitute at all. Only a monster that transforms *while already being damaged* (a real phase boss) can test that specific code. See `FINDINGS.md`.
+Everything below is about **capability only**. No account names, no identifiers.
+Verified 2026-08-21 from a character export, not assumed.
 
-Build the handling per spec, mark as untested, revisit when accessible.
+**Account A (primary dev account, used for all testing so far).** Slayer 49, Magic 66,
+no cannon. This is the account every FINDINGS entry to date was measured on.
+
+**Account B (second account, available for testing).** Slayer 81, Magic 79, combat
+90/89/85/90/85, 204 quests finished, owns a cannon and a rock hammer.
+
+### Now testable — was deferred, no longer blocked
+
+| Was blocked on | Now |
+|---|---|
+| **Cannon multikill** — "no cannon owned" | Account B owns cannon parts and ~530 cannonballs |
+| **AoE multikill** — Ice Burst needs 70 Magic | Magic 79, Desert Treasure I finished, so Ancient Magicks available |
+| **Gargoyle transform deaths** — needs 75 Slayer | Slayer 81, rock hammer in bank |
+| **True multi-phase bosses** — "all inaccessible" | **All four routes open.** See below |
+| **Raid scaled-HP exclusion** | CoX has no quest gate; ToB unlocked (A Night at the Theatre finished, with Theatre combat achievements completed) |
+
+**The phase-boss blocker is fully cleared, and this was the most important gap in the
+project.** BUILD-ORDER previously called `onNpcChanged`'s carry-forward "the case most
+likely to misbehave" and noted it had never run once, because a rock crab can't be
+damaged while dormant so the branch is structurally unreachable on Account A. Account B
+has killed Zulrah, Vorkath and the Grotesque Guardians — all of which transform *while
+already being damaged*.
+
+**Recommended order when this is picked up:**
+
+1. **Zulrah.** Changes form and npc_id repeatedly mid-fight, every fight. The purest and
+   most repeatable test of record-gated carry-forward that exists.
+2. **Grotesque Guardians (Dusk).** Doubly valuable: a phase boss *and* a transform-death
+   monster. Core's `NpcUtil` lists `GARGBOSS_DUSK_PHASE4` and `GARGBOSS_DUSK_DEATH` by
+   name, so this directly exercises the `isDying()` gate added 2026-08-21 on a boss
+   rather than a rockslug.
+3. **Vorkath.** Also an XP-attribution case — GAME-MECHANICS records that Vorkath applies
+   a +20% experience bonus against a published +0%, so measured XP should disagree with
+   the naive expectation in a *specific, predicted* direction. A good falsifiable test.
+4. **Kalphite Queen.** No quest gate at all. The original `ActorDeath`-fires-mid-transition
+   report in FINDINGS came from KQ.
+
+### Still blocked
+
+- **Nechryael** — needs 84 Slayer; Account B has 81. Three levels.
+- **Superior slayer monsters** — needs Bigger and Badder (150 Slayer points). Slayer
+  points are not in the character export; ask before planning around it.
+- **ToA scaled HP** — "Into the Tombs" is not started on Account B.
+
+### Caveat that matters for data integrity
+
+Account B is an established account with existing kill history. Everykill only counts
+what it observes from the moment it is running, so this does **not** contaminate
+anything — but it does mean **verified-from-zero kill counts are only possible on
+Account A**. Keep that distinction if both accounts ever upload.
 
 ---
 
