@@ -154,8 +154,19 @@ public class KillStateMachine
 	 * {@link #despawn} emits it. A lie leaves the npc standing and {@link #tick} throws
 	 * the flag away. No monster list needed - the corpse either leaves or it doesn't.
 	 */
-	public void death(int key, int tick, Consumer<KillRecord> sink)
+	/**
+	 * @param dying whether the NPC is actually dying, per core's {@code NpcUtil}. False
+	 *              for the monsters that sit at 0 hp waiting to be salted, mirrored or
+	 *              whatever else - for those, ActorDeath is a lie and we record nothing,
+	 *              so the only way they can ever count is a finishing action.
+	 */
+	public void death(int key, int tick, boolean dying, Consumer<KillRecord> sink)
 	{
+		if (!dying)
+		{
+			return;
+		}
+
 		final Record r = tracked.get(key);
 		if (r != null)
 		{

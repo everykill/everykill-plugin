@@ -47,7 +47,7 @@ public class KillStateMachineTest
 	{
 		hit(1, 20, true, 0);
 		hit(1, 18, true, 2);
-		machine.death(1, 3, emitted::add);
+		machine.death(1, 3, true, emitted::add);
 		machine.despawn(1, true, 4, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
@@ -73,7 +73,7 @@ public class KillStateMachineTest
 	public void aStrangersKillIsNotOurs()
 	{
 		hit(1, 40, false, 0);
-		machine.death(1, 1, emitted::add);
+		machine.death(1, 1, true, emitted::add);
 
 		Assert.assertTrue("a kill we did no damage to must never be recorded", emitted.isEmpty());
 	}
@@ -81,7 +81,7 @@ public class KillStateMachineTest
 	@Test
 	public void deathWithNoDamageRecordIsIgnored()
 	{
-		machine.death(99, 1, emitted::add);
+		machine.death(99, 1, true, emitted::add);
 		Assert.assertTrue(emitted.isEmpty());
 	}
 
@@ -90,7 +90,7 @@ public class KillStateMachineTest
 	{
 		hit(1, 25, true, 0);
 		hit(1, 12, false, 1);
-		machine.death(1, 2, emitted::add);
+		machine.death(1, 2, true, emitted::add);
 		machine.despawn(1, true, 3, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
@@ -103,7 +103,7 @@ public class KillStateMachineTest
 	{
 		hit(1, 100, true, 0);
 		hit(1, 1, false, 1);
-		machine.death(1, 2, emitted::add);
+		machine.death(1, 2, true, emitted::add);
 		machine.despawn(1, true, 3, emitted::add);
 
 		Assert.assertEquals("one splat from someone else is enough to contest it",
@@ -114,7 +114,7 @@ public class KillStateMachineTest
 	public void deathThenDespawnScoresOnce()
 	{
 		hit(1, 30, true, 0);
-		machine.death(1, 1, emitted::add);
+		machine.death(1, 1, true, emitted::add);
 		machine.despawn(1, true, 2, emitted::add);
 
 		Assert.assertEquals("ActorDeath followed by NpcDespawned is one corpse, not two",
@@ -132,7 +132,7 @@ public class KillStateMachineTest
 		machine.composition(1, 417, "Abyssal demon (phase 3)", 124, 3);
 		Assert.assertTrue(emitted.isEmpty());
 
-		machine.death(1, 4, emitted::add);
+		machine.death(1, 4, true, emitted::add);
 		machine.despawn(1, true, 5, emitted::add);
 
 		Assert.assertEquals("three phases, one kill", 1, emitted.size());
@@ -208,10 +208,57 @@ public class KillStateMachineTest
 	}
 
 	@Test
+	public void aLyingDeathSignalIsNotRecordedAtAll()
+	{
+		// The 2026-08-21 rockslug. Hit to 0 hp, ActorDeath fires, player walks off
+		// without salting it. We recorded it UNCONTESTED while the thing was stood in
+		// front of them taking hits.
+		//
+		// dying=false comes from core's NpcUtil, which curates the monsters that sit at
+		// 0 hp waiting for a salt. Nothing else can tell these apart - a real death and
+		// an abandoned slug both despawn about six ticks after the signal, so no window
+		// separates them. Tried tightening it, tried loosening it, broke it both ways.
+		hit(7, 27, true, 0);
+		machine.death(7, 1, false, emitted::add);
+		machine.despawn(7, false, 7, emitted::add);
+
+		Assert.assertTrue("a monster that lied about dying is not a kill", emitted.isEmpty());
+	}
+
+	@Test
+	public void aLyingDeathSignalCannotBeRescuedByALaterDeadFlag()
+	{
+		// Belt and braces: even if something downstream decides the despawn looks dead,
+		// there is no held signal for it to pair with, so it can only reach the
+		// flaggedDead branch - never OBSERVED.
+		hit(7, 27, true, 0);
+		machine.death(7, 1, false, emitted::add);
+		machine.despawn(7, true, 3, emitted::add);
+
+		Assert.assertEquals(1, emitted.size());
+		Assert.assertEquals("no death signal was ever held, so this cannot be OBSERVED",
+			DeathSignal.DESPAWN_WHILE_DEAD, emitted.get(0).signal);
+	}
+
+	@Test
+	public void aSaltedSlugStillCountsThroughTheFinishingAction()
+	{
+		// The other half. The salt is the only thing that legitimately kills these, and
+		// gating the death signal must not break that path.
+		hit(7, 27, true, 0);
+		machine.death(7, 1, false, emitted::add);
+		machine.finishingAction(7, 2);
+		machine.despawn(7, false, 3, emitted::add);
+
+		Assert.assertEquals(1, emitted.size());
+		Assert.assertEquals(DeathSignal.TRANSFORM_FINISH, emitted.get(0).signal);
+	}
+
+	@Test
 	public void observedDeathIsStillGradedAboveATransformFinish()
 	{
 		hit(1, 30, true, 0);
-		machine.death(1, 1, emitted::add);
+		machine.death(1, 1, true, emitted::add);
 		machine.despawn(1, true, 2, emitted::add);
 
 		Assert.assertEquals(DeathSignal.OBSERVED, emitted.get(0).signal);
@@ -229,7 +276,7 @@ public class KillStateMachineTest
 		// didn't match the game. This is here so shrinking it below a real death
 		// animation breaks the build instead of quietly costing someone their grade.
 		hit(1, 30, true, 0);
-		machine.death(1, 10, emitted::add);
+		machine.death(1, 10, true, emitted::add);
 		machine.despawn(1, true, 16, emitted::add);
 
 		Assert.assertEquals(DeathSignal.OBSERVED, emitted.get(0).signal);
@@ -243,7 +290,7 @@ public class KillStateMachineTest
 		// fires anyway. Measured 2026-08-21: eight slugs, seven counted off this lie,
 		// one of them twice.
 		hit(1, 27, true, 0);
-		machine.death(1, 1, emitted::add);
+		machine.death(1, 1, true, emitted::add);
 
 		Assert.assertTrue("a death signal on its own proves nothing", emitted.isEmpty());
 
@@ -259,7 +306,7 @@ public class KillStateMachineTest
 		// The kc=3 / kc=4 pair: emitted once on the lie, then again nine seconds later
 		// on the real despawn, off a single point of damage. One emission point now.
 		hit(1, 27, true, 0);
-		machine.death(1, 1, emitted::add);
+		machine.death(1, 1, true, emitted::add);
 		machine.tick(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1);
 
 		final int later = 20;
@@ -278,7 +325,7 @@ public class KillStateMachineTest
 		// despawns when it leaves the scene, isDead() is true because the health ratio
 		// is zero, and we counted a monster that is still standing there.
 		hit(1, 27, true, 0);
-		machine.death(1, 1, emitted::add);
+		machine.death(1, 1, true, emitted::add);
 		machine.tick(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1);
 
 		// walked out of range some time later
@@ -307,7 +354,7 @@ public class KillStateMachineTest
 		// item is what actually finished it, so claiming OBSERVED would be claiming we
 		// watched something we deduced.
 		hit(1, 27, true, 0);
-		machine.death(1, 1, emitted::add);
+		machine.death(1, 1, true, emitted::add);
 		machine.finishingAction(1, 2);
 		machine.despawn(1, false, 3, emitted::add);
 
@@ -336,7 +383,7 @@ public class KillStateMachineTest
 	{
 		hit(1, 10, true, 0);
 		machine.tick(KillStateMachine.STALE_TICKS + 1);
-		machine.death(1, KillStateMachine.STALE_TICKS + 2, emitted::add);
+		machine.death(1, KillStateMachine.STALE_TICKS + 2, true, emitted::add);
 
 		Assert.assertTrue(emitted.isEmpty());
 	}
@@ -346,9 +393,9 @@ public class KillStateMachineTest
 	{
 		hit(1, 30, true, 0);
 		hit(2, 30, true, 0);
-		machine.death(1, 1, emitted::add);
+		machine.death(1, 1, true, emitted::add);
 		machine.despawn(1, true, 2, emitted::add);
-		machine.death(2, 1, emitted::add);
+		machine.death(2, 1, true, emitted::add);
 		machine.despawn(2, true, 2, emitted::add);
 
 		Assert.assertEquals(2, emitted.size());
@@ -358,12 +405,12 @@ public class KillStateMachineTest
 	public void anIndexReusedAfterTheSuppressionWindowScoresAgain()
 	{
 		hit(1, 30, true, 0);
-		machine.death(1, 1, emitted::add);
+		machine.death(1, 1, true, emitted::add);
 		machine.despawn(1, true, 2, emitted::add);
 
 		final int later = KillStateMachine.EMITTED_TICKS + 5;
 		hit(1, 30, true, later);
-		machine.death(1, later + 1, emitted::add);
+		machine.death(1, later + 1, true, emitted::add);
 		machine.despawn(1, true, later + 2, emitted::add);
 
 		Assert.assertEquals("NPC indexes are recycled; a later kill is a real one",
@@ -375,7 +422,7 @@ public class KillStateMachineTest
 	{
 		hit(1, 10, true, 0);
 		machine.reset();
-		machine.death(1, 1, emitted::add);
+		machine.death(1, 1, true, emitted::add);
 
 		Assert.assertTrue(emitted.isEmpty());
 		Assert.assertEquals(0, machine.trackedCount());

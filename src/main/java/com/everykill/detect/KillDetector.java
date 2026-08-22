@@ -23,6 +23,7 @@ import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.NpcChanged;
 import net.runelite.api.events.NpcDespawned;
+import net.runelite.client.game.NpcUtil;
 
 /**
  * Adapter: maps RuneLite client events onto {@link KillStateMachine}, which holds
@@ -58,6 +59,14 @@ public class KillDetector
 	}
 
 	private final Client client;
+
+	// core's answer to "is this thing actually dead". a rockslug at 0 hp is not, and
+	// isDead() can't tell you that because it IS the 0 hp check. NpcUtil carries the
+	// curated list of monsters that sit at 0 hp waiting for a salt/mirror/whatever,
+	// plus overrides runelite pushes from their servers - so new content gets fixed
+	// without us shipping anything. don't rebuild this, we'd only get it wrong.
+	private final NpcUtil npcUtil;
+
 	private final KillStateMachine machine = new KillStateMachine();
 
 	// actor identity -> state machine key. NOT getIndex(), the game recycles those
@@ -70,9 +79,10 @@ public class KillDetector
 	private DamageListener damageListener;
 
 	@Inject
-	public KillDetector(Client client)
+	public KillDetector(Client client, NpcUtil npcUtil)
 	{
 		this.client = client;
+		this.npcUtil = npcUtil;
 	}
 
 	public void setDamageListener(DamageListener listener)
@@ -140,18 +150,26 @@ public class KillDetector
 			return;
 		}
 
+		final NPC npc = (NPC) actor;
 		final Integer key = actorKeys.get(actor);
 
-		// temp: every lesser demon graded INFERRED via DESPAWN_WHILE_DEAD, which can
-		// only happen if we never held a death signal at all. so does ActorDeath even
-		// fire for them? keyed=false just means it died and we never touched it, that's
-		// normal. NO line for something we definitely killed is the smoking gun.
-		log.debug("ActorDeath: npc_id={} name={} keyed={} tick={}",
-			((NPC) actor).getId(), actor.getName(), key != null, client.getTickCount());
+		// ActorDeath fires on health ratio hitting zero, which for a rockslug or a
+		// gargoyle is a flat lie - it sits there at 0 hp until you salt it. we counted
+		// one of those as UNCONTESTED on 2026-08-21 while it was stood in front of the
+		// player taking hits.
+		//
+		// no timer fixes this. a real death and a slug at 0 hp both despawn about six
+		// ticks later, so the two are identical in the only thing a clock can see. it's
+		// per-monster knowledge, and core already curates it.
+		final boolean actuallyDying = npcUtil.isDying(npc);
+
+		// temp: pair with the Fell back to line below.
+		log.debug("ActorDeath: npc_id={} name={} keyed={} dying={} tick={}",
+			npc.getId(), npc.getName(), key != null, actuallyDying, client.getTickCount());
 
 		if (key != null)
 		{
-			machine.death(key, client.getTickCount(), sink);
+			machine.death(key, client.getTickCount(), actuallyDying, sink);
 		}
 	}
 
@@ -161,7 +179,9 @@ public class KillDetector
 		final Integer key = actorKeys.remove(npc);
 		if (key != null)
 		{
-			machine.despawn(key, npc.isDead(), client.getTickCount(), sink);
+			// isDying(), not isDead(). isDead() IS the zero-health-ratio check, so it
+			// tells the same lie ActorDeath does.
+			machine.despawn(key, npcUtil.isDying(npc), client.getTickCount(), sink);
 		}
 	}
 

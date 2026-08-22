@@ -1029,3 +1029,61 @@ the systematic error is in how the data was assembled.
 The cheap external check — "is this consistent with the damage we have actually killed
 one with?" — caught in one kill what 16 perfectly-fitting samples could not. Keep that
 cross-check on any future max-HP estimate.
+
+## 2026-08-21 — use core's NpcUtil.isDying(). Stop tuning windows.
+
+**Status:** fixed, three regression tests, verified to fail without the fix. Confirmed
+false positive in a client first.
+
+**The bug.** A rockslug was recorded `grade=UNCONTESTED signal=OBSERVED kc=16` while
+standing in front of the player at 0 hp taking hits. Confirmed live — the player went
+back and hit it for 5.
+
+**Why no timer could fix it.** A real death and an abandoned rockslug produce the
+identical observable sequence: `ActorDeath`, then a despawn ~6 ticks later. Identical in
+the only dimension a clock can measure. Earlier the same evening `DEATH_CONFIRM_TICKS`
+was tightened (downgrading 31 honest demon kills) and then loosened to 20 (promoting
+this fake one from INFERRED to UNCONTESTED). **Both directions were wrong because the
+constant was never the right lever.**
+
+**What core does** — found by reading `runelite-client`, which should have happened
+before the first constant was touched:
+
+- `LootManager` does **not** subscribe to `ActorDeath` at all. Only two core plugins do,
+  and neither for NPC kills.
+- `NpcUtil.isDying(npc)` carries a curated switch of NPCs that "hit 0hp but don't
+  actually die" — gargoyles, rockslugs, lizards, zygomites — returning **false** for
+  them.
+- It also reads `RuntimeConfig`: `ignoreDeadNpcs`, `forceDeadNpcs`,
+  `healthCheckDeadNpcs`, pushed from RuneLite's servers, so **new content is patched
+  without a client release**.
+
+**Fix.** `NpcUtil` is `@Singleton`/`@Inject`, so we just use it:
+
+- `KillStateMachine.death()` takes a `dying` flag and records nothing when false. A
+  rockslug can then only ever be counted through a finishing action.
+- The despawn passes `npcUtil.isDying(npc)` instead of `npc.isDead()` — `isDead()` *is*
+  the zero-health-ratio check, so it tells the same lie.
+
+The gate lives in the state machine, not the adapter, so it is testable without a
+client. That is the whole point of the client-free split.
+
+`DEATH_CONFIRM_TICKS` stays at 20. It was the right fix for the demons and was never
+implicated here.
+
+**What this deletes from the plan.** `TransformDeathNpcs.IDS`, which
+spec-kill-detection.md warns is "silent and dangerous" when it gets stale. **Do not
+build it.** Core maintains the list and ships runtime overrides. Rebuilding it would
+mean owning a list that goes stale on every content update, to be worse than a
+dependency we already have.
+
+**Compliance note:** `NpcUtil` subscribes to `AnimationChanged` internally. Our rule is
+that *we* do not subscribe to NPC animations; calling a core utility that does is not
+the same thing, and core's own loot tracker depends on it. Flagged so it is a known
+decision rather than a submission surprise.
+
+**The lesson, and it cost most of an evening.** Two constants tuned in opposite
+directions on the same problem, both wrong, before anyone read how the reference
+implementation solves it. **When a fix requires guessing a number, check whether the
+problem has a known solution first.** The prior-art table in PROJECT.md exists for this
+and was not consulted.
