@@ -953,3 +953,56 @@ cost a whole kill, EMITTED_TICKS was undersized, now this). Treat any hand-picke
 window in this codebase as suspect until it has been measured in a client, and bias
 generous — every one of these failures cost real data, and none of the loosenings has
 cost anything yet.
+
+## 2026-08-21 — max-HP solve: works sometimes, unexplained otherwise. Parked.
+
+**Status:** inconclusive. Method is sound, data is not yet good enough. Do not act on
+the numbers below.
+
+Instrumented `healthRatio`/`healthScale` per hitsplat and solved the server formula for
+`maxHealth`. Tagged by actor key, so each fight is cleanly separated (an earlier
+npc_id-tagged version interleaved same-id demons and fitted nonsense — 85 hp for
+something we have killed with 80 damage).
+
+Results across four Lesser demon fights:
+
+```
+key  npc_id  samples  totaldmg  feasible maxHealth
+1    7664    11       81        NONE
+2    7656    16       82        81-82
+3    7664    14       82        NONE
+4    7656    13       81        NONE
+```
+
+**One fight solves cleanly (81-82, consistent with an earlier hand-solve of 82). Three
+admit no value at all.**
+
+**The failures are not regeneration.** Inspecting key 1 directly:
+
+```
+D=17  ratio=24  -> requires M >= 83
+D=57  ratio=9   -> requires M <= 82
+```
+
+An *early* sample demands a larger max HP and a *late* one demands smaller. Regen
+inflates health as a fight proceeds, so it would make late samples demand the larger
+value. This is the opposite.
+
+**Two pairing theories tried, both failed:**
+
+1. Ratio pairs with cumulative damage before that hitsplat. (Original. Fits some fights.)
+2. Ratio pairs with damage through the end of the previous tick, since health updates
+   per tick and several splats share a tick. (No improvement.)
+
+**Leading hypothesis, untested:** `healthRatio` is a client-side value refreshed only
+when the server sends an update, and the server may not send one every tick. If the
+ratio can be stale by an arbitrary number of ticks, **no fixed pairing offset can ever
+work**, which is precisely the pattern observed — some fights fit, others don't, with no
+consistent offset between them.
+
+**Next step if this is picked up again:** sample `healthRatio` on every `GameTick`
+rather than on hitsplats, and log it even when it does not change. That shows directly
+how often the server actually updates it, and whether staleness is the explanation.
+Until then the method cannot be trusted and the wiki-vs-observed question stays open.
+
+**Do not use these numbers.** One clean fit is not a result.
