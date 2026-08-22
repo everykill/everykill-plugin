@@ -8,7 +8,45 @@ No storage, no upload, no UI until Step 8.
 
 ---
 
+## Status at a glance
+
+Updated 2026-08-22. **"Built" and "verified" are different things and this project treats
+them as different things.** Code that compiles and passes unit tests has not been tested —
+every bug found so far was found in a client, not in a test run.
+
+| | Step | Status | Proof |
+|---|---|---|---|
+| 1 | Damage records + ActorDeath | ✅ **verified** | foreign-kill exclusion re-confirmed 2026-08-21 |
+| 2 | isDead despawn fallback | ✅ **verified** | both paths measured, gap is 6 ticks |
+| 3 | Transform deaths | ✅ **verified** | all three cases, twice — see the correction in-step |
+| 4 | NpcChanged phase handling | ⚠️ **built — never executed** | none. Zero runs. |
+| 5 | Measured XP by damage share | 🟡 **partial** | allocator verified; two numbers still unmeasured |
+| 6 | Loot: tile coincidence | ⬜ not started | — |
+| 7 | Loot attribution + guards | ⬜ not started | — |
+| 8 | Grading, batching, upload | ⬜ not started | — |
+| 0a | NPC stat table pull | 🟡 **partial** | 4,325 ids pulled and validated; script committed |
+| 0b | always_drops[] pull | ⬜ not started | — |
+| 0c | Combat formula implementation | ⬜ not started | — |
+
+**The one that matters: Step 4 has never run.** Not "lightly tested" — the
+carry-forward branch has executed zero times, and BUILD-ORDER has flagged it as the code
+most likely to misbehave since before it was written. It was blocked on account access;
+as of 2026-08-21 it is not. See *Test access* below.
+
+**Legend.** ✅ verified in a live client, with a `FINDINGS.md` entry naming what was
+measured · 🟡 partially met, outstanding work named in-step · ⚠️ code exists, has never
+run · ⬜ not started.
+
+**Rule for this table:** a step moves to ✅ only when its acceptance criteria were met
+*in a client* and an entry in `FINDINGS.md` records what was measured. Compiling is not
+evidence. Passing unit tests is not evidence. If you cannot point at the entry, it is
+not verified.
+
+---
+
 ## Step 1 — Damage records + ActorDeath
+
+**✅ Status: verified.** Foreign-kill exclusion re-confirmed on current code 2026-08-21 — another player killed cave crawlers in the same scene and produced zero kill lines. Note the original 50-chicken count test predates the `com.everykill` rewrite; the exclusion half is what has been re-proven since.
 
 **Build:**
 - A per-actor combat record, keyed on the NPC's runtime reference
@@ -28,6 +66,8 @@ Maintain our own collection keyed by actor, driven by spawn/despawn and hitsplat
 
 ## Step 2 — isDead despawn fallback
 
+**✅ Status: verified — and the answer the spec asked for is: both fire.** `ActorDeath` fires at health-ratio-zero, then the despawn follows. Measured gap is **6 ticks**, five times out of five on lesser demons. Dedupe is by actor reference, not npc index. See FINDINGS 2026-08-21, "SOLVED: the INFERRED grade was DEATH_CONFIRM_TICKS missing by one tick".
+
 **Build:** On `NpcDespawned` where `isDead()` and no `ActorDeath` was seen for that actor → emit a kill.
 
 **Acceptance:** Determine empirically whether `ActorDeath` and the `isDead` despawn **both** fire for the same kill. Log both paths separately and compare. If both fire, dedupe by actor reference. **Report the finding** — the spec treats this as unknown.
@@ -44,7 +84,7 @@ Getting it right took three separate corrections, all of them the same underlyin
 2. `isDead()` on the despawn reads the *same zero health ratio*. An abandoned slug at 0 hp despawned when the player walked away and we recorded a phantom kill. Now a record whose death signal was revoked doesn't get to use `isDead()` either.
 3. `FINISH_WINDOW_TICKS` at 3 was sized while `isDead()` was quietly covering for it. Once that crutch was correctly removed, a salt landing before the health bar emptied produced **no kill at all**. Widened to 5.
 
-**Acceptance — met.** All three cases run deliberately on rockslugs:
+**Acceptance — first run.** All three cases run deliberately on rockslugs. **Read the status block below this table before trusting it** — one of these three later failed on different timing:
 
 | case | result |
 |---|---|
@@ -54,11 +94,45 @@ Getting it right took three separate corrections, all of them the same underlyin
 
 The third is the one that matters. Full detail in `FINDINGS.md`, 2026-08-21.
 
-**Still untested:** desert lizards, zygomites, and gargoyles (75 Slayer). The mechanism is generic so they should follow, but "should" is not "did".
+### ✅ Status: verified — but it took a second round, and here is why
+
+**That table was passed on one timing and failed on another.** Re-tested 2026-08-21
+(later the same day) and the abandoned case recorded a **false kill at the top grade** —
+a rockslug graded `UNCONTESTED` while standing in front of the player at 0 hp taking
+hits.
+
+Both runs are real. The difference is the despawn gap:
+
+| run | item-use → despawn | revoked in time? | outcome |
+|---|---|---|---|
+| first | `gap=60` (~36s, walked away) | yes | correctly discarded ✅ |
+| second | ~6–10 ticks (despawned immediately) | **no** | **false kill** ❌ |
+
+Revocation runs from `tick()`. A despawn arriving before the sweep beats it. The
+original test only ever exercised the slow walk-away and the fast despawn was never
+tried, so the criterion read as met while a whole timing branch sat untested.
+
+**Fixed properly, not with another window.** The death signal is now gated through
+core's `NpcUtil.isDying()`, which returns `false` for monsters that sit at 0 hp — no
+timer can separate those from a real death, because a real death and an abandoned slug
+both despawn about six ticks after the signal. Retested in a client: salted →
+`TRANSFORM_FINISH`, abandoned → nothing recorded, `deathAt=-1`. Three regression tests,
+each verified to fail without the gate.
+
+**Lesson worth keeping: "the acceptance case passed" is not the same as "every path
+through the acceptance case passed."** Vary the timing, not just the scenario.
+
+**Still untested:** desert lizards, zygomites, and gargoyles. Gargoyles are **now
+reachable** (Slayer 81, rock hammer owned) — the mechanism is generic so they should
+follow, but "should" is not "did".
 
 ---
 
 ## Step 4 — NpcChanged phase handling
+
+**⚠️ Status: built — never executed. Zero runs.** The record-gated carry-forward branch in `onNpcChanged` has not run once, and it is not for want of trying: a rock crab cannot be damaged while dormant, so `NpcChanged` always completes before the first hitsplat and the branch is **structurally unreachable** on the substitute monsters available. Only a monster that transforms *while already being damaged* can execute it.
+
+**Now unblocked (2026-08-21).** A second account has Zulrah, Vorkath and the Grotesque Guardians. This is the highest-value outstanding test in the project. See *Test access* below for the recommended order.
 
 **Known exposure before you start — read `spec-kill-detection.md` edge case B first.** Step 3 found and fixed a bug where `ActorDeath`/`isDead()` fire on transform-death NPCs (rockslugs etc.) the moment health ratio hits zero, well before the NPC is actually dead. Two open RuneLite issues ([#15394](https://github.com/runelite/runelite/issues/15394), [#16479](https://github.com/runelite/runelite/issues/16479)) report the identical symptom on Kalphite Queen and Zalcano — NPCs read as dead mid-fight while still alive, during a phase or invulnerability window. **Do not assume `NpcChanged` carrying the record forward is sufficient protection** against a false `ActorDeath` firing mid-transition on these bosses; that has not been tested, and there's specific reason from the two issues above to expect it isn't. Verify this empirically before trusting the naive implementation below on any boss in the phase-transition list.
 
@@ -69,6 +143,8 @@ The third is the one that matters. Full detail in `FINDINGS.md`, 2026-08-21.
 ---
 
 ## Step 5 — Measured XP, allocated by damage share
+
+**🟡 Status: partial.** The allocator is verified in play — 51 consecutive kills 2026-08-21 with **stranded XP at zero throughout**, and per-npc XP reconciling to the point on two of three ids. Two things the step explicitly asks for are still unmeasured: the **XP settle window** (`SETTLE_TICKS = 2` remains desk-chosen) and the **residual noise floor**. Also open: attribution runs ~0.25% high because non-combat XP earned mid-fight is allocated to the monster — FINDINGS 2026-08-21.
 
 **This step was called "Derived XP + reconciliation" and had the roles the wrong way round.** It said to derive each NPC's XP from its damage record and demote `StatChanged` to a checksum. XP *is* paid per point of damage, so the reframe was half right — that part dissolves the merged-tick problem. But derivation cannot be the source of truth, for three reasons verified against the wiki on 2026-08-16 and recorded in `GAME-MECHANICS.md`:
 
@@ -102,6 +178,8 @@ The counter is now split. **Stranded** XP arrived while damage was on record and
 
 ## Step 6 — Loot: tile coincidence
 
+**⬜ Status: not started.** No code. This is the hardest correctness problem left in the client.
+
 **Build:** Mirror `LootManager` — record `ItemSpawned` per tile per tick, handle `ItemQuantityChanged` deltas for stackables, iterate the NPC's `size × size` footprint on death.
 
 **Acceptance:** Loot logged matches what actually dropped, verified by hand on a slayer task.
@@ -109,6 +187,8 @@ The counter is now split. **Stranded** XP arrived while damage was on record and
 ---
 
 ## Step 7 — Loot attribution + guards
+
+**⬜ Status: not started.** Depends on Step 6.
 
 **Build:**
 - Attach loot to kill records from the state machine
@@ -122,6 +202,8 @@ The counter is now split. **Stranded** XP arrived while damage was on record and
 ---
 
 ## Step 8 — Confidence grading, then batching and upload
+
+**⬜ Status: not started.** Grading exists in the client already (`Confidence`, ceiling lowered to `UNCONTESTED` 2026-08-21); the batching and upload half needs a backend that does not exist.
 
 **Build:** Agreement-vector grading for both kill and loot confidence. Only then: client-side batching (2–5 min interval, floor of 60s) and upload.
 
@@ -140,6 +222,8 @@ The counter is now split. **Stranded** XP arrived while damage was on record and
 
 ### Step 0a — NPC stat table pull script
 
+**🟡 Status: partial — pulled and validated.** `tools/fetch-reference-data.sh` is committed; one API call plus one awk pass, 0.9s, writes gitignored `data/monsters.tsv`. **4,325 npc ids.** Validated by prediction, not just inspection: it called Watchman max HP correctly on a monster nobody had hand-checked. **Not done:** the `InstantDamageCalculator` cross-check the acceptance criteria ask for, and the multiplier table itself.
+
 Standalone script hitting the Wiki Bucket API. Pull `infobox_monster`, cache locally, compute XP multipliers, build the `npc_id` bridge via name + combat level.
 
 Start with common slayer monsters; the table fills in incrementally. **Must never block kill recording.**
@@ -148,9 +232,13 @@ Start with common slayer monsters; the table fills in incrementally. **Must neve
 
 ### Step 0b — always_drops[] pull
 
+**⬜ Status: not started.** Same API and script as 0a; deferred until loot attribution is real.
+
 Same API, drops bucket, filter rarity `Always`. Store `item_id`, `quantity`, `is_stackable`, `is_countable`. Explicitly flag monsters with no guaranteed drop.
 
 ### Step 0c — combat formula implementation *(new, from `spec-performance.md` §8)*
+
+**⬜ Status: not started.** Requires 0a for NPC defence stats. Needs no game access.
 
 No game access needed. Implement the formulas in `spec-performance.md` §3 as a pure function: player levels + equipment bonuses + NPC stats + style → max hit, hit chance, DPS.
 
