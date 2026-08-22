@@ -1,5 +1,35 @@
 # RuneLite Plugin Development — Agent Guidelines
 
+## Precedence — read this first
+
+**This file and the project's own documentation are canon.** Where anything disagrees,
+the order is:
+
+1. **This file** (`CONVENTIONS.md`) — RuneLite and Plugin Hub rules. Non-negotiable;
+   breaking these gets the plugin rejected.
+2. **`PROJECT.md`** — project constraints and the integrity rules the dataset depends on.
+3. **The rest of `docs/`** — `BUILD-ORDER.md` is the task list, `FINDINGS.md` is the
+   append-only record of what has actually been measured, `spec-*.md` are designed but
+   not all verified.
+4. **Installed agent skills and plugins** — last.
+
+**Third-party agent skills are complementary workflow tooling, not project authority.**
+They describe how to work — debugging discipline, TDD loops, review passes, handoffs —
+and that is genuinely useful. They do **not** dictate project-specific behaviour, file
+layout, or where work is tracked.
+
+Concretely, when an installed skill's convention collides with ours, ours wins:
+
+| A skill may assume | This project uses |
+|---|---|
+| `CONTEXT.md` for project context | `docs/PROJECT.md` |
+| GitHub Issues for work tracking | `docs/BUILD-ORDER.md` |
+| `docs/adr/` for decisions | `docs/FINDINGS.md` (measured results, append-only) |
+
+Do not create a parallel copy of something this repo already has. Two sources of truth
+agree on the day they are written and quietly diverge afterwards, and the whole point of
+this project is that the data can be trusted.
+
 ## Logging
 
 - Use `log.debug()` for developer/diagnostic logging.
