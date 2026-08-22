@@ -676,3 +676,45 @@ monsters (Banshees) restore faster. **No numeric rate is published.**
 
 Do not attempt to model the regen rate to correct for it. It is undocumented, varies by
 monster, and the minimum-based estimator sidesteps it entirely without needing a number.
+
+## 2026-08-21 — XP attribution runs ~0.25% high; mid-fight non-combat XP lands on the monster
+
+**Status:** measured, mechanism plausible but not yet proven. Needs a per-kill XP
+diagnostic to confirm.
+
+Nine Lesser demon kills across three npc_ids, damage totals from the kill lines:
+
+| npc_id | Kills | Damage | XP measured | XP expected | Delta |
+|---|---|---|---|---|---|
+| 7664 | 4 | 325 | 1732 | 1732 | 0 |
+| 7657 | 2 | 162 | 863 | 863 | 0 |
+| 7656 | 3 | 244 | 1311 | ~1300 | **+11** |
+
+Aggregate: 731 damage, ~3896-3899 expected (the range is whether Hitpoints pays 1.33 or
+4/3 — GAME-MECHANICS.md already flags that rounding as undocumented), **3906 measured.
+Roughly +7 to +10.**
+
+Two of three ids reconcile exactly over multiple kills, which rules out a systematic
+per-damage rate error and rules out backward-allocation smearing between kills of the
+same monster. The excess is concentrated and real.
+
+**Likely mechanism.** `XpAttributor.settle()` writes XP off as `unallocatedXp` only when
+it arrived *outside* combat (`p.duringCombat == false`). XP that arrives while a fight is
+in progress is allocated to the monster being fought. So non-combat XP earned mid-fight —
+bones buried, anything incidental — is folded into that monster's XP total.
+`unallocatedXp` sat frozen at 129 across all nine kills, meaning nothing was written off,
+which is consistent: it all found a home, whether or not that home was correct.
+
+**This is a design characteristic, not obviously a bug.** The alternative — refusing to
+allocate XP during combat unless it matches expected damage output — would need an
+expected-XP model per style, which is exactly the "derive XP from damage" approach that
+was already rejected (see the Step 5 rewrite). Biasing slightly high and being honest
+about it may be the right trade.
+
+**What it does NOT affect:** kill counts, grades, damage totals, max-HP estimation. Only
+the per-monster XP figure, by a fraction of a percent.
+
+**Next step before acting:** log allocated XP per kill directly rather than inferring it
+by subtracting cumulative totals, and log which skill each allocation came from. That
+distinguishes "incidental XP folded in" from "combat XP misrouted between concurrently
+fought monsters", which have different fixes.
