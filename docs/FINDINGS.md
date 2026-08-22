@@ -718,3 +718,44 @@ the per-monster XP figure, by a fraction of a percent.
 by subtracting cumulative totals, and log which skill each allocation came from. That
 distinguishes "incidental XP folded in" from "combat XP misrouted between concurrently
 fought monsters", which have different fixes.
+
+## 2026-08-21 — RuneLite's own HP display is wiki-derived, so it can never corroborate us
+
+**Status:** verified by reading core's source. Important negative result.
+
+The in-game opponent health bar showed `Lesser demon 7/79` during the session where we
+measured 81-83 damage per kill. That looks like independent confirmation of the wiki's
+79. **It is not.**
+
+`OpponentInfoOverlay.java` line 125:
+
+```java
+lastMaxHealth = npcManager.getHealth(((NPC) opponent).getId());
+```
+
+Core reads max HP from `npcManager`, RuneLite's bundled NPC stats table, which is
+wiki-derived and keyed by npc id — the same lineage `data/monsters.tsv` came from. The
+79 on screen and the 79 in our table are one number quoted twice.
+
+**Rule that follows: never treat a RuneLite core display, or any plugin built on
+`npcManager`, as an independent check on our reference data.** Anything sourced from
+`npcManager` shares our failure mode. This also applies to Monster Stats, listed as a
+possible Step 0a shortcut in PROJECT.md — worth knowing before leaning on it.
+
+**A genuinely independent test does exist**, from the server formula core documents at
+line 170:
+
+```
+healthRatio = 1 + (healthScale - 1) * health / maxHealth     (health > 0; 0 otherwise)
+```
+
+`healthScale` is a display scale, **not** max HP — an earlier proposal to "just log
+healthScale" was wrong and would have proved nothing. But after we have dealt known
+damage `d`, `health = maxHealth - d`, leaving one equation in one unknown. Log
+`healthRatio` and `healthScale` next to our cumulative damage at two points mid-fight,
+solve for `maxHealth`, and the answer comes from server data with no wiki anywhere in
+the chain.
+
+That is the experiment that should settle the 79-vs-81 question. Core's own comment
+notes exact health is recoverable when `maxHealth <= healthScale`, so check that
+condition holds for the monster under test before trusting a point estimate.
