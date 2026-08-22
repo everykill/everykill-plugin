@@ -567,3 +567,72 @@ XP also reconciles against the documented rates (GAME-MECHANICS.md): 22 damage x
 Incidental: `unallocatedXp` sat at 68 across both kills and did not grow per kill,
 which is the benign bucket behaving as designed — a login-time XP drop with no combat
 to attach it to, not a per-kill allocation leak.
+
+## 2026-08-21 — Lesser demon takes 81 damage, wiki says 79
+
+**Status:** verified in a live client, three samples. Wiki disagrees with the game.
+
+Three kills, three different npc_ids, all in region 5789, all `dmg=81/81` with no
+foreign damage:
+
+```
+7656  attacks=13  33s  xp=432
+7664  attacks=8   20s  xp=431
+7657  attacks=11  ~28s xp=432
+```
+
+`data/monsters.tsv` lists 79 hitpoints for all three ids (level 82). Fetched
+https://oldschool.runescape.wiki/w/Lesser_demon directly on 2026-08-21 — the wiki
+itself says 79 for the level-82 variant, so the puller copied it faithfully. The
+disagreement is wiki-vs-game, not puller-vs-wiki.
+
+**Measured XP independently corroborates 81, which is the part that settles it.** XP is
+paid per damage point, so it is a second channel that does not share a failure mode with
+the hitsplat counter:
+
+- 81 damage -> 81x4 + 81x1.33 = 431.7 -> 431/432. **Matches all three kills.**
+- 79 damage -> 316 + 105.1 = 421.1 -> 421. Matches none of them.
+
+If our damage counter were over-reading by 2, XP would still have reported 79 damage
+worth. It didn't. The game paid for 81.
+
+**Regeneration ruled out.** The 33-second kill and the 20-second kill both took exactly
+81. NPC hitpoint regen over the fight would make the slow kill cost more; it didn't.
+
+Prediction made before the first kill was 79 damage / 421 xp, from the table. It was
+wrong, and observation corrected it. This is the first time the observed pipeline has
+caught the reference data being wrong, and it is the argument for the provenance
+tagging in spec-reference-data.md §2 — a silent merge would have buried this.
+
+Not yet established: whether 79 is stale, whether these ids are mis-mapped on the wiki,
+or whether something about region 5789 alters the variant. Recording the observation,
+not the explanation.
+
+## 2026-08-21 — DEATH_CONFIRM_TICKS=5 may be downgrading honest kills
+
+**Status:** strong pattern, cause not yet measured. Needs instrumentation before tuning.
+
+Same session, ten kills, a clean split by monster:
+
+| Monster | Kills | Signal | Grade |
+|---|---|---|---|
+| Watchman (5420) | 5 | `OBSERVED` | `UNCONTESTED` |
+| Knight of Ardougne (3297, 11936) | 2 | `OBSERVED` | `UNCONTESTED` |
+| Lesser demon (7656, 7657, 7664) | 3 | `DESPAWN_WHILE_DEAD` | `INFERRED` |
+
+All three demon kills were solo with `dmg=81/81` — zero foreign damage. They meet every
+condition for `UNCONTESTED` and are being graded down anyway.
+
+`DESPAWN_WHILE_DEAD` is the third branch of `KillStateMachine.despawn()`: no death
+signal was held, but `isDead()` was true. So either `ActorDeath` never fired for these,
+or it fired more than `DEATH_CONFIRM_TICKS` (5) before the despawn and `tick()` revoked
+it as stale.
+
+Plausible cause is a longer death animation on demons than on humanoids, but that is a
+hypothesis and has not been measured. **Do not tune the constant off this entry.** The
+next step is a temp debug line recording the actual death-signal-to-despawn gap per
+kill, gathered across several monster types, and then set the constant from the
+distribution.
+
+This is the same failure shape as the FINISH_WINDOW_TICKS episode: a tight window
+chosen at a desk, costing real data in the field. Bias the fix toward too generous.
