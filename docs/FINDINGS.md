@@ -541,3 +541,29 @@ before today still load with their counts intact. Verified: 41/41 tests pass, cl
 compile against RuneLite 1.12.35.
 
 Decision recorded in `docs/spec-reference-data.md` §5.
+
+## 2026-08-21 — reference table predicted Watchman's max HP correctly
+
+**Status:** verified in a live client.
+
+First live test of the P0 puller against a monster we had *not* previously measured,
+so this is a prediction rather than a fit.
+
+`data/monsters.tsv` row: `5420  Watchman  hitpoints=22  combat_level=33  experience_bonus=0`
+
+Two kills, both `grade=UNCONTESTED signal=OBSERVED`, both `dmg=22/22`:
+
+```
+21:33:56  kc=1 attacks=3 hits=2 maxHit=14 xp=117
+21:35:06  kc=2 attacks=4 hits=3 maxHit=14 xp=234 (cumulative, 117/kill)
+```
+
+Total damage to kill matched the table's hitpoints exactly, twice. The npc_id ↔ wiki
+bridge resolves correctly for a monster nobody hand-checked.
+
+XP also reconciles against the documented rates (GAME-MECHANICS.md): 22 damage x 4 =
+88 to the combat style, 22 x 1.33 = 29.3 Hitpoints, total 117.3 -> 117 measured.
+
+Incidental: `unallocatedXp` sat at 68 across both kills and did not grow per kill,
+which is the benign bucket behaving as designed — a login-time XP drop with no combat
+to attach it to, not a per-kill allocation leak.
