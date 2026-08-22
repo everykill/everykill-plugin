@@ -903,3 +903,53 @@ HP, and no amount of staring at 20 of them substitutes for the direct measuremen
 healthRatio/healthScale solve recorded earlier, which reads the server's own number and
 needs no minimum at all. Prefer the direct measurement. Stop inferring max HP from
 damage totals.
+
+## 2026-08-21 — SOLVED: the INFERRED grade was DEATH_CONFIRM_TICKS missing by one tick
+
+**Status:** measured, fixed, covered by a regression test.
+
+Instrumented `ActorDeath` (fired-or-not, keyed-or-not) and the `DESPAWN_WHILE_DEAD`
+fallback. Five lesser demon kills:
+
+```
+deathAt=78  tick=84   gap=6
+deathAt=221 tick=227  gap=6
+deathAt=267 tick=273  gap=6
+deathAt=332 tick=338  gap=6
+deathAt=467 tick=473  gap=6
+```
+
+`DEATH_CONFIRM_TICKS` was **5**. A lesser demon's death animation is **6**. Every clean
+solo demon kill missed `OBSERVED` by one tick and was written down `INFERRED` — 31 of
+them across the previous session.
+
+`revoked=false` in every case, which is why they landed in `DESPAWN_WHILE_DEAD` rather
+than being discarded: the despawn is processed *during* the tick, before `onGameTick`
+runs the revocation sweep for that same tick.
+
+**Two wrong turns worth recording**, because both were confident and both were wrong:
+
+1. First hypothesis was "window too tight" — correct, but abandoned.
+2. Then, reading the code, concluded `ActorDeath` must never fire for these NPCs, since
+   a late signal should have been revoked and fallen through to discarded. Reasoned from
+   source, stated it, and it was wrong. `ActorDeath` fires with `keyed=true` every time.
+   The intra-tick ordering above is what the code-reading missed.
+
+**The instrumentation settled in one kill what two rounds of reasoning got backwards.**
+When a question is empirical, measure it.
+
+**Fix:** `DEATH_CONFIRM_TICKS` 5 -> 20. The timer is the right mechanism — the case it
+guards against is the rockslug, left at 0 hp and abandoned, despawning when the player
+wanders off, which is *hundreds* of ticks. Six versus hundreds is an order of magnitude
+of daylight on both sides. It was simply set about three times too tight.
+
+**Regression test added:** `aSixTickDeathAnimationStillGradesObserved`. Verified it
+actually bites — fails at the old value of 5, passes at 20. No unit test could have
+*found* this bug (the logic was correct; the constant disagreed with the game), but one
+can stop it coming back.
+
+**Third time this project has been bitten by a tight timing window** (FINISH_WINDOW_TICKS
+cost a whole kill, EMITTED_TICKS was undersized, now this). Treat any hand-picked tick
+window in this codebase as suspect until it has been measured in a client, and bias
+generous — every one of these failures cost real data, and none of the loosenings has
+cost anything yet.

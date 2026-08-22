@@ -48,10 +48,18 @@ public class KillStateMachine
 
 	/**
 	 * How long a death signal is believed before the corpse has to show for it.
-	 * Provisional. Too short and a slow despawn drops UNCONTESTED to INFERRED, which is
-	 * a grade we can live with. Too long and a lie gets believed, which we can't.
+	 *
+	 * <p>Was 5, which was about three times too tight and cost us every single lesser
+	 * demon kill. Measured 2026-08-21: ActorDeath to despawn is <b>6 ticks</b>, dead on,
+	 * five times out of five. Missing by one tick downgraded 31 clean solo kills from
+	 * UNCONTESTED to INFERRED.
+	 *
+	 * <p>20 because the thing this guards against isn't a slow death animation, it's the
+	 * rockslug - left at 0 hp, abandoned, despawning when the player wanders off. That
+	 * gap is hundreds of ticks, not six. An order of magnitude of daylight either side,
+	 * so stop shaving it.
 	 */
-	static final int DEATH_CONFIRM_TICKS = 5;
+	static final int DEATH_CONFIRM_TICKS = 20;
 
 	/**
 	 * How recently an item-use must have happened for an unflagged despawn to count as

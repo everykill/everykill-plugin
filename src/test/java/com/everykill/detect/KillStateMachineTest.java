@@ -219,6 +219,24 @@ public class KillStateMachineTest
 	}
 
 	@Test
+	public void aSixTickDeathAnimationStillGradesObserved()
+	{
+		// Measured in a client 2026-08-21: lesser demon, ActorDeath to despawn is 6
+		// ticks, five out of five. DEATH_CONFIRM_TICKS was 5, so every one of 31 clean
+		// solo kills missed OBSERVED by a single tick and got written down INFERRED.
+		//
+		// No unit test could have caught that - the logic was fine, the constant just
+		// didn't match the game. This is here so shrinking it below a real death
+		// animation breaks the build instead of quietly costing someone their grade.
+		hit(1, 30, true, 0);
+		machine.death(1, 10, emitted::add);
+		machine.despawn(1, true, 16, emitted::add);
+
+		Assert.assertEquals(DeathSignal.OBSERVED, emitted.get(0).signal);
+		Assert.assertEquals(Confidence.UNCONTESTED, emitted.get(0).grade);
+	}
+
+	@Test
 	public void aDeathSignalThatNeverDespawnsIsNotAKill()
 	{
 		// A rockslug at 0 hp is still standing there waiting for salt. ActorDeath

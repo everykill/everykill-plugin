@@ -106,18 +106,23 @@ public class KillDetector
 
 		final NPC npc = (NPC) actor;
 		final int tick = client.getTickCount();
-		machine.damage(keyFor(npc, mine), npc.getId(), npc.getName(), npc.getCombatLevel(),
+		final int key = keyFor(npc, mine);
+		machine.damage(key, npc.getId(), npc.getName(), npc.getCombatLevel(),
 			regionOf(npc), hitsplat.getAmount(), mine, tick);
 
 		// temp: the server sends ratio/scale, never real hp. core solves
 		// healthRatio = 1 + (healthScale - 1) * health / maxHealth  for health, using a
 		// max hp it got from the wiki. we already know the damage, so we can turn it
 		// round and solve for maxHealth instead - jagex's number, no wiki in the chain.
-		// this is the only thing that ends the 79-vs-80 argument.
+		//
+		// key= not npc_id. six demons in the room share three ids, so an id-tagged log
+		// interleaves them and the solve fits garbage - it spat out 85 hp for something
+		// we've killed with 80 damage. the plugin keys on actor identity for exactly
+		// this reason; the log has to as well or it throws that away.
 		if (mine)
 		{
-			log.debug("Hit: npc_id={} amount={} healthRatio={} healthScale={} tick={}",
-				npc.getId(), hitsplat.getAmount(), npc.getHealthRatio(),
+			log.debug("Hit: key={} npc_id={} amount={} healthRatio={} healthScale={} tick={}",
+				key, npc.getId(), hitsplat.getAmount(), npc.getHealthRatio(),
 				npc.getHealthScale(), tick);
 		}
 
@@ -216,12 +221,13 @@ public class KillDetector
 		// by= matters. this fires on anyone's hitsplat, not just ours, so a line here
 		// does NOT mean we hit it. six cockatrices someone else was killing read like
 		// six kills we'd missed until that got straightened out.
-		log.debug("First contact: npc_id={} name={} by={} healthRatio={} healthScale={} tick={}",
-			npc.getId(), npc.getName(), mine ? "us" : "other",
-			npc.getHealthRatio(), npc.getHealthScale(), client.getTickCount());
-
 		final int key = ++nextActorKey;
 		actorKeys.put(npc, key);
+
+		log.debug("First contact: key={} npc_id={} name={} by={} healthRatio={} healthScale={} tick={}",
+			key, npc.getId(), npc.getName(), mine ? "us" : "other",
+			npc.getHealthRatio(), npc.getHealthScale(), client.getTickCount());
+
 		return key;
 	}
 
