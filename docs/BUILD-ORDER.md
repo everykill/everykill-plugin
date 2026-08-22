@@ -211,12 +211,29 @@ already being damaged*.
   points are not in the character export; ask before planning around it.
 - **ToA scaled HP** — "Into the Tombs" is not started on Account B.
 
-### Caveat that matters for data integrity
+### Verified-from-zero — what it is, and what it is not
 
-Account B is an established account with existing kill history. Everykill only counts
-what it observes from the moment it is running, so this does **not** contaminate
-anything — but it does mean **verified-from-zero kill counts are only possible on
-Account A**. Keep that distinction if both accounts ever upload.
+Both accounts have kill history predating the plugin. Everykill only counts what it
+observes from the moment it is running, so this contaminates nothing — but neither
+account can produce a *verified-from-zero* count for a monster it had already killed.
+
+**This is not a property of account type.** A brand-new main is verified-from-zero; a
+five-year-old ironman is not. It depends on one thing only: whether the plugin was
+running before that account's first kill of that monster.
+
+**The plugin behaves identically for every account type and must continue to.** There is
+no gate, no per-type branch, and no reason for one. Everykill is for every account.
+
+The distinction is a **label the site applies to a count**, never a restriction in the
+client. "Tracked from zero" is a stronger claim than "tracked since install", and mixing
+the two silently would be exactly the dirty data this project exists to avoid.
+PROJECT.md lists verified-from-zero as one of the four things nobody else does — a
+feature to expose honestly, not a limitation to hide.
+
+`firstKillMillis` per npc_id already gives the client the raw material. What the client
+cannot know is whether kills happened before install; there is no API that exposes it,
+which is the whole reason this project exists. Self-declared, or inferred for genuinely
+new accounts. **Open design question, not a solved one.**
 
 ---
 
