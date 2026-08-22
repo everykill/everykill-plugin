@@ -213,9 +213,17 @@ public class EverykillPlugin extends Plugin
 		xpService.drain(ledger::addXp);
 	}
 
-	// temp: the game just tells ironmen when someone else damaged their target. free
-	// ground truth for the contest AMBIGUOUS is supposed to catch, and we were missing
-	// it. nothing branches on this, no player names. bin it once we know the miss rate.
+	// KEPT ON PURPOSE - not a leftover, don't sweep it before checking FINDINGS.
+	//
+	// the game just tells ironmen when someone else damaged their target. that's free
+	// ground truth for the contest AMBIGUOUS is meant to catch, and we are demonstrably
+	// missing it: thirteen multicombat kills on 2026-08-20 showed zero foreign damage to
+	// us while the game printed this warning on every one.
+	//
+	// nothing branches on it and no player name is ever read - it exists to measure how
+	// often our own tracking misses a contest. exit condition: once that miss rate is
+	// known, either build it into grading properly or bin it. ironman-only, so it can
+	// never be the primary mechanism.
 	@Subscribe
 	public void onChatMessage(ChatMessage event)
 	{
