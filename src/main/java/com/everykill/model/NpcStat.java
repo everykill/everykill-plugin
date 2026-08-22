@@ -123,6 +123,41 @@ public class NpcStat
 		return days.computeIfAbsent(day.toString(), k -> new DayTally());
 	}
 
+	/**
+	 * Kills per day for the last {@code window} days, oldest first, gaps as zeroes.
+	 * Days you didn't fight it have no bucket, and a sparkline needs them anyway.
+	 */
+	public int[] dailyCounts(int window)
+	{
+		final int[] out = new int[window];
+		if (days == null || days.isEmpty())
+		{
+			return out;
+		}
+
+		final LocalDate today = LocalDate.now(ZoneId.systemDefault());
+		for (int i = 0; i < window; i++)
+		{
+			final DayTally t = days.get(today.minusDays(window - 1L - i).toString());
+			out[i] = t == null ? 0 : t.total();
+		}
+		return out;
+	}
+
+	/** Most kills in a single day. A personal best we can work out without a server. */
+	public int bestDay()
+	{
+		int best = 0;
+		if (days != null)
+		{
+			for (DayTally t : days.values())
+			{
+				best = Math.max(best, t.total());
+			}
+		}
+		return best;
+	}
+
 	/** Kills in the last {@code window} calendar days, today included. */
 	public int totalSince(int window)
 	{

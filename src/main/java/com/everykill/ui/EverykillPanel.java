@@ -157,6 +157,7 @@ public class EverykillPanel extends PluginPanel
 
 		monsterHeader.setFont(FontManager.getRunescapeSmallFont());
 		monsterHeader.setForeground(SUBTLE);
+		monsterHeader.setAlignmentX(LEFT_ALIGNMENT);
 
 		monsterList.setLayout(new BoxLayout(monsterList, BoxLayout.Y_AXIS));
 		monsterList.setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -276,9 +277,19 @@ public class EverykillPanel extends PluginPanel
 
 		if (rows.isEmpty())
 		{
-			monsterList.add(caption(window == Window.ALL
-				? "No kills recorded yet."
-				: "Nothing killed in this period."));
+			// the first thing every new user sees, and it used to be one sentence.
+			for (String line : window == Window.ALL
+				? new String[]{
+					"Nothing counted yet.",
+					"",
+					"Everykill counts every monster you",
+					"kill, not just the ~90 on the hiscores.",
+					"",
+					"Go hit something."}
+				: new String[]{"Nothing killed in this period."})
+			{
+				monsterList.add(caption(line.isEmpty() ? " " : line));
+			}
 		}
 
 		final int suppressed = notifier.getSuppressedThisSession();
@@ -357,6 +368,36 @@ public class EverykillPanel extends PluginPanel
 		// only draw the bar when the grades actually differ. a solid green line under
 		// every row is decoration; drawing it only for mixed rows makes the ones worth
 		// looking at jump out instead of hiding in a wall of identical bars.
+		// second line: when you fought it on the left, what it paid on the right. both
+		// come from data we were already storing and never showing.
+		final int[] daily = stat.dailyCounts(NpcStat.RETAINED_DAYS);
+		final long perKill = stat.total() > 0 ? stat.xp / stat.total() : 0L;
+
+		if (perKill > 0 || hasAny(daily))
+		{
+			final JPanel detail = new JPanel(new BorderLayout());
+			detail.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+			detail.setMaximumSize(new Dimension(Short.MAX_VALUE, 9));
+
+			if (hasAny(daily))
+			{
+				final Sparkline spark = new Sparkline();
+				spark.set(daily);
+				spark.setPreferredSize(new Dimension(70, 9));
+				detail.add(spark, BorderLayout.WEST);
+			}
+
+			if (perKill > 0)
+			{
+				final JLabel rate = new JLabel(shortXp(perKill) + " xp/kill");
+				rate.setFont(FontManager.getRunescapeSmallFont());
+				rate.setForeground(SUBTLE);
+				detail.add(rate, BorderLayout.EAST);
+			}
+
+			wrap.add(detail);
+		}
+
 		if (isMixed(stat))
 		{
 			final GradeBar bar = new GradeBar();
@@ -417,6 +458,24 @@ public class EverykillPanel extends PluginPanel
 		return stat.combatLevel > 0 ? name + " (" + stat.combatLevel + ")" : name;
 	}
 
+	private static String day(long millis)
+	{
+		return java.time.Instant.ofEpochMilli(millis)
+			.atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString();
+	}
+
+	private static boolean hasAny(int[] counts)
+	{
+		for (int c : counts)
+		{
+			if (c > 0)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private static boolean isMixed(NpcStat stat)
 	{
 		int grades = 0;
@@ -457,6 +516,21 @@ public class EverykillPanel extends PluginPanel
 		{
 			sb.append("<br>").append(shortXp(stat.xp)).append(" xp");
 		}
+
+		final int best = stat.bestDay();
+		if (best > 1)
+		{
+			sb.append("<br>best day ").append(best);
+		}
+		if (stat.firstKillMillis > 0)
+		{
+			sb.append("<br>first ").append(day(stat.firstKillMillis));
+			if (stat.lastKillMillis > stat.firstKillMillis)
+			{
+				sb.append(" &middot; last ").append(day(stat.lastKillMillis));
+			}
+		}
+
 		return sb.append("</html>").toString();
 	}
 
@@ -478,6 +552,61 @@ public class EverykillPanel extends PluginPanel
 		final Color c = grade.getColor();
 		return String.format("<font color='#%02x%02x%02x'>%s</font>",
 			c.getRed(), c.getGreen(), c.getBlue(), text);
+	}
+
+	/**
+	 * 35 days of kills as a tiny bar chart. We were already keeping the buckets and
+	 * only using them to filter a list; drawn, the same data says when you actually
+	 * fought the thing, which a number can't.
+	 */
+	private static final class Sparkline extends JPanel
+	{
+		private int[] counts = new int[0];
+
+		private Sparkline()
+		{
+			setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		}
+
+		private void set(int[] counts)
+		{
+			this.counts = counts;
+			repaint();
+		}
+
+		@Override
+		protected void paintComponent(Graphics g)
+		{
+			super.paintComponent(g);
+
+			int max = 0;
+			for (int c : counts)
+			{
+				max = Math.max(max, c);
+			}
+			if (max <= 0)
+			{
+				return;
+			}
+
+			final int h = getHeight();
+			final int w = getWidth();
+			final float step = w / (float) counts.length;
+
+			for (int i = 0; i < counts.length; i++)
+			{
+				if (counts[i] <= 0)
+				{
+					continue;
+				}
+
+				// always at least a pixel. a day you killed one thing should still be
+				// visible next to a day you killed two hundred.
+				final int bar = Math.max(1, Math.round(h * (counts[i] / (float) max)));
+				g.setColor(i == counts.length - 1 ? Color.WHITE : Confidence.EXACT.getColor());
+				g.fillRect(Math.round(i * step), h - bar, Math.max(1, Math.round(step) - 1), bar);
+			}
+		}
 	}
 
 	/** The 3px grade split — foundation, not storefront. The count is the headline. */
