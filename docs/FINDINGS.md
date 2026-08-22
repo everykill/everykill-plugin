@@ -811,3 +811,51 @@ fight.
 **Not established:** the regen rate. Do not derive one from this table — attack speed,
 weapon, and the player's setup are all uncontrolled, and the wiki states some monsters
 regenerate faster than others. The minimum estimator does not need the rate.
+
+## 2026-08-21 — CORRECTION: the "no overlap" claim above was over-claimed
+
+**Status:** supersedes the grouping in the previous entry. The conclusions survive; the
+phrasing did not.
+
+The entry above claimed "no overlap between the <=13-attack group (always 81) and the
+>=14-attack group (never 81)". **The very next kill was 14 attacks and 81 damage.** That
+claim was made on n=17 and falsified within two minutes. Recorded here rather than
+edited away.
+
+**Attack count was the wrong axis.** Re-running against elapsed wall-clock time (paired
+from the First contact and Kill log lines) gives a far cleaner picture:
+
+```
+damage : elapsed seconds observed
+  81   : 20 23 27 27 28 28 33 33 35
+  82   : 35 35 38 40 46 49 [183]
+  83   : 42 52
+```
+
+Threshold is around **35 seconds** for the first +1, with a single overlap point exactly
+at 35s where both values appear — the expected shape at a real boundary. The kill that
+falsified the claim took 35s: on the line. So the effect is real and the proxy was bad.
+
+**What still stands, unchanged:**
+
+- Minimum observed damage is **81**, stable across nine kills from 20s to 35s. Base max
+  HP is 81.
+- Longer fights require strictly more damage. Regeneration is real.
+- The minimum estimator is correct, and fast kills are what a good estimate needs.
+- The disagreement with the table's 79 is untouched.
+
+**Two caveats, stated rather than buried:**
+
+1. **The 183s / 82-damage point does not fit any steady-regen model.** Most likely an
+   artifact of the analysis, not the data: several demons share an npc_id and were
+   fought concurrently, so pairing a kill to "the most recent First contact with that
+   id" can mismatch. A limitation of the log format. Per-kill start ticks in the kill
+   line would remove the ambiguity.
+2. **The second step (+2 at 42-52s) does not follow the first (+1 at ~35s) at a
+   consistent rate.** If the regen clock free-runs rather than resetting when combat
+   starts, catching a tick depends on phase as well as duration, which would explain
+   both the boundary overlap and the irregular spacing. **Hypothesis, not a result.**
+
+**Method note for next time:** do not report a clean separation from a first pass on a
+convenience sample. Pick the axis with a physical justification (elapsed time, since
+regen is a clock) before grouping, not after seeing which one looks tidier.
