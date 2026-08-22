@@ -494,3 +494,26 @@ The useful part is what it proves: **we do receive other players' hitsplats.** T
 
 **Instrumentation fixed:** the log line now prints `by=us` or `by=other`. It read as six missed kills for several minutes before the code path was checked.
 **Source:** none — observed live.
+
+---
+
+## 2026-08-21 — P0 reference table pulled: 4,325 npc ids, and it agrees with everything we measured
+
+**Status:** verified
+**Method:** `tools/fetch-reference-data.sh` against the wiki's Bucket API, cross-checked against six monsters whose damage we recorded in play.
+**Finding:** The whole `infobox_monster` table comes back in **one request** — 3,233 rows expanding to **4,325 distinct npc ids**, 288KB, 0.9 seconds. `offset()` works if paging is ever needed. It isn't.
+
+Coverage: **15 ids missing hitpoints (0.3%)**, 875 missing experience bonus (20%).
+
+**It matches our own data on every monster we have measured**, with overkill always positive and small — 70/71–75, 120/123–126, 27/26–27, 60/60, 22/23, 22/22. Two independent sources, six monsters, no disagreement. That is the max-HP arithmetic in §1 of `spec-reference-data.md` becoming usable rather than theoretical.
+
+**Three things the raw data hides:**
+
+- **`id` carries non-numeric entries** (`beta14278`, `hist3011`) — wiki revision refs, not npc ids. Nothing in a live client matches them.
+- **Namespace pages leak into the bucket** (`RuneScape:Templates`), with no hitpoints and no ids.
+- **875 monsters have no `experience_bonus` field at all.** `GAME-MECHANICS.md` warned this is editor-entered and may be unfilled; this is that, measured. Treating absent as zero would silently hand 875 monsters a multiplier they were never assigned.
+
+**Consequence:** the puller is committed, the data is not. Wiki content is CC BY-NC-SA — non-commercial, share-alike — and committing it into a BSD repo would be redistributing it. `data/` is gitignored and regenerated on demand. The long-term intent remains deriving max HP from our own kill logs, where no licence applies at all.
+
+**Performance note worth keeping:** the first version ran grep and sed per row and took over five minutes on Windows, where spawning ~19,000 processes was almost the entire runtime. One awk pass does it in under a second. Same output.
+**Source:** OSRS Wiki Bucket API, `infobox_monster`, 2026-08-21.

@@ -11,3 +11,6 @@ snapshot/
 # Never let a delivered archive into the repo
 *.zip
 
+
+# generated reference data - CC BY-NC-SA, never committed. tools/fetch-reference-data.sh
+data/

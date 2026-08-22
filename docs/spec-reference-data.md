@@ -107,6 +107,46 @@ Returns, among others:
 {"id": ["976","977","978","979"], "hitpoints": 120, "combat_level": 100}
 ```
 
+### The puller — built and run, 2026-08-21
+
+`tools/fetch-reference-data.sh`. One curl call, one awk pass, **0.9 seconds** for the
+whole table. Writes `data/monsters.raw.json` and `data/monsters.tsv`.
+
+```
+4,325 npc ids
+   15 missing hitpoints   (0.3%)
+  875 missing xp bonus    (20%)
+```
+
+**`data/` is gitignored on purpose.** Wiki content is CC BY-NC-SA — non-commercial and
+share-alike, which sits badly against a BSD repo. Committing the dataset would be
+redistributing it. The script is committed; the data is generated on demand.
+
+**Validated against six monsters measured in play.** Every one matches, with overkill
+always positive and small:
+
+| npc_id | wiki HP | rolled damage observed |
+|---|---|---|
+| 7259 Dagannoth | 70 | 71–75 |
+| 7260 Dagannoth | 120 | 123–126 |
+| 421 Rockslug | 27 | 26–27 |
+| 7257 Ankou | 60 | 60 |
+| 409 Cave crawler | 22 | 23 |
+| 11917 Guard | 22 | 22 |
+
+**Two traps the raw data hides**, both handled in the script and both invisible until
+you look:
+
+- **`id` carries non-numeric entries** — `beta14278`, `hist3011`. Wiki revision refs,
+  not npc ids, and nothing in a live client will ever match them. Filter to numerics.
+- **Wiki namespace pages leak into the bucket**, e.g. `RuneScape:Templates`. Filter
+  anything with a colon in the name.
+
+**20% of monsters have no `experience_bonus` at all.** That is the "editor-entered data
+may be unfilled" warning from `GAME-MECHANICS.md`, measured at scale. Anything reading
+this field must treat absent as *unknown*, never as zero — 875 monsters would silently
+get a 1.0 multiplier they were never assigned.
+
 ### Three things that query taught us
 
 - **`id` is a repeated field.** Multiple npc_ids share one row. The bridge is free — no
