@@ -1006,3 +1006,26 @@ how often the server actually updates it, and whether staleness is the explanati
 Until then the method cannot be trusted and the wiki-vs-observed question stays open.
 
 **Do not use these numbers.** One clean fit is not a result.
+
+## 2026-08-21 — the one max-HP number the solve produced is falsified
+
+**Status:** the solve is not merely inconclusive, it is demonstrably wrong. Strengthens
+the parked entry above.
+
+The solve's single clean fit was **82** for npc_id 7656 (16 samples, unique fit, also
+reproduced by hand across 12 samples).
+
+At 22:23:17 a **7656 died to 80 total damage** — `grade=UNCONTESTED signal=OBSERVED
+dmg=80/80`, a clean 9-attack solo kill.
+
+A monster with 82 hitpoints cannot die to 80 damage. The fit was wrong despite being
+unique, internally consistent, and matching a careful hand calculation.
+
+**Worth sitting with.** A model that fits every sample perfectly and admits exactly one
+solution still produced a false answer, because the *input pairing* was wrong in a way
+none of the samples could reveal. Uniqueness of fit is not evidence of correctness when
+the systematic error is in how the data was assembled.
+
+The cheap external check — "is this consistent with the damage we have actually killed
+one with?" — caught in one kill what 16 perfectly-fitting samples could not. Keep that
+cross-check on any future max-HP estimate.
