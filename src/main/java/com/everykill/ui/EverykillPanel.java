@@ -171,6 +171,13 @@ public class EverykillPanel extends PluginPanel
 		tabs.setLayout(new java.awt.GridLayout(1, Window.values().length, 2, 0));
 		tabs.setMaximumSize(new Dimension(Short.MAX_VALUE, 22));
 
+		// BoxLayout lines children up by alignmentX relative to EACH OTHER, so one
+		// component at LEFT and the rest at the 0.5 default lands everything in a
+		// compromise position. they all have to agree or none of them do.
+		tabs.setAlignmentX(LEFT_ALIGNMENT);
+		monsterList.setAlignmentX(LEFT_ALIGNMENT);
+		noticeLabel.setAlignmentX(LEFT_ALIGNMENT);
+
 		for (Window w : Window.values())
 		{
 			final MaterialTab tab = new MaterialTab(w.label, tabs, null);
