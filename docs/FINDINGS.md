@@ -1208,3 +1208,35 @@ Comparison monster 2046 behaved sanely across the same fight — 5, 10, 10, 15 c
 
 **Not fixed. Nothing changed in code.** Logged so it is not rediscovered from scratch.
 **Source:** none — direct observation in a dev client.
+
+---
+
+## 2026-08-22 — the snakeling XP theft reproduced offline: own-tick-first allocation loses to a chip hit
+
+**Status:** verified (reproduced in a unit test) — **supersedes the "unverified-assumption (mechanism)" half of the earlier entry today**
+**Method:** Replayed the exact shape from the Zulrah log as a unit test against `XpAttributor`, no client involved. A scratch probe printed the resulting per-npc totals, then was deleted.
+**Finding:** The hypothesis logged earlier today is **correct**, and it needed no game access to confirm.
+
+```java
+xp.damage(SNAKELING, 1, 100);                     // recoil ping on a 1 hp add
+xp.xpChanged(CombatSkill.RANGED, 1_000_076, 100); // Zulrah's xp, arrives a tick EARLY
+xp.damage(ZULRAH, 19, 101);                       // Zulrah's hitsplat, one tick later
+xp.settle(101);
+```
+
+Result: **snakeling 76, Zulrah 0, unallocated 0, stranded 0.**
+
+The mechanism is `allocateAt()`'s search order — own tick, then forward, then back:
+
+```java
+for (int t = tick; t <= tick + SETTLE_TICKS; t++)   // own tick FIRST
+```
+
+XP lands one tick before its own hitsplat (FINDINGS 2026-08-21). So the boss's XP arrives on tick T while the boss's damage does not exist until T+1. If *any* damage sits in T's pool — a single point of recoil on an add is enough — `split()` succeeds there and returns. It never looks forward to T+1 where the damage that actually earned the XP is waiting. **The add takes 100% of it**, because it is 100% of its own tick's pool.
+
+**Why no guard fired.** `strandedXp` and `unallocatedXp` are both zero: 76 XP went in and 76 XP came out. The books balance exactly. **Nothing is lost, so nothing complains** — the allocator cannot distinguish "allocated correctly" from "allocated to the wrong monster". Any future guard for this has to reason about whether a monster *could plausibly* have yielded that XP, not about whether the totals add up.
+
+**Not fixed, deliberately.** The own-tick-first order is load-bearing and the comment above it says so in as many words. Two existing tests depend on it: `heldExperienceGoesToTheMonsterThatWasActuallyHit` and `experienceArrivingOneTickLateStillLands` ("current tick wins when it has damage"). Reordering the search naively trades this bug for the wrong-monster bug those two were written to prevent. The real design question is unanswered: **when XP arrives on a tick with a small pool and the next tick has a large one, which should win?** A candidate discriminator worth investigating is plausibility — a 1 hitpoint monster mathematically cannot pay 76 experience — but that is a desk idea, not a measurement, and this log has twice recorded what happens when a number gets guessed at.
+
+**Committed as a failing test on purpose.** `aChipHitOnAnAddDoesNotStealTheBossesExperience` fails; its control `anAddKeepsTheExperienceItActuallyEarned` passes, so a fix cannot simply deny adds their own experience. Suite is 47 tests, 1 failure, 0 errors, and **no production code was touched** — `./gradlew compileJava` is green and the plugin ships unchanged. A red build that names a real bug beats a green one hiding it.
+**Source:** none — reproduced directly from this repo's own code.

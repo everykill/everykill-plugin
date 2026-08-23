@@ -205,6 +205,49 @@ public class XpAttributorTest
 		Assert.assertEquals(0L, xp.xpFor(ABYSSAL_DEMON));
 	}
 
+	// ------------------------------------------------------------------
+	// Zulrah, 2026-08-22. A snakeling banked 102 xp on a 1 hp kill.
+	// ------------------------------------------------------------------
+
+	private static final int ZULRAH = 2042;
+	private static final int SNAKELING = 2045;
+
+	@Test
+	public void aChipHitOnAnAddDoesNotStealTheBossesExperience()
+	{
+		xp.prime(CombatSkill.RANGED, 1_000_000);
+
+		// The shape that did it, straight off the log. Recoil pings a snakeling for 1
+		// on tick 100. We hit Zulrah for 19 - but xp lands a tick BEFORE its hitsplat,
+		// so the 76 arrives at 100 while Zulrah's damage doesn't show up until 101.
+		//
+		// allocateAt() checks its own tick first. Tick 100's pool isn't empty, it has
+		// the snakeling's 1 damage in it, so the split succeeds there and never looks
+		// forward to the damage that actually earned the xp.
+		xp.damage(SNAKELING, 1, 100);
+		xp.xpChanged(CombatSkill.RANGED, 1_000_076, 100);
+		xp.damage(ZULRAH, 19, 101);
+		xp.settle(101);
+
+		Assert.assertEquals("19 damage earned it, 19 damage keeps it", 76L, xp.xpFor(ZULRAH));
+		Assert.assertEquals("a 1 hp add cannot bank 76 xp", 0L, xp.xpFor(SNAKELING));
+	}
+
+	@Test
+	public void anAddKeepsTheExperienceItActuallyEarned()
+	{
+		xp.prime(CombatSkill.RANGED, 1_000_000);
+
+		// The other side of it, so a fix can't just deny adds their xp. Snakeling dies
+		// on 100 and its own xp arrives with no boss damage anywhere near. It keeps it.
+		xp.damage(SNAKELING, 1, 100);
+		xp.xpChanged(CombatSkill.RANGED, 1_000_004, 100);
+		xp.settle(102);
+
+		Assert.assertEquals(4L, xp.xpFor(SNAKELING));
+		Assert.assertEquals(0L, xp.getStrandedXp());
+	}
+
 	@Test
 	public void drainHandsOverAndClears()
 	{
