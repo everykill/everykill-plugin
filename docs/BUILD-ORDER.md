@@ -25,7 +25,7 @@ every bug found so far was found in a client, not in a test run.
 | 7 | Loot attribution + guards | ⬜ not started | — |
 | 8 | Grading, batching, upload | ⬜ not started | — |
 | 0a | NPC stat table pull | 🟡 **partial** | 4,124 ids pulled and validated; script committed |
-| 0b | always_drops[] pull | ⬜ not started | — |
+| 0b | always_drops[] pull | 🟡 **partial** | 4,339 rows, 2,798 ids; nothing consumes it yet |
 | 0c | Combat formula implementation | ⬜ not started | — |
 
 **The one that matters: Step 4 has never run.** Not "lightly tested" — the
@@ -243,9 +243,16 @@ Start with common slayer monsters; the table fills in incrementally. **Must neve
 
 ### Step 0b — always_drops[] pull
 
-**⬜ Status: not started.** Same API and script as 0a; deferred until loot attribution is real.
+**🟡 Status: pulled and validated, not yet consumed.** `tools/fetch-always-drops.py` is committed. **4,339 rows covering 2,798 npc ids with a guaranteed drop, 2,710 of them countable**, in 17 seconds. Nothing in the client reads it yet — it feeds the corpse counter, which arrives with Step 7.
 
-Same API, drops bucket, filter rarity `Always`. Store `item_id`, `quantity`, `is_stackable`, `is_countable`. Explicitly flag monsters with no guaranteed drop.
+**The Bucket API cannot do this — the spec was wrong.** `bucket('dropsline')` exposes exactly two fields, `page_name` and `item_name`. No rarity, no quantity, ~35 field names probed. Rarity is the whole point, so the puller parses `{{DropsLine}}` out of page wikitext via `action=query&prop=revisions`, batching **50 titles per request** — ~1,350 names in 27 calls, one process. See FINDINGS 2026-08-22.
+
+Python rather than bash, deliberately: nested braces, HTML comments inside parameter values, quantity ranges and duplicate version blocks make this a real parse. `fetch-reference-data.sh` stays awk because a flat field grab suits it.
+
+**Known gaps, all recorded rather than guessed:**
+- **56 rows have blank quantities** where a monster's version blocks disagree (Black demon, Lesser demon). Emitted `countable=0`; there is no way to tell from a wiki page which version was killed.
+- **Guaranteed ≠ countable.** Clue scrolls, caskets, coins and Zulrah's scales are all `rarity=Always` and all lie about corpse count — they stack or drop one regardless. Flagged `countable=0`.
+- **Kalphite Queen has no guaranteed drop**, and neither does Rockslug (independently reproducing FINDINGS 2026-08-14). The corpse counter is simply unavailable for those monsters — not a missing-data case. **KQ is the next Step 4 target, so plan on not having it there.**
 
 ### Step 0c — combat formula implementation *(new, from `spec-performance.md` §8)*
 

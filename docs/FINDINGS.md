@@ -1240,3 +1240,56 @@ XP lands one tick before its own hitsplat (FINDINGS 2026-08-21). So the boss's X
 
 **Committed as a failing test on purpose.** `aChipHitOnAnAddDoesNotStealTheBossesExperience` fails; its control `anAddKeepsTheExperienceItActuallyEarned` passes, so a fix cannot simply deny adds their own experience. Suite is 47 tests, 1 failure, 0 errors, and **no production code was touched** — `./gradlew compileJava` is green and the plugin ships unchanged. A red build that names a real bug beats a green one hiding it.
 **Source:** none — reproduced directly from this repo's own code.
+
+---
+
+## 2026-08-22 — the drops bucket exposes no rarity, so Step 0b cannot use the Bucket API
+
+**Status:** verified
+**Method:** Probed ~35 candidate field names against the Bucket API. Found the bucket is named `dropsline` (not `drops`), then brute-forced single-field selects against it. Cross-read a real `{{DropsLine}}` call out of page wikitext to see what the template actually carries.
+**Finding:** `spec-reference-data.md` and BUILD-ORDER Step 0b both say "same API, drops bucket, filter rarity `Always`". **That is not possible.** `bucket('dropsline')` exposes exactly two fields:
+
+| field | |
+|---|---|
+| `page_name` | ✅ |
+| `item_name` | ✅ |
+| `rarity` | ❌ |
+| `quantity` | ❌ |
+| `item_id` | ❌ |
+
+Every other name probed returns "Field not found" — `rarity`, `quantity`, `drop_rarity`, `item_rarity`, `chance`, `qty`, `item_id` and ~28 more. The template itself carries the data (`{{DropsLine|name=Abyssal ashes|quantity=1|rarity=Always}}`), so the bucket is publishing a curated subset of it, exactly as `infobox_monster` does with defence bonuses (see the Step 0c entry today). **Rarity is the entire point of `always_drops[]`**, so the specced approach is dead.
+
+**Consequence:** Step 0b is implemented as `tools/fetch-always-drops.py`, parsing `{{DropsLine}}` out of page wikitext via `action=query&prop=revisions`. **Titles batch 50 per request**, so ~1,350 distinct monster names cost ~27 calls, not one per page — the 2026-08-14 lesson was about spawning 19,000 Windows subprocesses, and this is one process making 27 requests. Written in Python rather than bash because the parse is genuinely non-trivial: nested braces, HTML comments inside parameter values, quantity ranges, and duplicate version blocks. `awk` would have been a liability here; that is a deliberate departure from `fetch-reference-data.sh`, not an inconsistency.
+**Source:** oldschool.runescape.wiki Bucket API and `action=query`.
+
+---
+
+## 2026-08-22 — three things the wikitext drop parse has to handle that a naive filter would get wrong
+
+**Status:** verified
+**Method:** Ran the parse against Abyssal demon, Rockslug, Zulrah, Kalphite Queen and Bloodveld before writing the puller.
+**Finding:** A naive "grep for rarity=Always" produces wrong data in three distinct ways, all found in the first five pages tested.
+
+1. **Duplicate rows per page.** Abyssal demon returns `Abyssal ashes` **twice** — pages carry one drop table per version (standard, catacombs, wilderness slayer cave) and the guaranteed drop is restated in each. Same item at the same quantity is one drop written down repeatedly; deduped. **Different quantities across versions is a different table**, and from a wiki page there is no way to know which version was killed, so those rows are emitted with blank quantities and `countable=0` rather than picking one.
+2. **Quantity is not a number.** Zulrah's guaranteed drop reads `100-299<!--note: the 500 scale drop is separate and intentionally excluded here-->`. Editors leave HTML comments, `<ref>` tags and wiki links inside parameter values. Parsed into `quantity_min`/`quantity_max` after stripping, with unparseable values left blank rather than defaulted to 1.
+3. **Guaranteed does not mean countable.** `spec-data-model.md` already says only non-stackable guaranteed drops can count corpses, but the drop tables show *why* it matters: Bloodveld's "always" rows include `Clue scroll (elite)` and `Reward casket (elite)`, which drop one regardless of how many corpses, and Zulrah's are scales, which stack. Both would silently under-count. Flagged `countable=0` for coins, clue scrolls, caskets and scales.
+
+**Also corroborated:** Rockslug returns **no guaranteed drop at all**, independently reproducing FINDINGS 2026-08-14, which recorded the same thing from a hand-read of the drop table. Kalphite Queen likewise has none — worth knowing before the corpse counter is relied on at a boss.
+**Source:** oldschool.runescape.wiki drop tables for the five pages named.
+
+---
+
+## 2026-08-22 — the drop puller's brace matcher was off by one, and the summary counts looked plausible enough to ship
+
+**Status:** verified
+**Method:** First full run wrote 273 rows. Spot-checked two monsters whose guaranteed drops had already been confirmed by hand an hour earlier — Abyssal demon and Bloodveld — and both were **missing from the output**.
+**Finding:** The template-body scanner initialised its brace depth to 2 instead of 1. `{{DropsLine|` leaves **one** unclosed pair open, not two, so `}}` never brought the depth to zero. Every match ran off the end of its own template and consumed the remainder of the page — one 14 KB body instead of a 45-character one. Only drops whose page had a single trailing template survived, which is why anything came out at all.
+
+**The failure was quiet, and that is the point worth recording.** The run reported `273 rows, 273 npc ids with a guaranteed drop, 1248 pages with no guaranteed drop` and exited zero. Nothing errored. The numbers were *plausible* — plenty of monsters genuinely have no guaranteed drop, so a low count reads as a real-world fact rather than a parser fault. **The tell was 273 rows across exactly 273 ids: not one monster with two guaranteed drops, which Bloodveld demonstrably has.** The bug was found by checking output against a hand-verified example, not by reading the summary.
+
+After the fix: **4,339 rows, 2,798 npc ids with a guaranteed drop, 2,710 countable, 17 seconds.** A tenfold difference from a single character.
+
+**Validated against known-good data rather than eyeballed:** Abyssal demon returns exactly one `Abyssal ashes` row (deduped from the two version blocks); Bloodveld returns three, with clue scroll and casket correctly `countable=0`; Zulrah's `100-299<!--comment-->` parses to min 100 / max 299 and is `countable=0` because scales stack; **Rockslug returns nothing**, independently reproducing FINDINGS 2026-08-14. Kalphite Queen also has no guaranteed drop, which matters because it is the next Step 4 test target — **the corpse counter will not be available there.**
+
+56 rows carry blank quantities where version blocks disagree (Black demon, Lesser demon and similar carry different ash quantities per variant); those are emitted `countable=0` rather than guessed.
+**Source:** none — direct testing.
