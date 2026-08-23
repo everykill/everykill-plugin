@@ -14,6 +14,13 @@ Events are immutable and granular; everything else is derived. Get this layer ri
 
 ## kill_event
 
+> **This table is the server-side target design, not what the client emits.**
+> It is much wider than the real record — slayer fields, prayers, boosts,
+> loadout hashes, coordinates and `weapon_speed_ticks` (dropped, FINDINGS
+> 2026-08-20) do not exist on it. For what the client actually sends today,
+> build against **`docs/spec-kill-contract.md`**, which is checked field for
+> field against `KillRecord`.
+
 Immutable, ~300 bytes.
 
 | Group | Fields |

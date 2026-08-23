@@ -6,9 +6,10 @@ Kill counts for every monster in the game, not just the ~90 on the hiscores.
 
 Records a per-monster kill count for anything you kill, locally, and grades every
 kill by how well it can be evidenced. It also measures per-monster combat experience.
-The counts feed a website where you can see where you rank on monsters nobody else
-ranks — and how your dry streak on a given drop compares to other people actually
-killing that thing.
+
+A companion website is planned, where the counts will rank you on monsters nobody
+else ranks and compare your dry streak on a drop against other people actually
+killing that thing. **It does not exist yet and this plugin does not talk to it.**
 
 **Current status: P1. Local only. Nothing is uploaded.** The upload toggle exists,
 is off, and is not read by any code yet. It ships early so the required disclosure
@@ -41,14 +42,19 @@ loot. This is about the kill.
 Every kill carries one, always. There is no shape in this plugin that expresses
 "probably a kill" other than a grade — **classify, never fabricate**.
 
-- **exact** — we saw it die, we damaged it, nobody else did
+- **uncontested** — we hit it, we saw it die, and nobody else touched it while
+  we were watching
 - **inferred** — the death was deduced rather than observed: it despawned while
   flagged dead, or it vanished right after we used an item on it
 - **ambiguous** — another player damaged it too, so we cannot claim it cleanly
 
-Ranks and published rates read `exact` only. Totals read everything. The colours
-(`#5f9e5f`, `#c9913c`, `#b45252`) are identical in the plugin and on the site, so
-they are learned once.
+Ranks and published rates read `uncontested` only. Totals read everything. The
+colours (`#5f9e5f`, `#c9913c`, `#b45252`) are identical in the plugin and on the
+site, so they are learned once.
+
+The ceiling is `uncontested` and there is no `exact` — a record opens on the
+first hitsplat we witness, so damage dealt before we arrived is invisible. See
+`docs/spec-kill-contract.md`.
 
 ## Experience is measured, not derived
 
