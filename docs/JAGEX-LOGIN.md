@@ -128,14 +128,35 @@ then retry.
 
 ## Once you're in
 
-Play for ten minutes or so, then check this file exists:
+**Outdated as of the `com.everykill` rewrite (2026-08-20).** This section used to ask for
+`~/.runelite/everykill-plugin/snapshot.json`. **That file no longer exists** — the
+JSON-snapshot half was deleted in the rewrite and the ledger lives in the RuneLite config
+profile instead (`everykill.rsprofile.<id>.ledger`).
 
+To see what the plugin has recorded, run the dev client with `--debug` and read
+`~/.runelite/logs/client.log`:
+
+```bash
+grep -E "com\.everykill" ~/.runelite/logs/client.log | grep -v EventBus
 ```
-C:\Users\<you>\.runelite\everykill-plugin\snapshot.json
-```
 
-Open it in Notepad. You should see your skills with real XP values, a `session`
-block with an `xpPerHour` figure, your current task, and any drops you picked up.
+Kill lines look like `Kill: npc_id=… name=… grade=… signal=… dmg=…`, and the ledger is
+written out on each change. **Never paste `credentials.properties`** — only ever check its
+timestamp and size.
 
-**Paste me the contents.** That's the first genuine XP-rate data we'll have had —
-everything I've quoted so far has come from guides written for stronger accounts.
+## Which character the dev client logs in as
+
+**The credentials file is per-character, and the dev client rewrites it on every launch.**
+That makes its timestamp useless as a diagnostic — you are reading the dev client's own
+write, not the launcher's. Confirmed the hard way 2026-08-22.
+
+To switch the dev client to a different character:
+
+1. **Delete** `~/.runelite/credentials.properties` first. Without this you cannot tell a
+   stale file from a fresh one.
+2. Confirm `--insecure-write-credentials` is actually saved in **RuneLite (configure)** →
+   Client arguments. A missing or mistyped argument fails **silently**.
+3. Launch RuneLite from the Jagex Launcher **as the character you want**, get fully
+   in-game, then close it.
+4. Check the file came back. **A changed byte size is the honest tell** that it holds a
+   different character's session; the timestamp is not.

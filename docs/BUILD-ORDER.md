@@ -19,7 +19,7 @@ every bug found so far was found in a client, not in a test run.
 | 1 | Damage records + ActorDeath | ✅ **verified** | foreign-kill exclusion re-confirmed 2026-08-21 |
 | 2 | isDead despawn fallback | ✅ **verified** | both paths measured, gap is 6 ticks |
 | 3 | Transform deaths | ✅ **verified** | all three cases, twice — see the correction in-step |
-| 4 | NpcChanged phase handling | ⚠️ **built — never executed** | none. Zero runs. |
+| 4 | NpcChanged phase handling | 🟡 **partial** | branch executed 9× on Zulrah; no fight completed |
 | 5 | Measured XP by damage share | 🟡 **partial** | allocator verified; two numbers still unmeasured |
 | 6 | Loot: tile coincidence | ⬜ not started | — |
 | 7 | Loot attribution + guards | ⬜ not started | — |
@@ -130,7 +130,14 @@ follow, but "should" is not "did".
 
 ## Step 4 — NpcChanged phase handling
 
-**⚠️ Status: built — never executed. Zero runs.** The record-gated carry-forward branch in `onNpcChanged` has not run once, and it is not for want of trying: a rock crab cannot be damaged while dormant, so `NpcChanged` always completes before the first hitsplat and the branch is **structurally unreachable** on the substitute monsters available. Only a monster that transforms *while already being damaged* can execute it.
+**🟡 Status: partial — the branch has now executed, but no fight has been completed.** Nine carry-forward executions on Zulrah 2026-08-22, first time in the project's history. See FINDINGS 2026-08-22. **What is still missing is the acceptance criterion itself:** the fight ended in a player death, so it produced *zero* kills. Nine phases producing zero kills is not the same claim as a completed fight producing exactly one. **Do not mark this ✅ until a multi-phase boss is killed and the count is checked.**
+
+What the Zulrah run did establish:
+- Zulrah's dive is an `NpcChanged`, **not** a despawn/respawn — `2042 -> 2043 -> 2044` cycling, zero despawn discards mid-fight. This was an open question and is now measured.
+- Damage carried forward unbroken across all nine transitions, 66 → 338.
+- `deathAt=-1` on every transition — no false `ActorDeath`. **Zulrah-specific**, because its forms never zero their health ratio. Says nothing about KQ or Zalcano, which do.
+- Player death produced the correct terminal behaviour: record discarded, no phantom kill.
+- Snakelings (2045/2046) kept their own records and never polluted Zulrah's kill count. **But XP leaked** — see the second FINDINGS entry for 2026-08-22, unfixed.
 
 **Now unblocked (2026-08-21).** A second account has Zulrah, Vorkath and the Grotesque Guardians. This is the highest-value outstanding test in the project. See *Test access* below for the recommended order.
 
@@ -283,22 +290,36 @@ no cannon. This is the account every FINDINGS entry to date was measured on.
 project.** BUILD-ORDER previously called `onNpcChanged`'s carry-forward "the case most
 likely to misbehave" and noted it had never run once, because a rock crab can't be
 damaged while dormant so the branch is structurally unreachable on Account A. Account B
-has killed Zulrah, Vorkath and the Grotesque Guardians — all of which transform *while
+can reach Zulrah, Vorkath and the Grotesque Guardians — all of which transform *while
 already being damaged*.
 
-**Recommended order when this is picked up:**
+**Correction (2026-08-22): this section previously claimed Account B "has killed Zulrah,
+Vorkath and the Grotesque Guardians." That is false.** The account's collection log read
+**Zulrah kills: 0, Obtained 0/10, Personal Best: N/A** when the client was opened on
+2026-08-22. The original claim came from a character export read on 2026-08-21; whatever
+it was inferred from, it was not kill counts. **Access is not history.** The distinction
+matters because the recommended order below was written assuming familiarity with these
+fights, and the first Zulrah attempt ended in a death at 338/500 damage. Re-derive
+account capability from the collection log, not from quest or gear access.
 
-1. **Zulrah.** Changes form and npc_id repeatedly mid-fight, every fight. The purest and
-   most repeatable test of record-gated carry-forward that exists.
-2. **Grotesque Guardians (Dusk).** Doubly valuable: a phase boss *and* a transform-death
-   monster. Core's `NpcUtil` lists `GARGBOSS_DUSK_PHASE4` and `GARGBOSS_DUSK_DEATH` by
-   name, so this directly exercises the `isDying()` gate added 2026-08-21 on a boss
-   rather than a rockslug.
-3. **Vorkath.** Also an XP-attribution case — GAME-MECHANICS records that Vorkath applies
-   a +20% experience bonus against a published +0%, so measured XP should disagree with
-   the naive expectation in a *specific, predicted* direction. A good falsifiable test.
-4. **Kalphite Queen.** No quest gate at all. The original `ActorDeath`-fires-mid-transition
-   report in FINDINGS came from KQ.
+**Recommended order — revised 2026-08-22 after the Zulrah run:**
+
+1. **Kalphite Queen.** No quest gate, and it is now the highest-value target rather than
+   the last resort. Its first form is **genuinely killed** before the transformation —
+   20 game ticks of transition per the wiki — so it exercises the `ActorDeath`-fires-
+   mid-fight path that Zulrah structurally cannot. #15394 was reported against KQ.
+   Account B has the melee stats and gear for it. This is the fight that can still
+   falsify Step 4.
+2. **Grotesque Guardians (Dusk).** Phase boss *and* transform-death monster. Core's
+   `NpcUtil` lists `GARGBOSS_DUSK_PHASE4` and `GARGBOSS_DUSK_DEATH` by name, so this
+   exercises the `isDying()` gate added 2026-08-21 on a boss rather than a rockslug.
+3. **Vorkath.** Also an XP-attribution case — GAME-MECHANICS records a +20% experience
+   bonus against a published +0%, so measured XP should disagree with the naive
+   expectation in a *specific, predicted* direction. A good falsifiable test.
+4. **Zulrah.** ~~The purest test of carry-forward.~~ **Done 2026-08-22** — nine
+   transitions, mechanism confirmed. Worth returning to only for a completed kill, and
+   it is a hard fight to learn. Any multi-phase boss now satisfies the outstanding
+   acceptance criterion equally well, so pick the easiest one, not this.
 
 ### Still blocked
 

@@ -1161,3 +1161,50 @@ Also corrected: BUILD-ORDER claimed **4,325 npc ids**. The real figure is **4,12
 
 **Consequence:** Step 0c cannot compute `AverageDefBonus`, so the DPS half of the combat formula has no structured input. Recorded in BUILD-ORDER Step 0c with three options and an explicit instruction to choose before starting. **This also independently kills any plan to compute the XP multiplier ourselves** — that formula needs `AverageDefBonus` too, so even for the 762 ids where the wiki leaves `experience_bonus` blank, the fallback was never available. Reading the published value is not just preferred, it is the only option.
 **Source:** oldschool.runescape.wiki `api.php`, `action=bucket` and `action=parse`.
+
+---
+
+## 2026-08-22 — Step 4's carry-forward branch executed for the first time, nine times, on Zulrah
+
+**Status:** verified
+**Method:** Live dev client, main account, first-ever Zulrah attempt (KC 0 going in). Temporary debug logging on both arms of `KillStateMachine.composition()`, added the same day for exactly this. Ended in a player death at 338 damage dealt.
+**Finding:** **The record-gated carry-forward branch had never executed once in this project's history. It ran nine times in one fight.** Zulrah's dive is an `NpcChanged`, not a despawn/respawn — `2042 -> 2043 -> 2044` cycling, with **zero** despawn discards until the fight ended. That question was open and is now measured rather than reasoned about.
+
+Damage carried across every transition on one unbroken record: **66 → 116 → 116 → 129 → 175 → 178 → 270 → 287 → 289**, ending at 338. `othersDamage=0` throughout (solo boss).
+
+**`deathAt=-1` on all nine transitions.** BUILD-ORDER flagged specific exposure here via runelite/runelite#15394 (Kalphite Queen) and #16479 (Zalcano) — NPCs reading as dead mid-fight during a phase window, which would have produced a phantom kill per phase. **It did not happen on Zulrah**, because Zulrah's forms do not zero their health ratio between transitions. That is a real result for Zulrah and **says nothing about KQ or Zalcano**, which zero their HP by design. Do not generalise it.
+
+**Zero kills emitted for npc_id 2042/2043/2044 across the whole fight.** A broken implementation would have banked up to nine phantom kills. The player death then produced the correct terminal behaviour:
+
+```
+Discarded a despawn we had damage on: npc_id=2042 name=Zulrah myDamage=338
+flaggedDead=false revoked=false deathAt=-1 itemAt=null itemGap=-1 tick=7425
+```
+
+Damage on record, no death signal, no finishing item, so the record was binned rather than counted. Dying is the case most likely to fabricate a kill and it did not.
+
+**Snakelings stayed separate and correct.** 14 kills across npc_ids 2045 and 2046, each `dmg=1/1` (ring of recoil one-shots a 1 HP monster), graded UNCONTESTED. They never polluted Zulrah's record and Zulrah's damage never leaked into theirs — *as far as the kill counter is concerned*. XP is a different story, see the next entry.
+
+**What this does NOT establish.** The acceptance criterion is "one multi-phase fight produces exactly one kill." **The fight produced zero kills because the player died.** Nine phases producing zero kills is not the same claim as a completed fight producing one. **Step 4 stays 🟡 partial and the temporary logging stays in.** Kalphite Queen is the better next target: its first form is genuinely killed before the transformation (20 game ticks of transition per the wiki), so it exercises the `ActorDeath`-mid-fight path Zulrah never touched.
+**Source:** none — direct observation in a dev client. Wiki consulted for Zulrah/KQ mechanics: oldschool.runescape.wiki/w/Zulrah/Strategies, /w/Kalphite_Queen.
+
+---
+
+## 2026-08-22 — XP from damage dealt to Zulrah was allocated to a snakeling
+
+**Status:** verified (observed) / unverified-assumption (mechanism)
+**Method:** Same Zulrah session. Read back the per-kill `Kill:` lines and the final ledger write.
+**Finding:** Snakeling npc_id 2045 went from **`kc=7 xp=0` to `kc=8 xp=102`** on a single kill. The ledger's `xp` field is cumulative per npc_id, so **one snakeling kill added 102 experience**. Final ledger: `2045 Snakeling uncontested=9 xp=102 bySkill={RANGED: 76, HITPOINTS: 26}`.
+
+**That is impossible on its face.** A snakeling has **1 hitpoint** and the kill line reports `dmg=1/1`. Working backwards from the rates: 76 Ranged ÷ 4 = **19 damage**, and 26 Hitpoints ÷ 1.33 = **19.5 damage**. Both agree. Roughly **19 damage worth of experience** was credited to a monster that took one point of damage.
+
+Comparison monster 2046 behaved sanely across the same fight — 5, 10, 10, 15 cumulative, about 5 XP per 1-damage kill, which is right.
+
+**Timing.** The jump landed at 19:00:46, **four seconds after** carry-forward transition 9 (tick 7403, Zulrah at `myDamage=289`), and Zulrah's damage reached 338 by the discard at tick 7425. So ~49 damage went into Zulrah in that window while a snakeling died inside it. The offending kill line is also the only one in the fight with **`attacks=2`** rather than `attacks=1`.
+
+**Mechanism is a hypothesis, not a measurement.** The plausible reading is that `XpAttributor` pools damage per tick per npc_id and splits each combat `StatChanged` by damage share, and FINDINGS 2026-08-21 already records that **XP arrives one tick before its hitsplat**. If the experience for a Zulrah hit lands on a tick where the only damage in the pool belongs to the snakeling, the whole delta is allocated to the snakeling. **That is reasoning from source, which this log has twice recorded as insufficient.** It needs instrumentation on the allocator — log the pool contents and the split at allocation time — before anyone writes a fix.
+
+**Why it matters beyond Zulrah.** This is not the known ~0.25% skew from non-combat XP earned mid-fight (FINDINGS 2026-08-21). This is **combat XP from monster A landed on monster B**, which is exactly the dirty per-monster data the project exists to avoid. Anywhere a low-HP add dies next to a boss — snakelings, Nechryael spawns, KQ's kalphite workers — is exposed. `strandedXp` stayed at zero throughout, so the existing guard does not catch it.
+
+**Not fixed. Nothing changed in code.** Logged so it is not rediscovered from scratch.
+**Source:** none — direct observation in a dev client.
