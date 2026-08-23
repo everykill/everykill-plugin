@@ -14,3 +14,7 @@ snapshot/
 
 # generated reference data - CC BY-NC-SA, never committed. tools/fetch-reference-data.sh
 data/
+
+# runelite core source, unpacked for reading. somebody else's code - read it,
+# reimplement it, never paste it. tools/unpack-runelite-source.sh
+rlsrc/
