@@ -24,7 +24,7 @@ every bug found so far was found in a client, not in a test run.
 | 6 | Loot: tile coincidence | ⬜ not started | — |
 | 7 | Loot attribution + guards | ⬜ not started | — |
 | 8 | Grading, batching, upload | ⬜ not started | — |
-| 0a | NPC stat table pull | 🟡 **partial** | 4,325 ids pulled and validated; script committed |
+| 0a | NPC stat table pull | 🟡 **partial** | 4,124 ids pulled and validated; script committed |
 | 0b | always_drops[] pull | ⬜ not started | — |
 | 0c | Combat formula implementation | ⬜ not started | — |
 
@@ -222,13 +222,15 @@ The counter is now split. **Stranded** XP arrived while damage was on record and
 
 ### Step 0a — NPC stat table pull script
 
-**🟡 Status: partial — pulled and validated.** `tools/fetch-reference-data.sh` is committed; one API call plus one awk pass, 0.9s, writes gitignored `data/monsters.tsv`. **4,325 npc ids.** Validated by prediction, not just inspection: it called Watchman max HP correctly on a monster nobody had hand-checked. **Not done:** the `InstantDamageCalculator` cross-check the acceptance criteria ask for, and the multiplier table itself.
+**🟡 Status: partial — pulled and validated.** `tools/fetch-reference-data.sh` is committed; one API call plus two awk passes, 0.9s, writes gitignored `data/monsters.tsv`. **4,124 npc ids**, one row each. Validated by prediction, not just inspection: it called Watchman max HP correctly on a monster nobody had hand-checked. **Not done:** the npc↔wiki bridge is only as good as the name match, and 102 ids still carry no max HP.
 
-Standalone script hitting the Wiki Bucket API. Pull `infobox_monster`, cache locally, compute XP multipliers, build the `npc_id` bridge via name + combat level.
+**The multiplier half of this step is cancelled — see FINDINGS 2026-08-22.** Step 5 measures XP from `StatChanged`; nothing in the client computes or reads an XP multiplier, and nothing is planned to. `experience_bonus` is *published* by the Bucket API for 81.5% of ids, so where a multiplier is ever wanted it is read, not derived — `spec-reference-data.md` already said "read it, never compute it" while this step still said "compute XP multipliers". That contradiction is resolved in favour of reading. **The `InstantDamageCalculator` cross-check below is therefore dropped**: it would validate a number no shipped code consumes.
+
+Standalone script hitting the Wiki Bucket API. Pull `infobox_monster`, cache locally, build the `npc_id` bridge via name + combat level.
 
 Start with common slayer monsters; the table fills in incrementally. **Must never block kill recording.**
 
-**Acceptance addition (2026-08-14, see `FINDINGS.md`):** once the formula-based multiplier table covers a meaningful subset of `InstantDamageCalculator`'s ~150-entry `XP_MODIFIERS` table (`github.com/geeckon/instant-damage-calculator`), diff our computed values against theirs for the overlapping monsters. Agreement raises confidence in both; any mismatch is a bug in one implementation and needs chasing down before Step 5 depends on the result. This is a validation step against independently-read prior art, not a data source — see `docs/LICENSING.md` and the corresponding `FINDINGS.md` entry for why it's not copied directly.
+**~~Acceptance addition (2026-08-14)~~ — dropped 2026-08-22.** The `InstantDamageCalculator` `XP_MODIFIERS` diff was specified when Step 5 derived XP from damage and needed a trustworthy multiplier. Step 5 no longer derives anything. Kept in the record rather than deleted, per the append-only rule — if a published rate on the website ever needs a multiplier, reinstate it *then*, and re-read `docs/LICENSING.md` first.
 
 ### Step 0b — always_drops[] pull
 
@@ -238,7 +240,11 @@ Same API, drops bucket, filter rarity `Always`. Store `item_id`, `quantity`, `is
 
 ### Step 0c — combat formula implementation *(new, from `spec-performance.md` §8)*
 
-**⬜ Status: not started.** Requires 0a for NPC defence stats. Needs no game access.
+**⬜ Status: not started — and blocked on a data gap nobody had checked.** Requires 0a for NPC defence stats. Needs no game access.
+
+**The Bucket API does not expose monster defence bonuses.** Probed ~55 candidate field names 2026-08-22. `infobox_monster` gives levels (`attack_level`, `strength_level`, `defence_level`, `magic_level`, `ranged_level`), `attack_bonus`, `strength_bonus`, `magic_damage_bonus`, `max_hit`, `attack_speed`, `attack_style`, `slayer_level`, `slayer_experience`, `size`, `poisonous`. It does **not** give `dstab`/`dslash`/`dcrush`/`dmagic`/`dlight`/`dstandard`/`dheavy`, which exist in the page wikitext but are not in the bucket. `infobox_bonuses` is the equipment bucket, keyed on `page_name`, not monsters.
+
+So the DPS formula's `AverageDefBonus` term has no structured source. Options, in order of preference, none of them started: parse the infobox out of `action=parse&prop=wikitext` per page (slow, 3,200+ requests, and brittle against template edits); find a bulk source; or scope 0c to the accuracy/max-hit half that needs only levels and offensive bonuses. **Decide before starting, not halfway through.**
 
 No game access needed. Implement the formulas in `spec-performance.md` §3 as a pure function: player levels + equipment bonuses + NPC stats + style → max hit, hit chance, DPS.
 

@@ -1116,3 +1116,48 @@ Two possible uses, in increasing order of ambition:
 worse than a uniformly conservative rule. Read the message only; never parse or store
 the other player's name (PROJECT.md rule 3 - recording *that* foreign damage occurred is
 fine, recording *who* is not).
+
+---
+
+## 2026-08-22 — the multiplier table has no consumer: Step 0a's compute-and-cross-check half is cancelled
+
+**Status:** verified (source read + doc audit)
+**Method:** Grepped the whole tree for `multiplier`, `experience_bonus`, `xpBonus`, `XP_MODIFIER`, `XpModel`, `divergence`, `checksum` across `src/main` and `src/test`. Then audited every doc mentioning the multiplier.
+**Finding:** **Nothing in the client computes, reads, or stores an XP multiplier. Zero matches in src, zero in tests.** `XpModel` — the divergence checksum the specs describe — does not exist as code either. Step 5 measures XP from `StatChanged` and its own text says "**Requires:** nothing. That is the point." Meanwhile Step 0a still carried "compute XP multipliers" plus an acceptance criterion to diff our computed table against `InstantDamageCalculator`'s ~150 entries.
+
+Two documents already disagreed about this and nobody noticed: `spec-reference-data.md` says **"`experience_bonus` exists... read it, never compute it"**, while `BUILD-ORDER.md` Step 0a said compute it. The wiki publishes `experience_bonus` directly for **3,362 of 4,124 ids (81.5%)**, so the formula is only needed for the 18.5% the wiki leaves blank — and no shipped code wants the answer for any of them.
+
+The Vorkath disagreement recorded on 2026-08-16 (formula computes +20%, wiki lists +0%) is a real contradiction but a **moot** one: under measured XP it changes no number the plugin reports.
+
+**Consequence:** Step 0a's multiplier half cancelled and the IDC cross-check dropped, both recorded in place rather than deleted. Step 0a's remaining job is the npc↔wiki bridge and max HP, which is done. **This does not resurrect derivation** — see the 2026-08-16 entry; XP stays measured. If the companion website ever publishes a rate that needs a multiplier, reinstate the cross-check then and re-read `docs/LICENSING.md` first, because the licence position on `XP_MODIFIERS` is unchanged.
+**Source:** none — direct source read of this repo.
+
+---
+
+## 2026-08-22 — 87 npc_ids carry two different monsters; the puller was silently emitting both
+
+**Status:** verified
+**Method:** Parsed `data/monsters.raw.json` in Python, expanded every `id[]` array, and grouped by npc_id looking for rows whose `(name, hitpoints, combat_level, experience_bonus)` disagreed. Cross-checked the result against a live re-run of the fixed script.
+**Finding:** The TSV had **4,957 data rows for 4,124 unique npc_ids** — 742 ids repeated, and **87 of those repeats genuinely disagree**. Same npc_id, different stats, because the wiki stores difficulty and party-size variants as separate infobox entries that share an id. Example: `7566` Vasa Nistirio is both `hp=300, bonus=7.5` and `hp=450, bonus=10`.
+
+Not raids-only, which is what made it worth checking rather than dismissing: the list includes **Cerberus, King Black Dragon, the three Dagannoth Kings, Vardorvis, TzTok-Jad, Scurrius**. All 87 differ in `hitpoints`; 17 also differ in `experience_bonus`.
+
+Any consumer doing a naive `npc_id -> row` map got **whichever row happened to land last** — an arbitrary pick with no warning. Collapsing on "highest hitpoints wins" resolves 86 of 87, but that is a guess dressed as a rule, and `GAME-MECHANICS.md` is explicit that unclear sources degrade rather than guess. The single leftover is `13661` TzTok-Jad, where two entries agree on HP and bonus but list combat levels 1758 and 1527.
+
+**Consequence:** `tools/fetch-reference-data.sh` gained a second awk pass that emits **one row per npc_id** and adds an `ambiguous` column. Exact duplicate rows collapse for free. Where rows disagree the differing fields are **blanked and the row flagged**, per field rather than per row — so Vespula keeps `experience_bonus=0` (both variants agree) while its disputed max HP goes blank. Re-run confirms 4,124 rows, 87 flagged, 0.9s. **The two counts a reader now gets are honest:** 102 ids with unknown max HP (was 15 before the disputed ones stopped resolving arbitrarily) and 762 with unknown XP bonus.
+
+Also corrected: BUILD-ORDER claimed **4,325 npc ids**. The real figure is **4,124**. The old number appears to have counted raw rows before the namespace and non-numeric-id filters, not distinct ids.
+**Source:** oldschool.runescape.wiki Bucket API, `infobox_monster`.
+
+---
+
+## 2026-08-22 — the Bucket API has no monster defence bonuses, which blocks Step 0c
+
+**Status:** verified
+**Method:** Probed ~55 candidate field names against `bucket('infobox_monster')` one at a time, then read the raw wikitext of `Abyssal demon` via `action=parse&prop=wikitext` to confirm the fields exist on the page but not in the bucket. Also probed `infobox_bonuses`.
+**Finding:** `infobox_monster` exposes a **curated subset** of the infobox, not the whole thing. Available and confirmed: `attack_level`, `strength_level`, `defence_level`, `magic_level`, `ranged_level`, `attack_bonus`, `strength_bonus`, `magic_damage_bonus`, `max_hit`, `attack_speed`, `attack_style`, `slayer_level`, `slayer_experience`, `size`, `poisonous`, `examine`.
+
+**Not available:** every defence bonus. `dstab`, `dslash`, `dcrush`, `dmagic`, `dlight`, `dstandard`, `dheavy` — all present in the page wikitext (Abyssal demon: `dstab = 20`, `dslash = 20`, `dcrush = 20`, `dmagic = 0`) and all rejected by the bucket with "Field not found". Neither do the `attbns`/`strbns`/`mbns`/`rngbns` short forms; the bucket renames those to `attack_bonus`/`strength_bonus`/`magic_damage_bonus` and simply drops the rest. `infobox_bonuses` exists but is the **equipment** bucket, keyed on `page_name` — `Helm of Neitiznot`, not monsters. There is no bucket-listing endpoint (`list=bucketbuckets` and `.schema()` both fail), so field discovery is probe-only.
+
+**Consequence:** Step 0c cannot compute `AverageDefBonus`, so the DPS half of the combat formula has no structured input. Recorded in BUILD-ORDER Step 0c with three options and an explicit instruction to choose before starting. **This also independently kills any plan to compute the XP multiplier ourselves** — that formula needs `AverageDefBonus` too, so even for the 762 ids where the wiki leaves `experience_bonus` blank, the fallback was never available. Reading the published value is not just preferred, it is the only option.
+**Source:** oldschool.runescape.wiki `api.php`, `action=bucket` and `action=parse`.

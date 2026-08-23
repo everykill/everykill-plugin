@@ -142,15 +142,22 @@ you look:
 - **Wiki namespace pages leak into the bucket**, e.g. `RuneScape:Templates`. Filter
   anything with a colon in the name.
 
-**20% of monsters have no `experience_bonus` at all.** That is the "editor-entered data
+**18.5% of monsters have no `experience_bonus` at all.** That is the "editor-entered data
 may be unfilled" warning from `GAME-MECHANICS.md`, measured at scale. Anything reading
-this field must treat absent as *unknown*, never as zero — 875 monsters would silently
+this field must treat absent as *unknown*, never as zero — 762 npc ids would silently
 get a 1.0 multiplier they were never assigned.
+
+*(Corrected 2026-08-22: previously stated as 875 monsters / 20%. Recounted per distinct
+npc_id after the one-row-per-id fix — 762 of 4,124. See FINDINGS 2026-08-22.)*
 
 ### Three things that query taught us
 
 - **`id` is a repeated field.** Multiple npc_ids share one row. The bridge is free — no
-  separate join needed for the common case.
+  separate join needed for the common case. **But the reverse also happens and is not
+  free:** one npc_id can appear on *several* rows, and 87 of them carry genuinely
+  different stats (difficulty and party-size variants sharing an id). The puller now
+  collapses to one row per id and flags those 87 in an `ambiguous` column with the
+  disputed fields blanked. See FINDINGS 2026-08-22.
 - **`experience_bonus` exists and is non-zero for some monsters** (5 for two dagannoth
   variants). Confirms `GAME-MECHANICS.md`: read it, never compute it.
 - **The last row has no `experience_bonus` field at all.** Unfilled editor data, live,

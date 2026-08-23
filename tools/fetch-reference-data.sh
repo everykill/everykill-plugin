@@ -37,8 +37,6 @@ if grep -q '"error"' "$OUT/monsters.raw.json"; then
 fi
 
 tr '{' '\n' < "$OUT/monsters.raw.json" | awk -F'\t' '
-	BEGIN { print "npc_id\tname\thitpoints\tcombat_level\texperience_bonus" }
-
 	# Fields are pulled by name, never by position - the API makes no promise about
 	# order and it has already varied between queries.
 	function field(line, key, prefix,    v) {
@@ -77,9 +75,47 @@ tr '{' '\n' < "$OUT/monsters.raw.json" | awk -F'\t' '
 			}
 		}
 	}
+' | awk -F'\t' '
+	# Second pass, because one npc_id can arrive on several rows. Most are exact
+	# repeats and collapse for free. The rest genuinely disagree - same id, two
+	# different monsters - and those we refuse to guess at. See the note below.
+	BEGIN { OFS = "\t"; print "npc_id", "name", "hitpoints", "combat_level", "experience_bonus", "ambiguous" }
+
+	{
+		id = $1
+		sig = $2 SUBSEP $3 SUBSEP $4 SUBSEP $5
+
+		if (!(id in seen)) {
+			order[++count] = id
+			seen[id] = sig
+			nm[id] = $2; hp[id] = $3; cb[id] = $4; xb[id] = $5
+			next
+		}
+
+		if (seen[id] == sig) {
+			next        # exact repeat, nothing to decide
+		}
+
+		# Disagreement. Blank whichever fields differ so a reader gets "unknown"
+		# rather than a coin flip, and flag the row. GAME-MECHANICS.md: if the
+		# source is unclear the code degrades, it does not guess.
+		amb[id] = 1
+		if (nm[id] != $2) { nm[id] = "" }
+		if (hp[id] != $3) { hp[id] = "" }
+		if (cb[id] != $4) { cb[id] = "" }
+		if (xb[id] != $5) { xb[id] = "" }
+	}
+
+	END {
+		for (i = 1; i <= count; i++) {
+			id = order[i]
+			print id, nm[id], hp[id], cb[id], xb[id], (id in amb ? 1 : 0)
+		}
+	}
 ' > "$OUT/monsters.tsv"
 
 rows=$(( $(wc -l < "$OUT/monsters.tsv") - 1 ))
 echo "wrote $rows npc ids to data/monsters.tsv"
 awk -F'\t' 'NR>1 && $3=="" {n++} END {print "  missing hitpoints: " n+0}' "$OUT/monsters.tsv"
 awk -F'\t' 'NR>1 && $5=="" {n++} END {print "  missing xp bonus:  " n+0}' "$OUT/monsters.tsv"
+awk -F'\t' 'NR>1 && $6==1  {n++} END {print "  ambiguous ids:     " n+0 "  (stats disagree, fields blanked)"}' "$OUT/monsters.tsv"
