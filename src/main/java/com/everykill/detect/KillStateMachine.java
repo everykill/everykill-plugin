@@ -133,8 +133,22 @@ public class KillStateMachine
 		final Record r = tracked.get(key);
 		if (r == null)
 		{
+			// temp: remove after Step 4 is verified in FINDINGS - see BUILD-ORDER Step 4.
+			// this arm is the boring one: a transform on something we've never hit. it's
+			// what every rock crab did, which is exactly why the arm below has never run.
+			log.debug("temp: NpcChanged, no record open. npc_id={} name={} tick={}",
+				npcId, name, tick);
 			return;
 		}
+
+		// temp: remove after Step 4 is verified in FINDINGS - see BUILD-ORDER Step 4.
+		// THIS is the line that has never executed. logged unconditionally and before
+		// the mutation, so the old id is still readable - a kill count going up proves
+		// nothing about which path got us there, and silence proves nothing at all.
+		log.debug("temp: NpcChanged carry-forward. {} -> {} name={} -> {} myDamage={} othersDamage={} deathAt={} revoked={} tick={}",
+			r.npcId, npcId, r.name, name, r.myDamage, r.othersDamage,
+			r.deathSignalledAt, r.deathSignalRevoked, tick);
+
 		r.npcId = npcId;
 		r.name = name;
 		r.combatLevel = combatLevel;
