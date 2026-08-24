@@ -21,11 +21,11 @@ every bug found so far was found in a client, not in a test run.
 | 3 | Transform deaths | ✅ **verified** | all three cases, twice — see the correction in-step |
 | 4 | NpcChanged phase handling | ✅ **verified** | Nazastarool: 3 deaths, 2 transforms, 1 kill |
 | 5 | Measured XP by damage share | 🟡 **partial** | settle timing fixed + verified; noise floor + snakeling left |
-| 6 | Loot: tile coincidence | ⬜ not started | — |
-| 7 | Loot attribution + guards | ⬜ not started | — |
+| 6 | Loot capture (ServerNpcLoot) | ✅ **verified** | cyclops: CONFIRMED, 532x1 + rolled item, live 2026-08-24 |
+| 7 | Loot attribution + account gate | ✅ **verified** | hold-the-kill live; account=GROUP_IRONMAN resolved via clan channel |
 | 8 | Grading, batching, upload | ⬜ not started | — |
 | 0a | NPC stat table pull | 🟡 **partial** | 4,124 ids pulled and validated; script committed |
-| 0b | always_drops[] pull | 🟡 **partial** | 4,339 rows, 2,798 ids; nothing consumes it yet |
+| 0b | always_drops[] pull | ✅ **done (client side)** | 4,339 rows; the cross-check itself is server-side by spec |
 | 0c | Combat formula implementation | ⬜ not started | — |
 
 **Step 4 is done as of 2026-08-23** (Nazastarool, Nightmare Zone). The next real gap is Step 5: the XP allocator mis-attributes a boss's experience to any low-hp add that dies beside it, proven by a failing test, and its settle window is still an unmeasured desk number. Historical note: Step 4 had never run. Not "lightly tested" — the
