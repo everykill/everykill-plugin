@@ -12,7 +12,9 @@ import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.client.game.ItemStack;
-import net.runelite.client.events.ServerNpcLoot;
+import net.runelite.api.NPCComposition;
+import net.runelite.api.ScriptID;
+import net.runelite.api.events.ScriptPreFired;
 
 /**
  * Buffers server-reported loot so a kill can claim it on the tick boundary.
@@ -40,13 +42,25 @@ import net.runelite.client.events.ServerNpcLoot;
  * only buffers. Nothing here decides which kill owns what — {@code drainFor} hands the
  * tick's loot to whoever asks, and the joining lives with the kill records.
  *
- * <h2>The known weakness</h2>
+ * <h2>The known weakness, and what the server gives us against it</h2>
  *
  * {@link ServerNpcLoot} carries an {@code NPCComposition}, not the NPC instance we
- * tracked, so all we get is an id. Two of the same monster dying on one tick are
- * indistinguishable here. That's a real hole and the spec already says what to do with
- * it — mark those {@code unknown} and keep them out of drop-rate denominators. It is
- * not this class's job to guess.
+ * tracked, so all we get is an id. Two of the same monster dying on one tick would be
+ * indistinguishable from that alone.
+ *
+ * The underlying script carries more than the event does. {@code LOOTTRACKER_ADD_LOOT}
+ * is fired with {@code (npcId, eventId, itemId, qty)} and the <b>eventId increments per
+ * kill</b> — measured 2026-08-24, four cyclops kills producing 77265, 77266, 77267,
+ * 77268. RuneLite uses it to decide when to flush and then drops it; by the time
+ * {@code ServerNpcLoot} is posted the discriminator is gone.
+ *
+ * So we read {@link net.runelite.api.events.ScriptPreFired} ourselves and keep the
+ * eventId. That is strictly more information for the same subscription cost, and it is
+ * the only thing that can separate two identical monsters dying together.
+ *
+ * <b>Not yet proven:</b> that two same-id kills on ONE tick get two different eventIds.
+ * The four measured kills were sequential. Until that is measured, a tick holding more
+ * than one loot event for the same npc id stays ambiguous — see {@code drainFor}.
  */
 @Slf4j
 @Singleton
@@ -70,41 +84,86 @@ public class LootDetector
 	{
 		public final int npcId;
 		public final String npcName;
-		public final List<ItemStack> items;
+
+		/**
+		 * The server's own per-kill id. Two entries sharing one are the same kill's
+		 * loot arriving in pieces; two different ids are two different kills.
+		 */
+		public final int eventId;
+
+		/** Grows as the script fires each item; handed out read-only. */
+		private final List<ItemStack> mutableItems;
+
 		public final int tick;
 
-		ServerLoot(int npcId, String npcName, List<ItemStack> items, int tick)
+		ServerLoot(int npcId, String npcName, int eventId, List<ItemStack> items, int tick)
 		{
 			this.npcId = npcId;
 			this.npcName = npcName;
-			this.items = Collections.unmodifiableList(items);
+			this.eventId = eventId;
+			this.mutableItems = items;
 			this.tick = tick;
+		}
+
+		/** What the server said this kill dropped. */
+		public List<ItemStack> getItems()
+		{
+			return Collections.unmodifiableList(mutableItems);
 		}
 	}
 
-	public void onServerNpcLoot(ServerNpcLoot event)
+	/**
+	 * The loot script firing, one item at a time.
+	 *
+	 * <p>Items for one kill arrive as separate script fires sharing an eventId, so this
+	 * merges them into the entry that id already opened rather than creating one per
+	 * item.
+	 */
+	public void onScriptPreFired(ScriptPreFired event)
 	{
-		if (event.getComposition() == null || event.getItems() == null)
+		if (event.getScriptId() != ScriptID.LOOTTRACKER_ADD_LOOT)
 		{
 			return;
 		}
 
-		record(event.getComposition().getId(),
-			event.getComposition().getName(),
-			new ArrayList<>(event.getItems()),
-			client.getTickCount());
+		final Object[] args = event.getScriptEvent().getArguments();
+		if (args == null || args.length < 5)
+		{
+			return;
+		}
+
+		final int npcId = (int) args[1];
+		final int eventId = (int) args[2];
+		final int itemId = (int) args[3];
+		final int qty = (int) args[4];
+
+		final NPCComposition comp = client.getNpcDefinition(npcId);
+		final String name = comp == null ? null : comp.getName();
+
+		record(npcId, name, eventId, itemId, qty, client.getTickCount());
 	}
 
 	/**
 	 * The buffering itself, with no RuneLite types in the way.
 	 *
 	 * <p>Split out so it can be tested without a mocking framework — this project
-	 * doesn't have one, and adding a dependency to reach a four-line method would be
-	 * the tail wagging the dog.
+	 * doesn't have one, and adding a dependency to reach a few lines would be the tail
+	 * wagging the dog.
 	 */
-	public void record(int npcId, String npcName, List<ItemStack> items, int tick)
+	public void record(int npcId, String npcName, int eventId, int itemId, int qty, int tick)
 	{
-		pending.add(new ServerLoot(npcId, npcName, items, tick));
+		for (ServerLoot existing : pending)
+		{
+			if (existing.eventId == eventId && existing.tick == tick)
+			{
+				existing.mutableItems.add(new ItemStack(itemId, qty));
+				return;
+			}
+		}
+
+		final List<ItemStack> items = new ArrayList<>();
+		items.add(new ItemStack(itemId, qty));
+		pending.add(new ServerLoot(npcId, npcName, eventId, items, tick));
 	}
 
 	/**
@@ -148,7 +207,7 @@ public class LootDetector
 			{
 				log.debug("server loot expired unclaimed (nothing claims yet): "
 						+ "npc={} name={} items={} tick={}",
-					loot.npcId, loot.npcName, loot.items.size(), loot.tick);
+					loot.npcId, loot.npcName, loot.getItems().size(), loot.tick);
 				return true;
 			}
 			return false;

@@ -4,7 +4,6 @@
  */
 package com.everykill.detect;
 
-import java.util.Arrays;
 import java.util.List;
 import net.runelite.client.game.ItemStack;
 import org.junit.Assert;
@@ -22,6 +21,8 @@ public class LootDetectorTest
 	private static final int GIANT_RAT = 2856;
 	private static final int GOBLIN = 3033;
 	private static final int BONES = 526;
+	private static final int COINS = 995;
+	private static final int EVENT = 77265;
 
 	private LootDetector loot;
 
@@ -31,28 +32,53 @@ public class LootDetectorTest
 		loot = new LootDetector(null);
 	}
 
-	private static List<ItemStack> bones()
-	{
-		return Arrays.asList(new ItemStack(BONES, 1));
-	}
-
 	@Test
 	public void lootIsBufferedAndClaimedByItsOwnNpcOnItsOwnTick()
 	{
-		loot.record(GIANT_RAT, "Giant rat", bones(), 100);
+		loot.record(GIANT_RAT, "Giant rat", EVENT, BONES, 1, 100);
 
 		final List<LootDetector.ServerLoot> mine = loot.drainFor(GIANT_RAT, 100);
 
 		Assert.assertEquals(1, mine.size());
 		Assert.assertEquals(GIANT_RAT, mine.get(0).npcId);
-		Assert.assertEquals(BONES, mine.get(0).items.get(0).getId());
+		Assert.assertEquals(EVENT, mine.get(0).eventId);
+		Assert.assertEquals(BONES, mine.get(0).getItems().get(0).getId());
 		Assert.assertEquals("draining consumes it", 0, loot.pendingCount());
+	}
+
+	@Test
+	public void itemsSharingAnEventIdAreOneKillsDrop()
+	{
+		// the script fires once per item. a cyclops dropping big bones and 99 coins is
+		// two fires with one event id, measured 2026-08-24 - not two kills.
+		loot.record(GIANT_RAT, "Giant rat", EVENT, BONES, 1, 100);
+		loot.record(GIANT_RAT, "Giant rat", EVENT, COINS, 99, 100);
+
+		final List<LootDetector.ServerLoot> mine = loot.drainFor(GIANT_RAT, 100);
+
+		Assert.assertEquals("one kill", 1, mine.size());
+		Assert.assertEquals("both items", 2, mine.get(0).getItems().size());
+	}
+
+	@Test
+	public void differentEventIdsAreDifferentKills()
+	{
+		// the whole reason we read the script instead of ServerNpcLoot. same monster,
+		// same tick, two kills - and only the event id can tell them apart, because
+		// the composition is identical.
+		loot.record(GIANT_RAT, "Giant rat", EVENT, BONES, 1, 100);
+		loot.record(GIANT_RAT, "Giant rat", EVENT + 1, BONES, 1, 100);
+
+		final List<LootDetector.ServerLoot> mine = loot.drainFor(GIANT_RAT, 100);
+
+		Assert.assertEquals("two separate kills", 2, mine.size());
+		Assert.assertNotEquals(mine.get(0).eventId, mine.get(1).eventId);
 	}
 
 	@Test
 	public void anotherMonstersLootIsNotClaimed()
 	{
-		loot.record(GIANT_RAT, "Giant rat", bones(), 100);
+		loot.record(GIANT_RAT, "Giant rat", EVENT, BONES, 1, 100);
 
 		Assert.assertTrue(loot.drainFor(GOBLIN, 100).isEmpty());
 		Assert.assertEquals("still there for its real owner", 1, loot.pendingCount());
@@ -61,31 +87,18 @@ public class LootDetectorTest
 	@Test
 	public void lootFromAnotherTickIsNotClaimed()
 	{
-		// the whole point of keying on the tick. a kill resolving now must not pick up
-		// a drop the server reported for the previous one.
-		loot.record(GIANT_RAT, "Giant rat", bones(), 100);
+		// the point of keying on the tick. a kill resolving now must not pick up a drop
+		// the server reported for the previous one.
+		loot.record(GIANT_RAT, "Giant rat", EVENT, BONES, 1, 100);
 
 		Assert.assertTrue(loot.drainFor(GIANT_RAT, 101).isEmpty());
 	}
 
 	@Test
-	public void twoOfTheSameMonsterOnOneTickBothComeBack()
-	{
-		// the known hole. ServerNpcLoot carries a composition, not the npc instance, so
-		// two identical monsters dying together can't be told apart. returning both is
-		// how the caller finds out it's ambiguous - collapsing to one would invent an
-		// answer, and spec-drop-attribution says those kills are `unknown`.
-		loot.record(GIANT_RAT, "Giant rat", bones(), 100);
-		loot.record(GIANT_RAT, "Giant rat", bones(), 100);
-
-		Assert.assertEquals(2, loot.drainFor(GIANT_RAT, 100).size());
-	}
-
-	@Test
 	public void expiringDropsOnlyOlderTicks()
 	{
-		loot.record(GIANT_RAT, "Giant rat", bones(), 100);
-		loot.record(GOBLIN, "Goblin", bones(), 101);
+		loot.record(GIANT_RAT, "Giant rat", EVENT, BONES, 1, 100);
+		loot.record(GOBLIN, "Goblin", EVENT + 1, BONES, 1, 101);
 
 		loot.expire(101);
 
@@ -97,12 +110,12 @@ public class LootDetectorTest
 	public void itemsOnAClaimedDropCannotBeMutatedByTheCaller()
 	{
 		// a consumer editing what it was handed would corrupt the next reader's view.
-		loot.record(GIANT_RAT, "Giant rat", bones(), 100);
+		loot.record(GIANT_RAT, "Giant rat", EVENT, BONES, 1, 100);
 		final LootDetector.ServerLoot claimed = loot.drainFor(GIANT_RAT, 100).get(0);
 
 		try
 		{
-			claimed.items.add(new ItemStack(BONES, 99));
+			claimed.getItems().add(new ItemStack(BONES, 99));
 			Assert.fail("items should be unmodifiable");
 		}
 		catch (UnsupportedOperationException expected)
