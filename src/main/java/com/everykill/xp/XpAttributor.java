@@ -229,6 +229,25 @@ public class XpAttributor
 
 		poolClaimedBy.put(poolTick, xpTick);
 
+		// temp: step 5 measurement. remove once FINDINGS records a measured settle
+		// window and noise floor - BUILD-ORDER step 5 asks for both and both are still
+		// desk numbers.
+		//
+		// offset is poolTick - xpTick: 0 means the xp landed on its own tick, positive
+		// means we searched FORWARD to find the damage (xp arrived before its own
+		// hitsplat), negative means backward. that distribution IS the settle window,
+		// and SETTLE_TICKS=2 is currently a guess about it.
+		//
+		// ratio is xp per point of damage. it has a hard ceiling: base combat xp is 4
+		// per damage and the biggest experience_bonus in the whole wiki table is +145%,
+		// so nothing can legitimately pay more than about 9.8 to a style skill or 3.3
+		// to hitpoints. the snakeling that stole 76 xp for one point of recoil damage
+		// on 2026-08-22 was ~8x over that. logging it unconditionally so a real
+		// distribution decides the fix instead of me deciding it.
+		log.debug("temp: xp split. skill={} xp={} xpTick={} poolTick={} offset={} poolDamage={} npcsInPool={} ratio={}",
+			skill, xp, xpTick, poolTick, poolTick - xpTick, totalDamage, pool.size(),
+			String.format("%.2f", (double) xp / totalDamage));
+
 		// largest remainder, so the parts add up to the whole. rounding each share
 		// independently leaks or invents xp on every split.
 		long assigned = 0L;
