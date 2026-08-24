@@ -1964,3 +1964,30 @@ The loot script fires **once per item**, and `LootDetector.record` merges fires 
 3. **Rare drops get their own leaderboard**, designed later with Gage. Rarity comes from the wiki's drops bucket that `always_drops.tsv` is already built from, so nothing needs hand-curating.
 
 **Client-side consequence of (2), the only part in this repo's lane:** filtering by mob needs drops stored *per npc_id*, which `NpcStat` already keys on. No new structure — but the drop list must hang off the npc row rather than a flat session log, or the filter has nothing to filter on.
+
+---
+
+## 2026-08-24 — Step 6 verified in a client: loot attaches to the kill that produced it
+
+**Status:** verified — live, three cyclops kills, 2026-08-24 16:08
+**Method:** `LootDetector` + hold + `attachLoot` all in place (commits `5e050e6`, `b6dbd7e`, `5f9b77c`, `008d2c8`). Ordinary killing, reading the kill log's new `loot=` / `drops=` fields.
+
+```
+Cyclops  UNCONTESTED  CONFIRMED  532x1,995x41
+Cyclops  UNCONTESTED  CONFIRMED  532x1,869x10
+Cyclops  UNCONTESTED  CONFIRMED  532x1,1623x1
+```
+
+Item ids resolved against `ItemID` in `runelite-api-1.12.36.jar`: **Big bones**, **Coins ×41**, **Black knife ×10**, **Uncut sapphire**.
+
+**What this proves, each part independently:**
+
+1. **The hold works.** Every one of those kills was parked at death and met its loot on the tick boundary. Three commits ago the kill was emitted *before* its loot existed and this line would have read `loot=NONE drops=-` forever.
+2. **The join works.** `drainFor(npcId, tick)` found the right drop for the right kill, three times.
+3. **Grading works.** All three `CONFIRMED` — one loot event, kill uncontested, so rate-eligible.
+4. **`always_drops` predicted Big bones 3/3**, and the second item differed every time. That separates *guaranteed* from *rolled* with nothing hardcoded, in both directions.
+5. **Quantities are the server's own.** `995x41` is one entry with quantity 41, not 41 items — so nothing downstream has to reason about piles merging.
+
+**Still unverified, and the sample cannot speak to it:** every kill here was sequential and uncontested. **Two of the same monster dying on one tick has still never happened in a client**, so the `UNKNOWN` path — the reason `attachLoot` exists in the shape it does — is covered by unit tests only. Same for `PROBABLE`, which needs a contested or deduced kill with loot.
+
+**Note on the ghosts.** Two Ghost kills earlier in the same session predate the `loot=` field being added, so they are not evidence of the `NONE` path either way. The earlier finding that ghosts produce no loot event still stands on its own.
