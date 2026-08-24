@@ -1843,7 +1843,20 @@ return ownership != OWNERSHIP_OTHER || accountType == 0; // Mains can always tak
 
 **So `0` means main.** That is confirmed by core's own comment and is the only value this project can currently assert.
 
-**NOT verified: which non-zero value maps to which mode.** There are six ironman types (Ironman, Hardcore, Ultimate, Group, Hardcore Group, Unranked Group) and the varbit-to-mode mapping has **not** been read. It matters, because **Group Ironman is a genuine exception**: the game's own message says *"you don't get loot if players outside **your group** helped you kill the monster"* — so for a GIM, a groupmate's damage does **not** void the drop, and `othersDamage > 0` would wrongly exclude their normal group play.
+**The varbit-to-mode mapping, read from core `HiscorePlugin.java:277-286`:**
+
+| value | mode |
+|---|---|
+| **0** | main — *"Mains can always take items"* |
+| **1** | Ironman |
+| **2** | Ultimate Ironman |
+| **3** | Hardcore Ironman |
+
+Corroborated independently by `DailyTasksPlugin.java:212`, which comments `!= 2 /* UIM */`.
+
+**GROUP IRONMAN IS NOT IN THIS VARBIT.** Core's switch has no case for it and falls through to `NORMAL`. Group status is detected a completely different way — `client.getClanSettings(ClanID.GROUP_IRONMAN)` (`NameAutocompleter.java:241`), i.e. via the group's clan channel, not an account varbit. `HiscoreEndpoint` likewise has no group entry.
+
+**This is the trap.** A Group Ironman reading the varbit alone looks like **either** a plain Ironman **or**, if the varbit is 0 for them, a main — and neither is right. That must be resolved before the filter ships, because the game's own message says *"players outside **your group**"*: a groupmate's damage does **not** void a GIM's drop, so `othersDamage > 0` would wrongly exclude their ordinary group play. It matters, because **Group Ironman is a genuine exception**: the game's own message says *"you don't get loot if players outside **your group** helped you kill the monster"* — so for a GIM, a groupmate's damage does **not** void the drop, and `othersDamage > 0` would wrongly exclude their normal group play.
 
 **Related unread mechanism:** `GroundItem.getOwnership()` and the `OWNERSHIP_SELF` / `OWNERSHIP_GROUP` / `OWNERSHIP_OTHER` constants. Core already distinguishes *group* ownership from *self* and *other*, which is very likely the same distinction the group-ironman loot rule needs. Read this before implementing anything for GIM.
 
