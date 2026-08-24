@@ -122,7 +122,7 @@ wiki field as editor-entered data that may be unfilled.
 | **Who gets the drop** | **The player who dealt the most damage.** Not the last hit, and not first tag. A delay between damage and death does not change it *"as long as they did more than half of the total damage done"* — but if the monster heals, someone else can overtake | [Drops](https://oldschool.runescape.wiki/w/Drops) | 2026-08-24 |
 | Drops are invisible to other players for 100 ticks | 1 minute. Tradeable drops last 200 ticks, untradeable 300 | [Drops](https://oldschool.runescape.wiki/w/Drops) | 2026-08-24 |
 | **Team bosses use a damage THRESHOLD, not a majority** | Nex: *"the player must deal a set amount of minimum damage"* to get any drop; shares scale with total damage to Nex, minions and reavers; the **MVP** (most damage) gets +10% common quantity and +10% unique chance, and is the only one who receives the 100% drop | [Nex](https://oldschool.runescape.wiki/w/Nex) | 2026-08-24 |
-| Most bosses are instanced and cannot be teamed at all | Vorkath, Zulrah — *"This fight takes place in an instance"*. Contested kills are a narrower case than it looks; do not reason about team play from a solo boss | [Vorkath](https://oldschool.runescape.wiki/w/Vorkath) | 2026-08-24 |
+| **Encounter class decides ownership, and it is per-boss** | **~49 world + ~29 wilderness bosses are open and contestable; ~44 are instanced.** The wiki: *"Most bosses also reside in a multi-way area; very few reside in single-way areas or instances."* Contested kills are roughly half the boss list, not an edge case. Full classification and named lists: `reference-boss-encounter-classes.md` | [Boss](https://oldschool.runescape.wiki/w/Boss) | 2026-08-24 |
 
 ---
 
