@@ -119,6 +119,8 @@ wiki field as editor-entered data that may be unfilled.
 | Core `LootManager` posts no loot event when the ground is empty | `if (!allItems.isEmpty())` — the structural reason lootless kills are invisible ecosystem-wide | `game/LootManager.java:345` | 2026-08-16 |
 | Zygomite `_CAP` variants | Excluded on plausibility, never tested — needs 57 Slayer | — | UNVERIFIED |
 | Whether `ActorDeath` can fire twice on one regenerating NPC | Unknown | — | UNVERIFIED |
+| **Who gets the drop** | **The player who dealt the most damage.** Not the last hit, and not first tag. A delay between damage and death does not change it *"as long as they did more than half of the total damage done"* — but if the monster heals, someone else can overtake | [Drops](https://oldschool.runescape.wiki/w/Drops) | 2026-08-24 |
+| Drops are invisible to other players for 100 ticks | 1 minute. Tradeable drops last 200 ticks, untradeable 300 | [Drops](https://oldschool.runescape.wiki/w/Drops) | 2026-08-24 |
 
 ---
 
