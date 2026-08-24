@@ -175,9 +175,9 @@ What the Zulrah run did establish:
 
 **Still to do, and it needs real play:**
 
-- Measure the **XP settle window** — how many ticks after the hitsplat the delta actually lands. `SETTLE_TICKS = 2` is desk-chosen.
-- Measure the **residual noise floor**.
-- **Report both numbers.** The spec deliberately leaves them unset.
+- ~~Measure the **XP settle window**~~ — **done 2026-08-24.** 109 allocations: 108 at offset **+1**, one at **+2**, never zero or negative. XP always arrives a tick before its hitsplat, so `allocateAt`'s forward search is the only arm that has ever fired; the backward arm ran zero times. `SETTLE_TICKS = 2` stays, justified by a single sample that followed a 124-tick idle gap. Worth re-measuring at a boss.
+- Measure the **residual noise floor** — still open. Needs a hand-counted task with the ledger compared against skill totals.
+- **Exercise the multi-monster pool.** All 109 allocations had exactly **one** npc in the pool, so the mis-attribution reproduced on 2026-08-22 (a 1 hp add taking a boss's XP) has still never been seen in play. Needs a genuinely crowded cannon spot.
 
 **Acceptance:** Per-monster XP on a hand-counted task is within the measured noise floor of the skill totals the client reports, and **stranded** XP stays near zero during ordinary combat.
 

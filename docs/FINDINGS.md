@@ -1373,3 +1373,44 @@ The wiki is unambiguous about the risk: *"This is a safe activity in an instance
 
 **Step 4 moves to ✅ verified.** Both diagnostics have now met their recorded removal trigger and come out.
 **Source:** none — direct observation.
+
+---
+
+## 2026-08-24 — the XP settle window, measured: 108 of 109 splits land at offset +1
+
+**Status:** verified
+**Method:** Temporary instrumentation in `XpAttributor.split()` logging every allocation, collected to a file over ~10 minutes of ordinary combat (cannon plus melee, goblins/ducks/spiders in Lumbridge). 109 splits, 90 kills. All monsters killed carry `experience_bonus=0` in the reference table, so the textbook rate applies.
+
+**BUILD-ORDER Step 5 asks for this number and it has been a desk guess since the class was written.**
+
+| offset | count | share |
+|---|---|---|
+| **+1** | 108 | 99.1% |
+| **+2** | 1 | 0.9% |
+| 0 or negative | **0** | — |
+
+`offset` is `poolTick - xpTick`. **Every single allocation searched *forward*.** Not one landed on its own tick, and not one searched backward. This confirms the 2026-08-21 finding — XP arrives one tick before the hitsplat that earned it — and puts a number on how reliably: essentially always.
+
+**`SETTLE_TICKS = 2` is justified, but only barely, and by one sample.** The single `offset=+2` case (xpTick 781, poolTick 783) followed a **124-tick idle gap** — it is the first hit after a long pause, not a mid-fight event. Lowering the constant to 1 would have discarded it. Raising it above 2 has no support in this data at all: nothing needed a wider window, and the backward arm of `allocateAt` was never used once in 109 allocations. **Leave it at 2.** Worth re-measuring at a boss, where tick pressure differs from single-target grinding.
+
+**The pool always held exactly one monster — 109 of 109.** So this session did *not* exercise the multi-monster path where the 2026-08-22 snakeling mis-attribution lives. That case remains reproduced only in a unit test. A busier venue is still needed.
+
+**Zero ceiling violations.** Every ratio sat well inside the bound: base combat XP is 4 per damage and the largest `experience_bonus` in the whole wiki table is +145%, so nothing can legitimately exceed ~9.8 per damage to a style skill. The ceiling check works and found nothing wrong here.
+**Source:** none — direct measurement.
+
+---
+
+## 2026-08-24 — two false alarms called during that session, both from misreading fields
+
+**Status:** verified (both retracted)
+**Method:** Both were called mid-session from the live log, then falsified — one by replaying the exact sequence offline against `XpAttributor`, one by reading the event order properly.
+**Finding:** Neither was a bug. Recording them because both were stated confidently before being checked.
+
+**1. "The XP rate is half what it should be."** RANGED splits read `ratio=2.0` — 10 XP for 5 damage — against a textbook 4 per damage. **Wrong, because a single hit produces several splits, one per skill.** The full picture at pool tick 452 is `ATTACK xp=20`, `HITPOINTS xp=6`, `RANGED xp=10` — all against the same 5 damage. Reading one skill's share and comparing it to the whole-hit rate is the error. The rate is correct.
+
+**2. "Identical goblin kills bank wildly different XP — 12, 36, 10, 0, 46."** **Wrong: `xp=` in the kill line is the ledger's cumulative all-time total for that `npc_id`, not the XP from that kill.** Goblins occupy ten separate npc_ids with independent histories, so different totals are exactly what should appear. The `xp=0` case is a first kill on an id whose XP had not been allocated at emit time.
+
+**3. The off-by-one hypothesis was also wrong.** Given `offset=+1` on every split, the theory was that each tick's pool gets claimed by the previous tick's XP, systematically pairing damage with the wrong monster. **Falsified in a unit test:** four sequential goblins, each with XP arriving a tick before its hitsplat, allocated **20 XP each, exactly correct**, with zero stranded and zero unallocated. `allocateAt`'s forward search handles the early arrival properly — which is what the comment above it already claimed.
+
+**The pattern is worth naming, because it is the same one as the placeholder bank data on 2026-08-22 and the 273-row drop pull on 2026-08-23:** a field was read without checking what it actually contained, and a confident conclusion followed. The fix each time was the same — replay it, or read the neighbouring records, before saying anything. Instrumentation output is evidence about the *shape* of events; it is not self-explanatory about their *meaning*.
+**Source:** none — direct testing.
