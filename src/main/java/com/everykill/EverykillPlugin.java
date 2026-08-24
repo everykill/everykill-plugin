@@ -8,6 +8,7 @@ import com.everykill.detect.KillDetector;
 import com.everykill.detect.LootDetector;
 import com.everykill.ledger.LocalLedger;
 import com.everykill.model.AccountType;
+import net.runelite.api.clan.ClanID;
 import net.runelite.api.gameval.VarbitID;
 import com.everykill.model.Confidence;
 import com.everykill.model.Drop;
@@ -440,7 +441,21 @@ public class EverykillPlugin extends Plugin
 		{
 			return AccountType.UNKNOWN;
 		}
-		return AccountType.fromVarbit(client.getVarbitValue(VarbitID.IRONMAN));
+
+		final AccountType fromVarbit =
+			AccountType.fromVarbit(client.getVarbitValue(VarbitID.IRONMAN));
+
+		// group ironman isn't in that varbit at all - core's own switch has no case for
+		// it and falls through. it lives in the group's clan channel instead, which is
+		// how NameAutocompleter finds it. verified live 2026-08-24: zelnork is a GIM and
+		// the varbit alone reported UNRESOLVED.
+		if (fromVarbit == AccountType.GROUP_UNRESOLVED
+			&& client.getClanSettings(ClanID.GROUP_IRONMAN) != null)
+		{
+			return AccountType.GROUP_IRONMAN;
+		}
+
+		return fromVarbit;
 	}
 
 	private void onKill(KillRecord kill)

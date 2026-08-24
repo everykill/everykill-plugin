@@ -53,6 +53,27 @@ public class AccountTypeTest
 	}
 
 	@Test
+	public void groupIronmanIsNotReachableFromTheVarbit()
+	{
+		// core's switch has no case for it - it falls through to normal. group status
+		// comes from the clan channel, so no varbit value may ever map here.
+		for (int v = -5; v <= 20; v++)
+		{
+			Assert.assertNotEquals("varbit " + v, AccountType.GROUP_IRONMAN,
+				AccountType.fromVarbit(v));
+		}
+	}
+
+	@Test
+	public void aGroupIronmanStillLosesLootToOutsiders()
+	{
+		// they're an ironman. the nuance is that a GROUPMATE isn't an outsider, and we
+		// can't tell those apart yet, so this is conservative on purpose.
+		Assert.assertTrue(AccountType.GROUP_IRONMAN.outsideDamageVoidsLoot());
+		Assert.assertTrue(AccountType.GROUP_IRONMAN.isIronman());
+	}
+
+	@Test
 	public void anUnresolvedAccountDoesNotVoidLoot()
 	{
 		// deliberate. wrong here leaves a groupmate's fair kill in the denominator.

@@ -41,6 +41,17 @@ public enum AccountType
 	HARDCORE_IRONMAN("Hardcore Ironman", 3),
 
 	/**
+	 * Group ironman. Not a varbit value — this is only reachable by checking the
+	 * group's clan channel, so {@link #fromVarbit} can never return it.
+	 *
+	 * <p>Outside damage voids their loot like any other iron, but <b>a groupmate is
+	 * not outside</b>: the game's warning reads <i>"players outside your group helped
+	 * you kill the monster"</i>. Telling those apart needs to know who dealt the
+	 * damage, which the kill record does not currently carry.
+	 */
+	GROUP_IRONMAN("Group Ironman", -3),
+
+	/**
 	 * The varbit said something we don't have a name for.
 	 *
 	 * <p>Not folded into {@link #MAIN}: an unknown mode treated as a main would have
@@ -92,16 +103,27 @@ public enum AccountType
 	/**
 	 * Whether another player's involvement voids this account's drops entirely.
 	 *
-	 * <p>True for every ironman mode. False for a main, whose contested kills still
-	 * roll — they just lose to whoever dealt more damage.
+	 * <p>True for every ironman mode including {@link #GROUP_IRONMAN} — but for a group
+	 * account "another player" means someone <b>outside the group</b>. A groupmate's
+	 * damage voids nothing, and the kill record does not currently carry who dealt what,
+	 * so a GIM's contested kills come out conservative rather than exact.
+	 *
+	 * <p>False for a main, whose contested kills still roll — they just lose to whoever
+	 * dealt more damage.
 	 *
 	 * <p>{@link #GROUP_UNRESOLVED} answers <b>false</b> on purpose. Being wrong in that
-	 * direction means a groupmate's fair kill stays in the denominator; being wrong the
-	 * other way would void every legitimate group kill a GIM ever makes. Neither is
-	 * good, and the fix is resolving group status, not picking the tidier default.
+	 * direction means a fair kill stays in a denominator; being wrong the other way
+	 * voids legitimate kills wholesale.
 	 */
 	public boolean outsideDamageVoidsLoot()
 	{
-		return this == IRONMAN || this == ULTIMATE_IRONMAN || this == HARDCORE_IRONMAN;
+		return this == IRONMAN || this == ULTIMATE_IRONMAN || this == HARDCORE_IRONMAN
+			|| this == GROUP_IRONMAN;
+	}
+
+	/** Any ironman mode, group included. */
+	public boolean isIronman()
+	{
+		return outsideDamageVoidsLoot();
 	}
 }
