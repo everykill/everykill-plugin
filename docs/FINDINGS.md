@@ -2041,3 +2041,55 @@ One line, three things proven:
 **Process note, and it cost time.** `account=GROUP_UNRESOLVED` appeared on a kill, and it was assumed to be account osiriz — a main — which made it look like a mapping bug. Temporary diagnostics went in to chase it. The user corrected it in three words: that was Zelnork, a group ironman, and the plugin had been reporting the truth the whole time.
 
 **The account in use is part of the evidence.** A log line saying something surprising about account type is not evidence of a bug until you know which account produced it. Same shape as reading a cumulative field as a per-kill one: the number was right, the assumption about what it described was not.
+
+---
+
+## 2026-08-24 — UI audit: what the panel shows vs what the spec says, and the answer to "uncontested on the overlay?"
+
+**Status:** audit, no code changed
+
+Prompted by a look at the live panel and overlay after Step 6/7 landed.
+
+### The panel's worst problem is a known bug, not a style issue
+
+The screenshot shows **four separate "Lesser demon (82)" rows** (41, 31, 30, 17 kills) and **three "Giant rat" rows** (11, 4, 3). Those are different `npc_id`s wearing the same name — `data/monsters.tsv` lists **eight or more ids** named "Lesser demon".
+
+This is already written up at `FINDINGS.md:307`:
+
+> *"A slayer task shows as multiple panel rows that must be summed before comparing against the in-game task counter. This is PROJECT.md's 'store raw npc_id forever, display grouping is a read-time concern' behaving exactly as designed, but it is confusing in the panel and argues for a display-only rollup that leaves the ids intact."*
+
+**The storage is correct and must not change** (`PROJECT.md:57`). The fix is a **display-only rollup**: group rows by `(name, combatLevel)`, sum them, keep the ids underneath so expanding a row can still show the split. A player killing 119 lesser demons should see one row saying 119.
+
+### What the spec has that the client doesn't
+
+`spec-plugin-ux.md` specifies **four tabs**; roughly one exists.
+
+| Spec | Built |
+|---|---|
+| **1a. Kill Log** — every monster in the game, killed or not; completion header; grouped views; search; per-row detail incl. **drops received** and **dryness position** | partial — a flat list of what you have killed, no search, no completion, no drops |
+| **1b. Session** — kills/hr, xp/hr, time elapsed, supplies, deaths, slayer task from varbits | partial — session kill count and grade split only |
+| **1c. Goals** — set a kill goal, progress bars, auto-suggest from slayer task | **none** |
+| **1d. Records** — personal bests, milestones, **luckiest drop, longest dry streak** | **none** |
+
+So the two things named in the question — **viewing drops** and **dry streaks** — are both specified and both unbuilt. Drops now exist in `KillRecord` as of today (`008d2c8`) but nothing renders them, and nothing persists them per npc yet.
+
+### The overlay question: keep the grade split, but it should not be the default
+
+`spec-plugin-ux.md:69-77` is explicit about the overlay:
+
+> *"Off by default. When on, one compact box."*
+> Contents: **current target counter** (name, kills this session, lifetime KC) and **active goal progress bar**.
+> *"If a proposed overlay element would change what a player does in the next tick, it doesn't ship."*
+
+The grade split is **not** in that list. It also fails the spec's own test in spirit: seeing `ambiguous 1` appear mid-fight tells a player someone else is on their target, which is exactly the kind of in-fight signal the section exists to keep out.
+
+**Recommendation:** keep `showGradeSplit()` as an opt-in diagnostic — it has earned its place during development and it is genuinely useful for verifying grading against the game — but the overlay's default should be the spec's: target name, session kills, lifetime KC. The grade split belongs in the **Session tab**, where it is a summary rather than a live prompt.
+
+The one thing the overlay currently gets right and should keep: hiding `inferred`/`ambiguous` when they are zero, so a clean session stays quiet.
+
+### Ordering, if this becomes the next arc
+
+1. **Display rollup** — one row per monster. Fixes the loudest confusion and is display-only, so it cannot corrupt stored data.
+2. **Drops in the panel** — the data now exists; per-npc persistence does not. Needs a `drops` field on `NpcStat` first.
+3. **Overlay default** back to the spec's contents; grade split moves to a Session tab.
+4. **Dry streaks** — needs drop history per npc plus rarity, and rarity is server-side by `spec-reference-data.md`. Client can show *"kills since last X"*; the *"you are 2.4x dry"* framing is a site feature.
