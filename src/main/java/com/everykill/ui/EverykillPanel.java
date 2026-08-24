@@ -30,6 +30,7 @@ import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
+import javax.swing.border.CompoundBorder;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.components.materialtabs.MaterialTab;
 import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
@@ -170,7 +171,11 @@ public class EverykillPanel extends PluginPanel
 		// MaterialTabGroup rather than a JComboBox. A stock combo box renders with a
 		// white popup and black text in the middle of a dark panel and looks exactly as
 		// bad as that sounds. This is what core's own panels use.
-		tabs.setLayout(new java.awt.GridLayout(1, Window.values().length, 2, 0));
+		// MaterialTab hardcodes a 10px empty border each side. Five of those in 225px
+		// leaves ~24px for text, and "Now" needs 31 - measured, not guessed - so it
+		// rendered as "N...". Narrowing the gaps doesn't help: the padding is the
+		// problem, so the border gets replaced below.
+		tabs.setLayout(new java.awt.GridLayout(1, Window.values().length, 1, 0));
 		tabs.setMaximumSize(new Dimension(Short.MAX_VALUE, 22));
 
 		// BoxLayout lines children up by alignmentX relative to EACH OTHER, so one
@@ -189,6 +194,11 @@ public class EverykillPanel extends PluginPanel
 			{
 				window = w;
 				rebuild();
+
+				// core sets its own border AFTER this returns - select() calls the
+				// event first, then setBorder(SELECTED_BORDER) - so narrowing it here
+				// would be overwritten. queue it behind that.
+				SwingUtilities.invokeLater(() -> narrow(tab, true));
 				return true;
 			});
 			tabs.addTab(tab);
@@ -197,6 +207,9 @@ public class EverykillPanel extends PluginPanel
 			{
 				tabs.select(tab);
 			}
+
+			// unselected tabs get it straight away; the selected one is queued above.
+			narrow(tab, w == window);
 		}
 
 		box.add(tabs);
@@ -309,6 +322,25 @@ public class EverykillPanel extends PluginPanel
 
 		revalidate();
 		repaint();
+	}
+
+	/**
+	 * Rebuilds a tab's border with 2px sides instead of core's 10.
+	 *
+	 * <p>{@code MaterialTab} pads 10px each side. Five tabs in a 225px panel leaves
+	 * about 24px of text room and "Now" needs 31, so the first tab rendered as "N...".
+	 * Gap tuning cannot fix that — the padding is the whole budget.
+	 *
+	 * <p>The selected form keeps core's orange underline, because that stripe is the
+	 * only thing showing which window you're looking at.
+	 */
+	private static void narrow(MaterialTab tab, boolean selected)
+	{
+		tab.setBorder(selected
+			? new CompoundBorder(
+				BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.BRAND_ORANGE),
+				BorderFactory.createEmptyBorder(5, 2, 4, 2))
+			: BorderFactory.createEmptyBorder(5, 2, 5, 2));
 	}
 
 	/**
