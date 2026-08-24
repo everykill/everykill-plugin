@@ -5,6 +5,7 @@
 package com.everykill;
 
 import com.everykill.detect.KillDetector;
+import com.everykill.detect.LootDetector;
 import com.everykill.ledger.LocalLedger;
 import com.everykill.model.KillRecord;
 import com.everykill.model.NpcStat;
@@ -30,6 +31,7 @@ import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.StatChanged;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ServerNpcLoot;
 import net.runelite.client.events.OverlayMenuClicked;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -80,6 +82,9 @@ public class EverykillPlugin extends Plugin
 
 	@Inject
 	private KillDetector detector;
+
+	@Inject
+	private LootDetector lootDetector;
 
 	@Inject
 	private LocalLedger ledger;
@@ -211,6 +216,22 @@ public class EverykillPlugin extends Plugin
 
 		detector.onGameTick(event);
 		xpService.drain(ledger::addXp);
+
+		// after the kills for this tick have resolved, so anything still buffered is
+		// genuinely unclaimed rather than just early. nothing joins loot to kills yet -
+		// step 6 measures first, see docs/plan-step6-loot.md.
+		lootDetector.expire(client.getTickCount());
+	}
+
+	// step 6, capture only. the server names the monster and the item outright
+	// (LOOTTRACKER_ADD_LOOT -> ServerNpcLoot), which beats inferring a drop from items
+	// appearing near a corpse. nothing branches on this yet - it buffers, and the log
+	// line in expire() is there to answer "does every kill actually get one of these"
+	// before any attribution is built on the assumption that it does.
+	@Subscribe
+	public void onServerNpcLoot(ServerNpcLoot event)
+	{
+		lootDetector.onServerNpcLoot(event);
 	}
 
 	// KEPT ON PURPOSE - not a leftover, don't sweep it before checking FINDINGS.
