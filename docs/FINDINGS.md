@@ -2021,3 +2021,23 @@ Both routes to getting it client-side are named and rejected at `:240-241` — *
 **What that means for `LootConfidence.NONE`:** it stays deliberately ambiguous in the client, and that is correct rather than incomplete. Its javadoc already says the cross-check *"isn't wired up yet"* — that wording should read *"is a server-side concern"*, because the client is never going to resolve it.
 
 **Process note.** `EverykillPlugin`'s own header says the plugin **records and does not analyse**. The plan I wrote this morning (`plan-step6-loot.md`, step 6 of the order of work) lists "always_drops cross-check" without saying where it runs, and I read that as client-side work. Checking the spec before writing took under a minute and would have cost an afternoon of building something that had to be torn out — and worse, something that would have failed Hub review for a network call.
+
+---
+
+## 2026-08-24 — account type verified live: GROUP_IRONMAN resolves through the clan channel, not the varbit
+
+**Status:** verified — live, 2026-08-24 16:25, account Zelnork (group ironman)
+
+```
+Kill: npc_id=7263 name=Ghost grade=UNCONTESTED ... account=GROUP_IRONMAN loot=NONE drops=-
+```
+
+One line, three things proven:
+
+1. **Group ironman resolves.** `client.getClanSettings(ClanID.GROUP_IRONMAN)` returns non-null for a GIM, which is the only route to that answer — `VarbitID.IRONMAN` has no group value and core's own switch falls through to normal.
+2. **The varbit-only path was right to refuse.** Before the clan check existed, the same account reported `GROUP_UNRESOLVED` rather than guessing at `MAIN` or `IRONMAN`. Both guesses would have been wrong and neither would have looked wrong.
+3. **`loot=NONE drops=-` on a ghost is correct, not a miss.** `always_drops.tsv` has no rows for Ghost, and the server reported nothing. Reference data and live behaviour agree.
+
+**Process note, and it cost time.** `account=GROUP_UNRESOLVED` appeared on a kill, and it was assumed to be account osiriz — a main — which made it look like a mapping bug. Temporary diagnostics went in to chase it. The user corrected it in three words: that was Zelnork, a group ironman, and the plugin had been reporting the truth the whole time.
+
+**The account in use is part of the evidence.** A log line saying something surprising about account type is not evidence of a bug until you know which account produced it. Same shape as reading a cumulative field as a per-kill one: the number was right, the assumption about what it described was not.
