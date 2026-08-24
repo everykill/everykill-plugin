@@ -1776,3 +1776,44 @@ So the ironman problem is real but **shallower than the superseded entry claimed
 
 Only the third pass, joining on timestamp, is evidence. **Do not answer a correlation question by reading a log window or by counting nearby lines.** Extract both event types with their timestamps and join them.
 **Source:** live measurement 2026-08-24; [Ironman Mode](https://oldschool.runescape.wiki/w/Ironman_Mode).
+
+---
+
+## 2026-08-24 — the game ANNOUNCES the ironman contest in chat, and the plugin already receives it
+
+**Status:** verified — live, correlated across 17 kills
+**Method:** A screenshot of the client during the rat test showed two chat messages nobody had thought to look for. Confirmed present in the log and correlated by timestamp against every kill in the session.
+
+**The game says it outright, as `SPAM` chat messages:**
+
+> *"As an Ironman, you might not receive kill-credit for this monster."*
+> *"As an Ironman, you don't get loot if players outside your group helped you kill the monster."*
+
+**This is a direct server statement about the exact condition the ironman filter needs**, and it had been approached all day by inference — first from `othersDamage`, then from hitsplat ownership flags. The signal was in the chat box the whole time.
+
+**Correlation across the session:**
+
+| | warning fired |
+|---|---|
+| 9 UNCONTESTED kills | **0** |
+| 8 AMBIGUOUS kills | **6** |
+
+**Zero false positives.** No warning ever appeared on a clean kill. That matters more than the recall gap: a signal that never fires wrongly can safely *add* to a filter.
+
+**Timing, read off the log:**
+- **`don't get loot`** fires on the **same second as the kill** — 15:13:48, 15:15:02, 15:16:23 each match their kill exactly. It is a statement about the kill that just happened.
+- **`might not receive kill-credit`** fires **4–9 seconds before** the kill (15:09:19 → kill 15:09:23; 15:14:27 → kill 15:14:33; 15:16:17 → kill 15:16:23). It appears to trigger when the contest *begins*, not when the monster dies.
+
+**Two contested kills produced no warning** — the `5/11` at 15:10:30 and the `1/5` at 15:11:35. **The cause is unknown and must not be guessed.** Candidates: the client de-duplicating repeated `SPAM` messages, a cooldown on the warning, or a genuine difference in those kills. Both of those kills also produced no loot, so the underlying rule held; only the announcement was absent.
+
+**Design consequence.** The chat message is a *better* signal than `othersDamage > 0` in one respect — it is the server's own statement rather than our reconstruction — but it is **not a replacement**, for three reasons:
+1. Recall was 6/8 in this sample and the gap is unexplained.
+2. `SPAM` messages can be filtered or suppressed client-side by the user, so their absence is not evidence.
+3. It says *"might not"* for kill-credit, which is not a determination.
+
+**The robust filter is the union: `othersDamage > 0` OR the loot warning seen for that kill.** Damage covers the announcement gap, the announcement covers the zero-damage splash case that `othersDamage` structurally cannot see (see the `BLOCK_OTHER` entry above). Neither alone is sufficient; together they cover both known failure modes.
+
+**Not implemented.** Recorded so the filter is built on the union rather than on whichever half was investigated most recently.
+
+**Process note.** This was found by the user glancing at his own screen, after a day spent inferring the same fact from hitsplat internals. **The client's own chat output is a first-class data source and was never checked.** Worth remembering before the next round of inference: read what the game is already saying before reconstructing it from events.
+**Source:** live measurement 2026-08-24, screenshot plus `client.log` correlation.
