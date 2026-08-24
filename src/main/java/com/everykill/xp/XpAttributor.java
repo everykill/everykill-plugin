@@ -31,14 +31,13 @@ public class XpAttributor
 	 * How far {@link #allocateAt} may search for the damage that earned an XP drop.
 	 * No longer provisional — see the measurement below.
 	 */
-	// measured 2026-08-24, 109 allocations over ordinary combat: 108 landed at
-	// offset +1 and one at +2. never zero, never negative - xp ALWAYS turns up a tick
-	// before the hitsplat that earned it, so the forward search is the only arm that
-	// has ever fired. the backward arm ran zero times.
+	// measured 2026-08-24 over two venues, 392 allocations. goblins: +1 x108, +2 x1.
+	// dagannoths: +1 x272, 0 x8, -1 x3. xp USUALLY turns up a tick before the
+	// hitsplat that earned it, but not always, and the backward arm does fire.
 	//
-	// 2 is justified by exactly one sample, and that one followed a 124 tick idle gap.
-	// drop it to 1 and you lose that case. raise it and nothing in the data asks for
-	// the room. worth re-measuring at a boss, tick pressure is different there.
+	// the first session was single-target goblins and showed zero at offset 0, which
+	// made a case for searching forward before own-tick. a second venue killed that
+	// idea. don't reorder this on one venue's data.
 	static final int SETTLE_TICKS = 2;
 
 	private final Map<CombatSkill, Integer> lastKnownXp = new EnumMap<>(CombatSkill.class);

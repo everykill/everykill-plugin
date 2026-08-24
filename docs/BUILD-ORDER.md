@@ -175,9 +175,10 @@ What the Zulrah run did establish:
 
 **Still to do, and it needs real play:**
 
-- ~~Measure the **XP settle window**~~ — **done 2026-08-24.** 109 allocations: 108 at offset **+1**, one at **+2**, never zero or negative. XP always arrives a tick before its hitsplat, so `allocateAt`'s forward search is the only arm that has ever fired; the backward arm ran zero times. `SETTLE_TICKS = 2` stays, justified by a single sample that followed a 124-tick idle gap. Worth re-measuring at a boss.
+- ~~Measure the **XP settle window**~~ — **done 2026-08-24.** Two venues, 392 allocations. Goblins gave +1 ×108, +2 ×1. Dagannoths gave +1 ×272, **0 ×8, -1 ×3**. XP usually arrives a tick before its hitsplat, but not always, and the backward search arm does fire. `SETTLE_TICKS = 2` stays and the search order stays.
 - Measure the **residual noise floor** — still open. Needs a hand-counted task with the ledger compared against skill totals.
-- **Exercise the multi-monster pool.** All 109 allocations had exactly **one** npc in the pool, so the mis-attribution reproduced on 2026-08-22 (a 1 hp add taking a boss's XP) has still never been seen in play. Needs a genuinely crowded cannon spot.
+- ~~**Exercise the multi-monster pool.**~~ — **answered, and the answer is that it cannot be exercised.** 392 allocations across two venues, every one with exactly **one** npc in the pool, including a cannon clipping six distinct dagannoth ids. `damage()` calls `settle()` on every hitsplat, so the first hitsplat after a pending XP drop allocates the whole thing against a pool containing only itself. **The damage-share split has never run with more than one monster in it.** See FINDINGS 2026-08-24.
+- **Fix the settle timing.** This is now the real Step 5 work: defer allocation to the tick boundary instead of settling per hitsplat. It subsumes the snakeling mis-attribution (2026-08-22), which is one visible instance of the general rule *whichever hitsplat is processed first claims that tick's entire XP drop*. Touches stranded/unallocated accounting, so it needs its own pass.
 
 **Acceptance:** Per-monster XP on a hand-counted task is within the measured noise floor of the skill totals the client reports, and **stranded** XP stays near zero during ordinary combat.
 

@@ -1419,6 +1419,8 @@ The wiki is unambiguous about the risk: *"This is a safe activity in an instance
 
 ## 2026-08-24 — the settle-window measurement bears on the snakeling bug: every test defending own-tick-first exercises an offset never seen in play
 
+> **SUPERSEDED the same day.** A second venue (dagannoths, 283 allocations) produced **offset 0 eight times and offset -1 three times**. The premise below — that offset 0 never occurs — held only for single-target goblin grinding. The reorder hypothesis is dead and the current search order must be left alone. See the later entry. Kept because the caution it recorded about sample breadth turned out to be the important part.
+
 **Status:** verified (the offsets), **hypothesis** (the implication)
 **Method:** Hand-traced `allocateAt` for each existing test and for the reproduced snakeling case, then compared the offsets each one exercises against the 109 measured allocations.
 
@@ -1441,3 +1443,58 @@ The wiki is unambiguous about the risk: *"This is a safe activity in an instance
 
 **What would settle it:** the same instrumentation run at a boss and in a crowded multi-monster spot. If offset 0 stays at zero occurrences across venues, the case for reordering is strong and the two tests should be re-examined rather than the code bent around them. If offset 0 appears anywhere, the current order is protecting something real and the snakeling fix has to come from a different direction.
 **Source:** none — direct measurement plus code reading.
+
+---
+
+## 2026-08-24 — a damage pool can never hold two monsters in practice, because settle() runs on every hitsplat
+
+**Status:** verified (reproduced in a unit test, corroborated by 283 live allocations)
+**Method:** Cannoned dagannoths at Waterbirth with the round-two instrumentation, which logs pool contents and flags multi-npc pools. Then replayed the two possible event orderings offline against `XpAttributor`.
+
+**283 allocations. Every single one had exactly one npc in the pool** — the same result as the 109 goblin allocations, at a completely different venue, with a cannon clipping several dagannoths and six distinct npc ids appearing across the session. Pool damage ran as high as 30 per tick. A different dagannoth appears on nearly every consecutive tick — 304, 305, 306, 307 — each alone.
+
+**The multi-monster path is not rare. It is unreachable.** The offline replay shows why:
+
+```java
+xp.damage(970, 10, 101);                              // both hitsplats first
+xp.damage(971,  6, 101);
+xp.xpChanged(CombatSkill.RANGED, 1_000_064, 100);
+  -> 970=40  971=24   correct, split by damage share
+
+xp.xpChanged(CombatSkill.RANGED, 1_000_064, 100);     // xp first, as it always is
+xp.damage(970, 10, 101); xp.settle(101);
+xp.damage(971,  6, 101); xp.settle(101);
+  -> 970=64  971=0     the first hitsplat takes everything
+```
+
+Same two monsters, same 64 XP, different answer. **`damage()` calls `settle()` on every hitsplat.** When XP is already pending — which it always is, since it arrives a tick early — the very first hitsplat of the next tick triggers allocation against a pool that contains only that one monster. The second hitsplat lands microseconds later into a pool whose XP has already been spent.
+
+**118 adjacent-tick pairs with different monsters** were observed. Those are hits that would have shared a pool if allocation had waited for the tick to finish.
+
+**This is the same root cause as the snakeling theft on 2026-08-22.** That was framed as "a chip hit on an add steals the boss's XP". The general statement is: **whichever hitsplat is processed first claims the entire XP drop for its tick.** The snakeling case is just the most visible instance, because a 1 hitpoint add taking 76 XP is obviously absurd, whereas one dagannoth taking another dagannoth's share looks like ordinary data.
+
+**Consequence for the design.** The damage-share split in `split()` — largest-remainder, carefully summing to the whole — is real code that has, as far as these 392 measured allocations show, **never once run with more than one monster in the pool.** It is correct and untested in play.
+
+**Not fixed.** The obvious move is to defer allocation until the tick boundary rather than settling on each hitsplat, but that changes when XP is attributed for every kill in the plugin and touches the `EMITTED_TICKS`/stranded accounting. It needs its own careful pass, not a quick edit at the end of a session.
+**Source:** none — direct measurement and testing.
+
+---
+
+## 2026-08-24 — offset 0 and offset -1 both occur; the reorder hypothesis is falsified
+
+**Status:** verified — **supersedes the hypothesis logged earlier today**
+**Method:** Same dagannoth session, 283 allocations, compared against the 109 from goblin grinding.
+
+| offset | goblins (109) | dagannoths (283) |
+|---|---|---|
+| +1 | 108 | 272 |
+| +2 | 1 | 0 |
+| **0** | **0** | **8** |
+| **-1** | **0** | **3** |
+
+Earlier today it was recorded that offset 0 never occurred in 109 allocations, that every test defending `allocateAt`'s own-tick-first search order depends on offset 0, and therefore that searching forward before own-tick *might* be closer to what the game does. **That hypothesis is dead.** Offset 0 happens, offset -1 happens, and the backward arm of the search — which had fired zero times in the first session — fires in ordinary combat at a second venue. The current search order is protecting real cases and must not be reordered.
+
+**The correction matters more than the conclusion.** The first session's 109 samples looked decisive: a 108/1 split with a clean zero in the column that would have justified a change. It was one account, one venue, one weapon, single-target, and it was wrong about the shape of the distribution. The caution recorded at the time — *"109 samples is one venue, one account, one weapon; offset 0 could be perfectly normal at a boss and just absent from goblins"* — was exactly right, and a second venue cost one session to confirm it.
+
+**The snakeling fix therefore has to come from the settle-timing direction**, not from reordering the search.
+**Source:** none — direct measurement.

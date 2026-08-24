@@ -248,6 +248,52 @@ public class XpAttributorTest
 		Assert.assertEquals(0L, xp.getStrandedXp());
 	}
 
+	// ------------------------------------------------------------------
+	// Waterbirth, 2026-08-24. 392 allocations across two venues and not one
+	// of them had two monsters in the pool, cannon or not.
+	// ------------------------------------------------------------------
+
+	private static final int DAGANNOTH_A = 970;
+	private static final int DAGANNOTH_B = 971;
+
+	@Test
+	public void twoMonstersHitOnOneTickSplitTheExperienceBetweenThem()
+	{
+		xp.prime(CombatSkill.RANGED, 1_000_000);
+
+		// both hitsplats land before the xp does. this is the case split() was written
+		// for - largest remainder, shares summing to the whole - and it works.
+		xp.damage(DAGANNOTH_A, 10, 101);
+		xp.damage(DAGANNOTH_B, 6, 101);
+		xp.xpChanged(CombatSkill.RANGED, 1_000_064, 100);
+		xp.settle(101);
+
+		Assert.assertEquals(40L, xp.xpFor(DAGANNOTH_A));
+		Assert.assertEquals(24L, xp.xpFor(DAGANNOTH_B));
+	}
+
+	@Test
+	public void aPendingDropIsNotSwallowedByWhicheverHitsplatArrivesFirst()
+	{
+		xp.prime(CombatSkill.RANGED, 1_000_000);
+
+		// same tick, same two monsters, same 64 xp. the only difference is that the xp
+		// was already waiting - which it always is, it arrives a tick early - so
+		// damage()'s settle() fires on the FIRST hitsplat against a pool holding only
+		// that one monster. the second hitsplat finds the xp already spent.
+		//
+		// this is why a multi-npc pool has never been observed in play, and it's the
+		// general form of the snakeling theft: first hitsplat processed takes the lot.
+		xp.xpChanged(CombatSkill.RANGED, 1_000_064, 100);
+		xp.damage(DAGANNOTH_A, 10, 101);
+		xp.settle(101);
+		xp.damage(DAGANNOTH_B, 6, 101);
+		xp.settle(101);
+
+		Assert.assertEquals("first hitsplat must not take the whole drop", 40L, xp.xpFor(DAGANNOTH_A));
+		Assert.assertEquals("the other monster earned its share", 24L, xp.xpFor(DAGANNOTH_B));
+	}
+
 	@Test
 	public void drainHandsOverAndClears()
 	{
