@@ -19,7 +19,7 @@ every bug found so far was found in a client, not in a test run.
 | 1 | Damage records + ActorDeath | ✅ **verified** | foreign-kill exclusion re-confirmed 2026-08-21 |
 | 2 | isDead despawn fallback | ✅ **verified** | both paths measured, gap is 6 ticks |
 | 3 | Transform deaths | ✅ **verified** | all three cases, twice — see the correction in-step |
-| 4 | NpcChanged phase handling | 🟡 **partial** | branch executed 9× on Zulrah; no fight completed |
+| 4 | NpcChanged phase handling | ✅ **verified** | Nazastarool: 3 deaths, 2 transforms, 1 kill |
 | 5 | Measured XP by damage share | 🟡 **partial** | allocator verified; two numbers still unmeasured |
 | 6 | Loot: tile coincidence | ⬜ not started | — |
 | 7 | Loot attribution + guards | ⬜ not started | — |
@@ -28,7 +28,7 @@ every bug found so far was found in a client, not in a test run.
 | 0b | always_drops[] pull | 🟡 **partial** | 4,339 rows, 2,798 ids; nothing consumes it yet |
 | 0c | Combat formula implementation | ⬜ not started | — |
 
-**The one that matters: Step 4 has never run.** Not "lightly tested" — the
+**Step 4 is done as of 2026-08-23** (Nazastarool, Nightmare Zone). The next real gap is Step 5: the XP allocator mis-attributes a boss's experience to any low-hp add that dies beside it, proven by a failing test, and its settle window is still an unmeasured desk number. Historical note: Step 4 had never run. Not "lightly tested" — the
 carry-forward branch has executed zero times, and BUILD-ORDER has flagged it as the code
 most likely to misbehave since before it was written. It was blocked on account access;
 as of 2026-08-21 it is not. See *Test access* below.
@@ -130,7 +130,13 @@ follow, but "should" is not "did".
 
 ## Step 4 — NpcChanged phase handling
 
-**🟡 Status: partial — the branch has now executed, but no fight has been completed.** Nine carry-forward executions on Zulrah 2026-08-22, first time in the project's history. See FINDINGS 2026-08-22. **What is still missing is the acceptance criterion itself:** the fight ended in a player death, so it produced *zero* kills. Nine phases producing zero kills is not the same claim as a completed fight producing exactly one. **Do not mark this ✅ until a multi-phase boss is killed and the count is checked.**
+**✅ Status: verified 2026-08-23** — Nazastarool in a Nightmare Zone practice dream. Three `ActorDeath` events, two carry-forwards, **exactly one kill emitted**, damage unbroken across all three forms (70 → 140 → 221, `dmg=221/221`, graded UNCONTESTED). Both temporary diagnostics met their recorded removal trigger and are **out of the tree**.
+
+The `isDying` column read **false, false, true** across the three deaths, settling what the KQ attempt could not: **`ActorDeath` fires on every intermediate phase.** The event is always present; `NpcUtil.isDying()` is the only thing standing between it and three kills for one monster. See FINDINGS 2026-08-23.
+
+Earlier attempts, kept because they cost real trips: **Zulrah 2026-08-22** proved the branch executes at all — nine transitions, first time in project history, player died at 338/500. **Kalphite Queen 2026-08-23** proved a genuinely-dying first form emits no phantom kill (the runelite#15394 exposure) but ended in a death during form 2, and its `deathAt=-1` was an ambiguous reading that prompted the `onActorDeath` diagnostic.
+
+**`xp=0` on the NMZ kill is expected** — practice mode grants no combat experience. It does not affect this step, which counts kills from damage. Step 5 still needs a venue that actually grants XP.
 
 What the Zulrah run did establish:
 - Zulrah's dive is an `NpcChanged`, **not** a despawn/respawn — `2042 -> 2043 -> 2044` cycling, zero despawn discards mid-fight. This was an open question and is now measured.

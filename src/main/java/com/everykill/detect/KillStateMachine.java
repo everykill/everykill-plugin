@@ -133,22 +133,15 @@ public class KillStateMachine
 		final Record r = tracked.get(key);
 		if (r == null)
 		{
-			// temp: remove after Step 4 is verified in FINDINGS - see BUILD-ORDER Step 4.
-			// this arm is the boring one: a transform on something we've never hit. it's
-			// what every rock crab did, which is exactly why the arm below has never run.
-			log.debug("temp: NpcChanged, no record open. npc_id={} name={} tick={}",
-				npcId, name, tick);
+			// a transform on something we've never hit. that's every rock crab waking
+			// up, and it isn't our kill.
 			return;
 		}
 
-		// temp: remove after Step 4 is verified in FINDINGS - see BUILD-ORDER Step 4.
-		// THIS is the line that has never executed. logged unconditionally and before
-		// the mutation, so the old id is still readable - a kill count going up proves
-		// nothing about which path got us there, and silence proves nothing at all.
-		log.debug("temp: NpcChanged carry-forward. {} -> {} name={} -> {} myDamage={} othersDamage={} deathAt={} revoked={} tick={}",
-			r.npcId, npcId, r.name, name, r.myDamage, r.othersDamage,
-			r.deathSignalledAt, r.deathSignalRevoked, tick);
-
+		// zulrah cycles form nine times in a fight, nazastarool goes zombie ->
+		// skeleton -> ghost. same monster, new npc id each time, and ActorDeath fires
+		// on every one of them. carry the record over and emit nothing - the despawn
+		// of the LAST form is the kill. measured 2026-08-22 and 2026-08-23.
 		r.npcId = npcId;
 		r.name = name;
 		r.combatLevel = combatLevel;

@@ -1,6 +1,6 @@
 # Everykill
 
-RuneLite plugin + companion hiscore website that tracks **per-monster** XP, kill counts and drops.
+RuneLite plugin that tracks **per-monster** XP, kill counts and drops. A companion hiscore website consumes what it records; **that site is specced outside this repo** and nothing here depends on it existing.
 
 The RuneLite coding conventions imported above are authoritative and take precedence over anything below. This file adds project-specific context on top of them.
 
@@ -97,6 +97,7 @@ Plugin Hub install distribution is steep — the top plugin has ~595k, the 250th
 - `docs/spec-kill-detection.md` · `docs/spec-drop-attribution.md` · `docs/spec-data-model.md` · `docs/spec-performance.md`
 - `docs/STANDING-ASSUMPTIONS.md` — external facts this project depends on, when each was last verified against a primary source, and how often to re-check
 - `docs/JAGEX-LOGIN.md` — logging into a Jagex account from the dev client
+- `docs/PRODUCT-DIRECTION.md` — why the plugin exists, what's cut, and which inputs the site needs recorded now. **Plugin scope only; the site's own feature set lives outside this repo.**
 - `docs/STEP-3.7-DETAILED.md` — detailed walkthrough of swapping the example plugin's files for the real ones
 - `docs/README.md` — early project README (predates the Everykill naming and current spec set; kept for history, not current design)
 

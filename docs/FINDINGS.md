@@ -1345,3 +1345,31 @@ The wiki is unambiguous about the risk: *"This is a safe activity in an instance
 
 **Why this was missed, and it is the same failure this log keeps recording.** `rlsrc` was unpacked earlier the same day *specifically* so core could be read instead of guessed at. `NpcUtil` was then opened and grepped for gargoyle constants — and the `NZONE_` block sat directly underneath, unread. Two player deaths (Zulrah 338/500, KQ during form 2) were spent on the assumption that mid-fight phase transitions require a dangerous boss. **They do not.** Grepping a file for the thing you already expect is not reading it.
 **Source:** rlsrc `net/runelite/client/game/NpcUtil.java`; oldschool.runescape.wiki/w/Nightmare_Zone.
+
+---
+
+## 2026-08-23 — Step 4 acceptance criterion met: Nazastarool, three deaths, two transforms, exactly one kill
+
+**Status:** verified
+**Method:** Nightmare Zone practice dream, Nazastarool only, main account. Both temporary diagnostics active — the `NpcChanged` carry-forward pair and the `ActorDeath` arrival line added earlier today.
+
+```
+19:05:02  temp: ActorDeath. npc_id=6398 name=Nazastarool isDying=false tracked=true tick=2009
+19:05:05  temp: NpcChanged carry-forward. 6398 -> 6399 myDamage=70  deathAt=-1 tick=2014
+19:05:25  temp: ActorDeath. npc_id=6399 name=Nazastarool isDying=false tracked=true tick=2047
+19:05:28  temp: NpcChanged carry-forward. 6399 -> 6400 myDamage=140 deathAt=-1 tick=2052
+19:05:48  temp: ActorDeath. npc_id=6400 name=Nazastarool isDying=true  tracked=true tick=2085
+19:05:51  Kill: npc_id=6400 name=Nazastarool grade=UNCONTESTED signal=OBSERVED
+          dmg=221/221 attacks=18 hits=18 maxHit=24 kc=1 sessionKills=1
+```
+
+**Three `ActorDeath` events, two carry-forwards, one kill emitted.** Damage accumulated unbroken across all three forms — 70, 140, 221 — and the final record carried `dmg=221/221`, no foreign damage, graded `UNCONTESTED`. **This is the acceptance criterion, met in a client.**
+
+**It also answers what KQ could not.** The `isDying` column reads **false, false, true**. `ActorDeath` *does* fire on every intermediate phase — the event is present and correct, and `NpcUtil.isDying()` rejects the first two before `KillStateMachine.death()` can set `deathSignalledAt`. Earlier today the KQ run produced `deathAt=-1` and that was explicitly logged as an unmeasured outcome, because it reads identically whether the gate swallowed the signal or the signal never arrived. **It arrives. The gate is what stops it.** The one-line `onActorDeath` diagnostic added a few hours earlier is what made the difference; the ambiguity was real and is now closed.
+
+**Nightmare Zone is the right venue for this class of test and should have been used first.** No travel, no risk, no supplies, repeatable immediately, and Nazastarool packs two transforms into a ~50-second fight. Both boss attempts (Zulrah 338/500, KQ during form 2) ended in a player death and neither produced a completed kill; the safe instance produced one on the first attempt.
+
+**`xp=0`, and that is expected.** NMZ practice mode grants no combat experience — noticed by the user before the log was read. It does not affect this result: Step 4 counts kills from damage, not experience. It is arguably cleaner, since no XP means no possibility of the allocator mis-attribution recorded on 2026-08-22 contaminating the observation. **Step 5's unmeasured settle window still needs a venue that actually grants XP.**
+
+**Step 4 moves to ✅ verified.** Both diagnostics have now met their recorded removal trigger and come out.
+**Source:** none — direct observation.

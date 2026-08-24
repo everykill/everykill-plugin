@@ -143,7 +143,7 @@ No game access needed. Implement the formulas above as a pure function: player l
 
 **Validation:** compare output against the OSRS Wiki DPS calculator for a handful of known setups. Any disagreement is a bug in ours until proven otherwise.
 
-### Order within Tier 3
+### Rollout order for the performance metrics
 
 1. **Record the inputs now** — the §2 fields, and active-tick accounting. Impossible to backfill
 2. **Ship single-player metrics** — observed DPS, damage efficiency, uptime. These work at N=1, from the first kill, on the most obscure monster in the game

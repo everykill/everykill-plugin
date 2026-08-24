@@ -175,7 +175,7 @@ for the rockslug. **`FINDINGS.md`, 2026-08-20.**
 
 ## 4. The better long-term source is our own kill logs
 
-`PRODUCT-DIRECTION.md:54` already plans to derive rates from kill logs. **Max HP is
+`PRODUCT-DIRECTION.md` §3 already plans to derive rates from kill logs. **Max HP is
 easier than rates**, because minimum observed lethal damage converges on true max HP
 from above and tightens with every kill from every user.
 
