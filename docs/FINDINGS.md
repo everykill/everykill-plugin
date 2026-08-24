@@ -1742,3 +1742,37 @@ So the ironman problem is real but **shallower than the superseded entry claimed
 
 **Still not tested: a kill where the other player ONLY splashed and never landed a hit.** Every AMBIGUOUS kill above contains real foreign damage. The wiki's *"even zero points of damage"* clause is therefore still unconfirmed in play, and it is the case that decides whether `othersDamage > 0` alone is unsound or merely incomplete.
 **Source:** live measurement 2026-08-24; `HitsplatID` from `runelite-api-1.12.36.jar`; [Ironman Mode](https://oldschool.runescape.wiki/w/Ironman_Mode).
+
+---
+
+## 2026-08-24 — measured: an ironman gets NOTHING from a contested kill, even at 90% of the damage
+
+**Status:** verified — 17 kills, live, two accounts, Edgeville Dungeon multicombat
+**Method:** Zelnork (ironman) killed giant rats while a second player attacked the same rats. Kills and `loottracker_add_loot` script events matched **by timestamp**, not by proximity in the log (see the method warning below).
+
+| kill | my damage | share | server loot event |
+|---|---|---|---|
+| UNCONTESTED × 9 | full | 100% | **all nine** |
+| AMBIGUOUS | 9/11 | 82% | none |
+| AMBIGUOUS | 5/11 | 45% | none |
+| AMBIGUOUS | 1/5 | 20% | none |
+| AMBIGUOUS | 4/10 | 40% | none |
+| AMBIGUOUS | 8/10 | 80% | none |
+| AMBIGUOUS | 1/5 | 20% | none |
+| **AMBIGUOUS** | **9/10** | **90%** | **none** |
+| AMBIGUOUS | 4/5 | 80% | none |
+
+**9 clean kills produced 9 loot events. 8 contested kills produced zero.** Every loot event carries the same timestamp as its kill, so nothing is lost to timing.
+
+**The 9/10 row is the finding.** Ninety per cent of the damage and no drop at all. This confirms the wiki rule as **absolute, not proportional and not majority-based**: any other player's involvement voids an ironman's drop entirely, however small their contribution and however large ours. On a main that kill wins the drop comfortably — `Drops` says the most-damage player receives it.
+
+**Consequence: `othersDamage > 0` is the correct predicate for the ironman drop-rate filter**, and it is now measured rather than assumed. Contested kills must be excluded from ironman drop-rate denominators entirely — no threshold, no share calculation, no per-boss encounter rule. Kill counts are unaffected; the kill happened.
+
+**Still not covered:** every contested kill here contains real foreign *damage*. A kill where the other player **only splashed** was attempted twice and both times they connected before the kill landed. The wiki's *"even zero points of damage"* clause therefore remains unconfirmed in play. Since `BLOCK_OTHER` is visible to us (previous entry), a fix counting foreign *attacks* rather than foreign *damage* would cover that case if it is real — but whether it is real is still unmeasured.
+
+**METHOD WARNING, recorded because it produced two wrong answers in a row on this exact question.**
+1. The first pass eyeballed a `tail` window and reported "perfect correlation, every AMBIGUOUS got nothing". The conclusion happened to be correct, but the evidence did not support it — the loot lines for several kills sat outside the window being read.
+2. The second pass scripted it as *"did a loot event appear within the next few lines?"* and reported the **opposite** — that contested kills did get loot. That was wrong too: proximity in a log is not association, and it was matching each contested kill against the **following** kill's loot.
+
+Only the third pass, joining on timestamp, is evidence. **Do not answer a correlation question by reading a log window or by counting nearby lines.** Extract both event types with their timestamps and join them.
+**Source:** live measurement 2026-08-24; [Ironman Mode](https://oldschool.runescape.wiki/w/Ironman_Mode).
