@@ -19,6 +19,8 @@ import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -309,23 +311,118 @@ public class EverykillPanel extends PluginPanel
 		repaint();
 	}
 
+	/**
+	 * Folds rows that are the same monster wearing different ids.
+	 *
+	 * <p>Returns synthetic {@link NpcStat}s rather than a new type so every row-drawing
+	 * path downstream is untouched. Nothing here is written back — the ledger keeps raw
+	 * ids forever and this is a read-time view, per {@code PROJECT.md}.
+	 */
+	private static List<NpcStat> rollUp(List<NpcStat> stats)
+	{
+		final Map<String, NpcStat> byKey = new LinkedHashMap<>();
+		final Map<String, Integer> biggest = new HashMap<>();
+
+		for (NpcStat stat : stats)
+		{
+			final String key = (stat.name == null ? "?" : stat.name) + "\u0000" + stat.combatLevel;
+			final NpcStat into = byKey.get(key);
+
+			if (into == null)
+			{
+				byKey.put(key, copyOf(stat));
+				biggest.put(key, stat.total());
+				continue;
+			}
+
+			absorb(into, stat);
+
+			// keep the id of whichever one the player actually killed most, so
+			// expanding the row lands somewhere real.
+			if (stat.total() > biggest.get(key))
+			{
+				biggest.put(key, stat.total());
+				into.npcId = stat.npcId;
+			}
+		}
+
+		return new ArrayList<>(byKey.values());
+	}
+
+	private static NpcStat copyOf(NpcStat from)
+	{
+		final NpcStat out = new NpcStat(from.npcId, from.name);
+		out.combatLevel = from.combatLevel;
+		absorb(out, from);
+		return out;
+	}
+
+	private static void absorb(NpcStat into, NpcStat from)
+	{
+		into.uncontested += from.uncontested;
+		into.inferred += from.inferred;
+		into.ambiguous += from.ambiguous;
+		into.xp += from.xp;
+		into.myDamageTotal += from.myDamageTotal;
+		into.othersDamageTotal += from.othersDamageTotal;
+		into.killsWithDamage += from.killsWithDamage;
+
+		if (from.firstKillMillis > 0
+			&& (into.firstKillMillis == 0 || from.firstKillMillis < into.firstKillMillis))
+		{
+			into.firstKillMillis = from.firstKillMillis;
+		}
+		into.lastKillMillis = Math.max(into.lastKillMillis, from.lastKillMillis);
+
+		if (from.xpBySkill != null)
+		{
+			if (into.xpBySkill == null)
+			{
+				into.xpBySkill = new HashMap<>();
+			}
+			from.xpBySkill.forEach((skill, xp) -> into.xpBySkill.merge(skill, xp, Long::sum));
+		}
+
+		if (from.days != null)
+		{
+			if (into.days == null)
+			{
+				into.days = new HashMap<>();
+			}
+			from.days.forEach((day, tally) ->
+			{
+				final NpcStat.DayTally target =
+					into.days.computeIfAbsent(day, k -> new NpcStat.DayTally());
+				target.uncontested += tally.uncontested;
+				target.inferred += tally.inferred;
+				target.ambiguous += tally.ambiguous;
+				target.xp += tally.xp;
+				target.myDamage += tally.myDamage;
+				target.othersDamage += tally.othersDamage;
+				target.killsWithDamage += tally.killsWithDamage;
+			});
+		}
+	}
+
 	/** Rows for whatever window is picked, biggest first, empties dropped. */
 	private List<NpcStat> statsForWindow()
 	{
 		if (window == Window.SESSION)
 		{
-			final List<NpcStat> out = new ArrayList<>(ledger.getSession().values());
+			final List<NpcStat> out = rollUp(new ArrayList<>(ledger.getSession().values()));
 			out.sort(Comparator.comparingInt(NpcStat::total).reversed());
 			return out;
 		}
 
 		if (window == Window.ALL)
 		{
-			return ledger.allTimeSorted();
+			final List<NpcStat> out = rollUp(ledger.allTimeSorted());
+			out.sort(Comparator.comparingInt(NpcStat::total).reversed());
+			return out;
 		}
 
 		final List<NpcStat> out = new ArrayList<>();
-		for (NpcStat stat : ledger.allTimeSorted())
+		for (NpcStat stat : rollUp(ledger.allTimeSorted()))
 		{
 			if (stat.totalSince(window.days) > 0)
 			{
