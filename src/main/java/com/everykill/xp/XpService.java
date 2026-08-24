@@ -82,8 +82,16 @@ public class XpService
 	/** Move accumulated experience into the ledger and clear the buffer. */
 	public void drain(XpSink sink)
 	{
-		// match up anything still waiting on its hitsplat before handing over
-		attributor.settle(client.getTickCount());
+		// settle the tick that has FINISHED, not the one we're standing in. GameTick
+		// arrives before that tick's hitsplats do, so settling at getTickCount() looks
+		// for a damage pool that hasn't been filled yet, gives up on it, and strands
+		// xp that had a perfectly good pool a moment later. seen live 2026-08-24:
+		// "xp=34 arrivedAt=114 now=117 pools=[113, 114, 115, 117]" - written off with
+		// its own tick sitting right there in the map.
+		//
+		// core waits the same way. SpecialCounterPlugin parks a future hitsplatTick
+		// and only acts once onGameTick reaches it.
+		attributor.settle(client.getTickCount() - 1);
 
 		for (Map.Entry<Integer, Map<CombatSkill, Long>> npc : attributor.drain().entrySet())
 		{
