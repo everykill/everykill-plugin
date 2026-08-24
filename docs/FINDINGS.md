@@ -1562,3 +1562,38 @@ int qty    = (int) scriptEvent.getArguments()[4];
 
 **Consequence for Step 6.** The step as written implements the mechanism core has moved away from. It should be re-planned around `ServerNpcLoot` as the primary source, with tile coincidence kept only as a documented fallback for cases the script does not cover — and the fallback should be built second, once the primary is proven, rather than first.
 **Source:** `rlsrc` RuneLite 1.12.36, `LootManager.java` lines 282-349, `LootTrackerPlugin.java` line 773.
+
+---
+
+## 2026-08-24 — design research: how other systems show players that a record is real but not rankable
+
+**Status:** research, no code written
+**Method:** Read the public rules of four systems that face the same problem — a record that is genuine but cannot go in a ranking. Everykill's `Confidence` grades (UNCONTESTED / INFERRED / AMBIGUOUS) already exist in code with the rule *"ranks read the top grade only, totals read the lot"*, but nothing in `PRODUCT-DIRECTION.md` explains grading to a player, and the concern raised was that it would confuse an ordinary user.
+
+**The four systems, and what each does about it:**
+
+| System | The distinction | How it is shown |
+|---|---|---|
+| **Warcraft Logs** | ranked vs flagged/unranked parse | parse still exists and is viewable; a flagged rank gets a **gold background**. Exploited ranks are flagged first and removed only once a code fix lands |
+| **Chess (Glicko)** | provisional vs established rating | a single **`?`** after the number when rating deviation > 110. No explanation shown inline; the mark is the whole UI |
+| **MLB** | qualified vs unqualified for a rate title | **3.1 plate appearances per team game.** Unqualified players simply do not appear on rate leaderboards, but their hits still count in every total |
+| **speedrun.com** | `new` / `verified` / `rejected` | pending runs are held off the board and visible only to the runner; **rejection carries a required `reason` string** |
+
+**Four independent domains converged on the same structure**, which is the strongest signal in this research:
+
+1. **The record is never destroyed.** WCL keeps the parse, MLB counts the hits, speedrun.com keeps rejected runs in the API. Everykill's rule already matches: AMBIGUOUS *"counts in totals, never in a denominator"*.
+2. **The mark is tiny.** A `?`, a gold background, an absence from a list. Not one of these systems explains itself inline — the mark is a hook for a player who cares, and invisible to one who does not.
+3. **The rule is stated publicly and precisely.** *3.1 per game*, *RD > 110*. Not "we filter low-quality data".
+4. **Exclusion is from the leaderboard, not from the player's own numbers.** MLB is the sharpest case: an unqualified batter's average is still his average, it just cannot win a title.
+
+**On the confusion concern — it is real, and MLB is the closest fit.** Chess's `?` is understood because every chess site has used it for decades; Everykill would carry no such convention. WCL's gold background is understood only by players who already care about parses. **The MLB pattern needs no explanation at all**: a player never sees "you are unqualified", they simply see their own count and, separately, a leaderboard they are or are not on. The disclosure only has to appear at the point where the two numbers differ.
+
+**What this suggests for Everykill**, subject to the user's decision:
+- **In the plugin:** show the total by default. The existing `showGradeSplit()` overlay breakdown stays opt-in, and the current behaviour of hiding INFERRED and AMBIGUOUS lines when they are zero is already the right instinct — a clean session shows one number.
+- **On the site:** the player's own kill count is the total, all grades. Leaderboards and drop-rate denominators are UNCONTESTED-only. The difference is disclosed **only where it bites** — a rate page saying *"based on N of your M kills"* — rather than as a persistent badge on every row.
+- **State the rule in one public sentence**, the way MLB states 3.1. Something a player can read once and never think about again.
+
+**What none of these systems justify** is a per-row grade badge everywhere, which is the design the code's colour-per-grade enum could tempt someone into building. Colours already exist on `Confidence` and are marked *"colours match the site exactly, don't touch them"*, so the palette is settled; where it is *shown* is not.
+
+**Not decided, not built.** This is prior art for a product decision that belongs to the user.
+**Source:** [Warcraft Logs ranks guide](https://www.warcraftlogs.com/help/ranks/), [Glicko system](https://www.glicko.net/glicko/glicko.pdf) and Lichess provisional-rating convention, [MLB rate stat qualifiers](https://www.mlb.com/glossary/standard-stats/rate-stats-qualifiers) (Official Baseball Rule 9.22), [speedrun.com API run statuses](https://github.com/speedruncomorg/api/blob/master/version1/runs.md), all read 2026-08-24.
