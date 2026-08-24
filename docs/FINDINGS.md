@@ -1414,3 +1414,30 @@ The wiki is unambiguous about the risk: *"This is a safe activity in an instance
 
 **The pattern is worth naming, because it is the same one as the placeholder bank data on 2026-08-22 and the 273-row drop pull on 2026-08-23:** a field was read without checking what it actually contained, and a confident conclusion followed. The fix each time was the same — replay it, or read the neighbouring records, before saying anything. Instrumentation output is evidence about the *shape* of events; it is not self-explanatory about their *meaning*.
 **Source:** none — direct testing.
+
+---
+
+## 2026-08-24 — the settle-window measurement bears on the snakeling bug: every test defending own-tick-first exercises an offset never seen in play
+
+**Status:** verified (the offsets), **hypothesis** (the implication)
+**Method:** Hand-traced `allocateAt` for each existing test and for the reproduced snakeling case, then compared the offsets each one exercises against the 109 measured allocations.
+
+| case | xpTick | poolTick | offset |
+|---|---|---|---|
+| `heldExperienceGoesToTheMonsterThatWasActuallyHit`, first half | 99 | 99 | **0** |
+| `heldExperienceGoesToTheMonsterThatWasActuallyHit`, second half | 100 | 101 | +1 |
+| `experienceArrivingOneTickLateStillLands` | 101 | 101 | **0** |
+| `aChipHitOnAnAddDoesNotStealTheBossesExperience` (the bug) | 100 | 100 | **0** |
+| **measured in play, 109 allocations** | — | — | **+1 ×108, +2 ×1, 0 ×0** |
+
+**Both tests that protect the own-tick-first search order depend on offset 0, and offset 0 did not occur once in 109 real allocations.** The snakeling theft is also an offset-0 event. That is not coincidence: XP arrives a tick *before* the hitsplat that earned it, so any pool sitting on the XP's own tick is, by construction, **not** the pool that produced it — it is the previous tick's damage, still in the map.
+
+**The implication, and it is only a hypothesis:** searching forward *before* own-tick may be closer to what the game actually does than the current order. That would fix the snakeling case without a magnitude heuristic or a plausibility check.
+
+**Not implemented, for three reasons.**
+1. The comment above `allocateAt` says plainly: *"flip it, or crank SETTLE_TICKS till something sticks, and you pay the wrong monster and never hear about it. don't."* That was written deliberately and the reason is not visible from here.
+2. `heldExperience...` first half would break. It encodes XP landing on the same tick as its own damage — a real scenario even if this session never produced one.
+3. **109 samples is one venue, one account, one combat style, and every pool held exactly one monster.** Offset 0 may be ordinary at a boss, in multicombat, or with a different weapon speed, and simply absent from goblin grinding. Reordering the most safety-critical logic in the allocator on the strength of one Lumbridge session is exactly the mistake `DEATH_CONFIRM_TICKS` recorded twice.
+
+**What would settle it:** the same instrumentation run at a boss and in a crowded multi-monster spot. If offset 0 stays at zero occurrences across venues, the case for reordering is strong and the two tests should be re-examined rather than the code bent around them. If offset 0 appears anywhere, the current order is protecting something real and the snakeling fix has to come from a different direction.
+**Source:** none — direct measurement plus code reading.
