@@ -46,6 +46,29 @@ public class NpcStat
 	public long firstKillMillis;
 	public long lastKillMillis;
 
+	// damage share, summed across every kill on this row. the grades tell you HOW we
+	// knew about a kill; these tell you how much of it was actually ours, and those
+	// are different questions. AMBIGUOUS covers both "a mate and i split it" and "i
+	// hit a 20-man boss once" - same label, nothing alike, and only damage separates
+	// them.
+	//
+	// the game itself decides ownership by damage, and not with one rule:
+	//   ordinary monsters and world bosses - most damage sees the drop
+	//   team bosses (nex)                  - a minimum threshold, then shares
+	//   instanced (vorkath, zulrah)        - nobody else is there
+	// see docs/reference-boss-encounter-classes.md. we store the raw numbers and let
+	// the consumer apply whichever rule fits the encounter. picking one here would
+	// bake in the wrong one for half the boss list.
+	//
+	// absent on rows written before this existed, same as xpBySkill - fills in on the
+	// next kill. a zero here means "never recorded", not "dealt no damage", so don't
+	// read a share off a row whose killsWithDamage is 0.
+	public long myDamageTotal;
+	public long othersDamageTotal;
+
+	/** kills that contributed to the damage totals above. the denominator. */
+	public int killsWithDamage;
+
 	// yyyy-mm-dd -> that day's tally, local time, because "today" means the player's
 	// today. only exists for days you actually killed the thing, and pruned past
 	// RETAINED_DAYS - enough for today/week/month and nothing beyond it.
@@ -60,6 +83,12 @@ public class NpcStat
 		public int inferred;
 		public int ambiguous;
 		public long xp;
+
+		// same fields as the row above, scoped to this day. without them a week or
+		// month window can count kills but can't say how much of them was ours.
+		public long myDamage;
+		public long othersDamage;
+		public int killsWithDamage;
 
 		public int total()
 		{
@@ -78,6 +107,11 @@ public class NpcStat
 	}
 
 	public void record(Confidence grade, long whenMillis)
+	{
+		record(grade, whenMillis, 0, 0);
+	}
+
+	public void record(Confidence grade, long whenMillis, int myDamage, int othersDamage)
 	{
 		switch (grade)
 		{
@@ -111,6 +145,19 @@ public class NpcStat
 			firstKillMillis = whenMillis;
 		}
 		lastKillMillis = whenMillis;
+
+		// a kill we somehow have no damage for isn't evidence of a share, so it stays
+		// out of the denominator entirely rather than dragging the average down.
+		if (myDamage > 0 || othersDamage > 0)
+		{
+			myDamageTotal += myDamage;
+			othersDamageTotal += othersDamage;
+			killsWithDamage++;
+
+			today.myDamage += myDamage;
+			today.othersDamage += othersDamage;
+			today.killsWithDamage++;
+		}
 	}
 
 	/** That day's tally, created on demand, with anything ancient pruned. */

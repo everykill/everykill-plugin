@@ -181,11 +181,11 @@ public class LocalLedger
 		// NPC names can change between game updates; keep the latest.
 		stat.name = kill.npcName;
 		stat.combatLevel = kill.combatLevel;
-		stat.record(kill.grade, kill.timestampMillis);
+		stat.record(kill.grade, kill.timestampMillis, kill.myDamage, kill.othersDamage);
 
 		final NpcStat sessionStat = session.computeIfAbsent(kill.npcId,
 			k -> new NpcStat(kill.npcId, kill.npcName));
-		sessionStat.record(kill.grade, kill.timestampMillis);
+		sessionStat.record(kill.grade, kill.timestampMillis, kill.myDamage, kill.othersDamage);
 
 		sessionKills++;
 		sessionGrades.merge(kill.grade, 1, Integer::sum);
