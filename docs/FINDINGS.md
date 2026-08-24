@@ -1817,3 +1817,39 @@ Only the third pass, joining on timestamp, is evidence. **Do not answer a correl
 
 **Process note.** This was found by the user glancing at his own screen, after a day spent inferring the same fact from hitsplat internals. **The client's own chat output is a first-class data source and was never checked.** Worth remembering before the next round of inference: read what the game is already saying before reconstructing it from events.
 **Source:** live measurement 2026-08-24, screenshot plus `client.log` correlation.
+
+---
+
+## 2026-08-24 — every ironman finding today is account-type gated, and the plugin currently has no idea what account type it is on
+
+**Status:** verified (the gap, and the mechanism), **UNVERIFIED** (the non-zero varbit values)
+**Method:** Grepped `src/main` for any notion of account type, then read how core gates ironman-specific behaviour.
+
+**`grep -rn "AccountType\|accountType\|IRONMAN" src/main` returns nothing.** The plugin has never checked what kind of account it is running on. Everything measured today — contested kills producing no loot, the chat warnings, the `othersDamage > 0` filter predicate — **applies to ironman accounts only** and is flatly wrong for a main:
+
+| situation | main | ironman |
+|---|---|---|
+| contested kill, we dealt 90% | **receives the drop** (most damage wins) | **receives nothing** |
+| contested kill, we dealt 20% | receives nothing (someone else had more) | receives nothing |
+| drop-rate denominator | depends on the encounter's own rule | **always excluded** |
+
+Applying the ironman rule to a main would discard legitimate kills where the player won the drop outright. Applying the main rule to an ironman would count lootless kills as dry ones. **Both directions are silent data corruption**, which is the failure mode this project exists to prevent.
+
+**The mechanism core uses:** `client.getVarbitValue(VarbitID.IRONMAN)` — varbit **1777** in `runelite-api-1.12.36.jar`. `GroundItemsPlugin` reads exactly this to decide whether ground items are takeable, with the comment:
+
+```java
+return ownership != OWNERSHIP_OTHER || accountType == 0; // Mains can always take items
+```
+
+**So `0` means main.** That is confirmed by core's own comment and is the only value this project can currently assert.
+
+**NOT verified: which non-zero value maps to which mode.** There are six ironman types (Ironman, Hardcore, Ultimate, Group, Hardcore Group, Unranked Group) and the varbit-to-mode mapping has **not** been read. It matters, because **Group Ironman is a genuine exception**: the game's own message says *"you don't get loot if players outside **your group** helped you kill the monster"* — so for a GIM, a groupmate's damage does **not** void the drop, and `othersDamage > 0` would wrongly exclude their normal group play.
+
+**Related unread mechanism:** `GroundItem.getOwnership()` and the `OWNERSHIP_SELF` / `OWNERSHIP_GROUP` / `OWNERSHIP_OTHER` constants. Core already distinguishes *group* ownership from *self* and *other*, which is very likely the same distinction the group-ironman loot rule needs. Read this before implementing anything for GIM.
+
+**Required before the ironman filter ships:**
+1. Read `VarbitID.IRONMAN` once the player is logged in and store the account type on the session.
+2. Gate every rule from today's findings behind it. A main must keep the encounter-class rules from `reference-boss-encounter-classes.md`.
+3. Resolve the six-mode mapping, and treat **group** ironman separately — a groupmate is not an outsider.
+4. Do not assume the varbit is available at login; core reads it live at the point of use rather than caching it at startup.
+**Source:** `rlsrc` RuneLite 1.12.36 `GroundItemsPlugin.java:275,768`; `VarbitID` from `runelite-api-1.12.36.jar`; [Ironman Mode](https://oldschool.runescape.wiki/w/Ironman_Mode).
