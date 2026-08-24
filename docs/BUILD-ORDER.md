@@ -20,7 +20,7 @@ every bug found so far was found in a client, not in a test run.
 | 2 | isDead despawn fallback | ✅ **verified** | both paths measured, gap is 6 ticks |
 | 3 | Transform deaths | ✅ **verified** | all three cases, twice — see the correction in-step |
 | 4 | NpcChanged phase handling | ✅ **verified** | Nazastarool: 3 deaths, 2 transforms, 1 kill |
-| 5 | Measured XP by damage share | 🟡 **partial** | allocator verified; two numbers still unmeasured |
+| 5 | Measured XP by damage share | 🟡 **partial** | settle timing fixed + verified; noise floor + snakeling left |
 | 6 | Loot: tile coincidence | ⬜ not started | — |
 | 7 | Loot attribution + guards | ⬜ not started | — |
 | 8 | Grading, batching, upload | ⬜ not started | — |
