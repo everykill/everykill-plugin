@@ -24,17 +24,71 @@ import org.junit.Test;
 public class KillStateMachineTest
 {
 	private KillStateMachine machine;
-	private List<KillRecord> emitted;
+
+	/**
+	 * Kills that have come out of the machine.
+	 *
+	 * <p>Kills are held until the tick boundary now — loot arrives after the death,
+	 * measured 2026-08-24 — so reading this drains the machine first and a test can
+	 * still assert straight after a despawn. The plugin does the same thing every
+	 * 600ms.
+	 *
+	 * <p>The flush tick is <b>the machine's own current tick</b>, not a large constant:
+	 * flushing at a far-future tick would age out any record still being fought, which
+	 * broke the phase-transition test where an assert sits between two hits.
+	 */
+	private final class Emitted extends ArrayList<KillRecord>
+	{
+		@Override
+		public int size()
+		{
+			flush();
+			return super.size();
+		}
+
+		@Override
+		public KillRecord get(int index)
+		{
+			flush();
+			return super.get(index);
+		}
+
+		@Override
+		public boolean isEmpty()
+		{
+			flush();
+			return super.isEmpty();
+		}
+
+		private void flush()
+		{
+			machine.tick(lastTick, super::add);
+		}
+	}
+
+	/** Highest tick any call has used, so a flush never travels forward in time. */
+	private int lastTick;
+
+	private Emitted emitted;
 
 	@Before
 	public void setUp()
 	{
 		machine = new KillStateMachine();
-		emitted = new ArrayList<>();
+		emitted = new Emitted();
+	}
+
+	private void advance(int tick)
+	{
+		if (tick > lastTick)
+		{
+			lastTick = tick;
+		}
 	}
 
 	private void hit(int index, int amount, boolean mine, int tick)
 	{
+		advance(tick);
 		machine.damage(index, 415, "Abyssal demon", 124, 12363, amount, mine, tick);
 	}
 
@@ -47,7 +101,9 @@ public class KillStateMachineTest
 	{
 		hit(1, 20, true, 0);
 		hit(1, 18, true, 2);
+		advance(3);
 		machine.death(1, 3, true, emitted::add);
+		advance(4);
 		machine.despawn(1, true, 4, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
@@ -59,6 +115,7 @@ public class KillStateMachineTest
 	public void despawnWhileDeadIsInferred()
 	{
 		hit(1, 30, true, 0);
+		advance(2);
 		machine.despawn(1, true, 2, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
@@ -73,6 +130,7 @@ public class KillStateMachineTest
 	public void aStrangersKillIsNotOurs()
 	{
 		hit(1, 40, false, 0);
+		advance(1);
 		machine.death(1, 1, true, emitted::add);
 
 		Assert.assertTrue("a kill we did no damage to must never be recorded", emitted.isEmpty());
@@ -81,6 +139,7 @@ public class KillStateMachineTest
 	@Test
 	public void deathWithNoDamageRecordIsIgnored()
 	{
+		advance(1);
 		machine.death(99, 1, true, emitted::add);
 		Assert.assertTrue(emitted.isEmpty());
 	}
@@ -90,7 +149,9 @@ public class KillStateMachineTest
 	{
 		hit(1, 25, true, 0);
 		hit(1, 12, false, 1);
+		advance(2);
 		machine.death(1, 2, true, emitted::add);
+		advance(3);
 		machine.despawn(1, true, 3, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
@@ -103,7 +164,9 @@ public class KillStateMachineTest
 	{
 		hit(1, 100, true, 0);
 		hit(1, 1, false, 1);
+		advance(2);
 		machine.death(1, 2, true, emitted::add);
+		advance(3);
 		machine.despawn(1, true, 3, emitted::add);
 
 		Assert.assertEquals("one splat from someone else is enough to contest it",
@@ -114,7 +177,9 @@ public class KillStateMachineTest
 	public void deathThenDespawnScoresOnce()
 	{
 		hit(1, 30, true, 0);
+		advance(1);
 		machine.death(1, 1, true, emitted::add);
+		advance(2);
 		machine.despawn(1, true, 2, emitted::add);
 
 		Assert.assertEquals("ActorDeath followed by NpcDespawned is one corpse, not two",
@@ -125,14 +190,18 @@ public class KillStateMachineTest
 	public void phaseChangeCarriesForwardAndEmitsNothing()
 	{
 		hit(1, 40, true, 0);
+		advance(1);
 		machine.composition(1, 416, "Abyssal demon (phase 2)", 124, 1);
 		Assert.assertTrue("a phase transition is not a kill", emitted.isEmpty());
 
 		hit(1, 35, true, 2);
+		advance(3);
 		machine.composition(1, 417, "Abyssal demon (phase 3)", 124, 3);
 		Assert.assertTrue(emitted.isEmpty());
 
+		advance(4);
 		machine.death(1, 4, true, emitted::add);
+		advance(5);
 		machine.despawn(1, true, 5, emitted::add);
 
 		Assert.assertEquals("three phases, one kill", 1, emitted.size());
@@ -144,6 +213,7 @@ public class KillStateMachineTest
 	public void despawnWithoutDeathFlagIsDiscarded()
 	{
 		hit(1, 40, true, 0);
+		advance(1);
 		machine.despawn(1, false, 1, emitted::add);
 
 		Assert.assertTrue("an NPC that walked away is not a kill", emitted.isEmpty());
@@ -162,6 +232,7 @@ public class KillStateMachineTest
 		// task counts as zero.
 		hit(7, 55, true, 0);
 		machine.finishingAction(7, 1);
+		advance(2);
 		machine.despawn(7, false, 2, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
@@ -173,6 +244,7 @@ public class KillStateMachineTest
 	public void aFinishingActionOnSomethingWeNeverHitIsNotAKill()
 	{
 		machine.finishingAction(7, 1);
+		advance(2);
 		machine.despawn(7, false, 2, emitted::add);
 
 		Assert.assertTrue("no damage of ours, no kill — the rule is unchanged", emitted.isEmpty());
@@ -193,6 +265,7 @@ public class KillStateMachineTest
 	{
 		hit(7, 55, true, 0);
 		machine.finishingAction(8, 1);
+		advance(2);
 		machine.despawn(7, false, 2, emitted::add);
 
 		Assert.assertTrue("the evidence is per-NPC, not ambient", emitted.isEmpty());
@@ -202,6 +275,7 @@ public class KillStateMachineTest
 	public void despawnWithoutAnyFinishingActionIsStillDiscarded()
 	{
 		hit(7, 55, true, 0);
+		advance(1);
 		machine.despawn(7, false, 1, emitted::add);
 
 		Assert.assertTrue(emitted.isEmpty());
@@ -219,7 +293,9 @@ public class KillStateMachineTest
 		// an abandoned slug both despawn about six ticks after the signal, so no window
 		// separates them. Tried tightening it, tried loosening it, broke it both ways.
 		hit(7, 27, true, 0);
+		advance(1);
 		machine.death(7, 1, false, emitted::add);
+		advance(7);
 		machine.despawn(7, false, 7, emitted::add);
 
 		Assert.assertTrue("a monster that lied about dying is not a kill", emitted.isEmpty());
@@ -232,7 +308,9 @@ public class KillStateMachineTest
 		// there is no held signal for it to pair with, so it can only reach the
 		// flaggedDead branch - never OBSERVED.
 		hit(7, 27, true, 0);
+		advance(1);
 		machine.death(7, 1, false, emitted::add);
+		advance(3);
 		machine.despawn(7, true, 3, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
@@ -246,8 +324,10 @@ public class KillStateMachineTest
 		// The other half. The salt is the only thing that legitimately kills these, and
 		// gating the death signal must not break that path.
 		hit(7, 27, true, 0);
+		advance(1);
 		machine.death(7, 1, false, emitted::add);
 		machine.finishingAction(7, 2);
+		advance(3);
 		machine.despawn(7, false, 3, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
@@ -258,7 +338,9 @@ public class KillStateMachineTest
 	public void observedDeathIsStillGradedAboveATransformFinish()
 	{
 		hit(1, 30, true, 0);
+		advance(1);
 		machine.death(1, 1, true, emitted::add);
+		advance(2);
 		machine.despawn(1, true, 2, emitted::add);
 
 		Assert.assertEquals(DeathSignal.OBSERVED, emitted.get(0).signal);
@@ -276,7 +358,9 @@ public class KillStateMachineTest
 		// didn't match the game. This is here so shrinking it below a real death
 		// animation breaks the build instead of quietly costing someone their grade.
 		hit(1, 30, true, 0);
+		advance(10);
 		machine.death(1, 10, true, emitted::add);
+		advance(16);
 		machine.despawn(1, true, 16, emitted::add);
 
 		Assert.assertEquals(DeathSignal.OBSERVED, emitted.get(0).signal);
@@ -290,11 +374,13 @@ public class KillStateMachineTest
 		// fires anyway. Measured 2026-08-21: eight slugs, seven counted off this lie,
 		// one of them twice.
 		hit(1, 27, true, 0);
+		advance(1);
 		machine.death(1, 1, true, emitted::add);
 
 		Assert.assertTrue("a death signal on its own proves nothing", emitted.isEmpty());
 
-		machine.tick(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1);
+		advance(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1);
+		machine.tick(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1, emitted::add);
 
 		Assert.assertTrue("and it stays nothing once the corpse fails to show",
 			emitted.isEmpty());
@@ -306,12 +392,15 @@ public class KillStateMachineTest
 		// The kc=3 / kc=4 pair: emitted once on the lie, then again nine seconds later
 		// on the real despawn, off a single point of damage. One emission point now.
 		hit(1, 27, true, 0);
+		advance(1);
 		machine.death(1, 1, true, emitted::add);
-		machine.tick(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1);
+		advance(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1);
+		machine.tick(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1, emitted::add);
 
 		final int later = 20;
 		hit(1, 1, true, later);
 		machine.finishingAction(1, later + 1);
+		advance(later + 2);
 		machine.despawn(1, false, later + 2, emitted::add);
 
 		Assert.assertEquals("one slug, one kill", 1, emitted.size());
@@ -325,10 +414,13 @@ public class KillStateMachineTest
 		// despawns when it leaves the scene, isDead() is true because the health ratio
 		// is zero, and we counted a monster that is still standing there.
 		hit(1, 27, true, 0);
+		advance(1);
 		machine.death(1, 1, true, emitted::add);
-		machine.tick(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1);
+		advance(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1);
+		machine.tick(1 + KillStateMachine.DEATH_CONFIRM_TICKS + 1, emitted::add);
 
 		// walked out of range some time later
+		advance(40);
 		machine.despawn(1, true, 40, emitted::add);
 
 		Assert.assertTrue("it lied about dying once; isDead() is the same lie",
@@ -341,6 +433,7 @@ public class KillStateMachineTest
 		// Nothing revoked here - no ActorDeath ever fired, it just left flagged dead.
 		// The guard must not swallow this one.
 		hit(1, 30, true, 0);
+		advance(2);
 		machine.despawn(1, true, 2, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
@@ -354,8 +447,10 @@ public class KillStateMachineTest
 		// item is what actually finished it, so claiming OBSERVED would be claiming we
 		// watched something we deduced.
 		hit(1, 27, true, 0);
+		advance(1);
 		machine.death(1, 1, true, emitted::add);
 		machine.finishingAction(1, 2);
+		advance(3);
 		machine.despawn(1, false, 3, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
@@ -373,7 +468,8 @@ public class KillStateMachineTest
 		hit(1, 10, true, 0);
 		Assert.assertEquals(1, machine.trackedCount());
 
-		machine.tick(KillStateMachine.STALE_TICKS + 1);
+		advance(KillStateMachine.STALE_TICKS + 1);
+		machine.tick(KillStateMachine.STALE_TICKS + 1, emitted::add);
 
 		Assert.assertEquals("an NPC we stopped fighting must not leak", 0, machine.trackedCount());
 	}
@@ -382,7 +478,8 @@ public class KillStateMachineTest
 	public void staleRecordCannotLaterScore()
 	{
 		hit(1, 10, true, 0);
-		machine.tick(KillStateMachine.STALE_TICKS + 1);
+		advance(KillStateMachine.STALE_TICKS + 1);
+		machine.tick(KillStateMachine.STALE_TICKS + 1, emitted::add);
 		machine.death(1, KillStateMachine.STALE_TICKS + 2, true, emitted::add);
 
 		Assert.assertTrue(emitted.isEmpty());
@@ -393,9 +490,13 @@ public class KillStateMachineTest
 	{
 		hit(1, 30, true, 0);
 		hit(2, 30, true, 0);
+		advance(1);
 		machine.death(1, 1, true, emitted::add);
+		advance(2);
 		machine.despawn(1, true, 2, emitted::add);
+		advance(1);
 		machine.death(2, 1, true, emitted::add);
+		advance(2);
 		machine.despawn(2, true, 2, emitted::add);
 
 		Assert.assertEquals(2, emitted.size());
@@ -405,12 +506,16 @@ public class KillStateMachineTest
 	public void anIndexReusedAfterTheSuppressionWindowScoresAgain()
 	{
 		hit(1, 30, true, 0);
+		advance(1);
 		machine.death(1, 1, true, emitted::add);
+		advance(2);
 		machine.despawn(1, true, 2, emitted::add);
 
 		final int later = KillStateMachine.EMITTED_TICKS + 5;
 		hit(1, 30, true, later);
+		advance(later + 1);
 		machine.death(1, later + 1, true, emitted::add);
+		advance(later + 2);
 		machine.despawn(1, true, later + 2, emitted::add);
 
 		Assert.assertEquals("NPC indexes are recycled; a later kill is a real one",
@@ -422,6 +527,7 @@ public class KillStateMachineTest
 	{
 		hit(1, 10, true, 0);
 		machine.reset();
+		advance(1);
 		machine.death(1, 1, true, emitted::add);
 
 		Assert.assertTrue(emitted.isEmpty());

@@ -54,6 +54,8 @@ public class ForeignSplashTest
 		ourHit(20, 100);
 		theirHit(5, 101);
 		machine.despawn(KEY, true, 103, emitted::add);
+		// kills are held to the tick boundary now - loot lands after the death.
+		machine.tick(104, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
 		Assert.assertEquals(Confidence.AMBIGUOUS, emitted.get(0).grade);
@@ -73,6 +75,8 @@ public class ForeignSplashTest
 		ourHit(20, 100);
 		theirHit(0, 101);
 		machine.despawn(KEY, true, 103, emitted::add);
+		// kills are held to the tick boundary now - loot lands after the death.
+		machine.tick(104, emitted::add);
 
 		Assert.assertEquals(1, emitted.size());
 		final KillRecord kill = emitted.get(0);

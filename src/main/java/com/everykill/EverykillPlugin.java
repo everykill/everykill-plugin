@@ -214,7 +214,9 @@ public class EverykillPlugin extends Plugin
 			xpService.prime();
 		}
 
-		detector.onGameTick(event);
+		// kills resolved during this tick come out here, not at the moment of death -
+		// their loot arrives after they do. see KillStateMachine.resolve.
+		detector.onGameTick(event, this::onKill);
 		xpService.drain(ledger::addXp);
 
 		// after the kills for this tick have resolved, so anything still buffered is

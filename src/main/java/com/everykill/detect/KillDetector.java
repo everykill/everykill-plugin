@@ -204,9 +204,9 @@ public class KillDetector
 		}
 	}
 
-	public void onGameTick(GameTick event)
+	public void onGameTick(GameTick event, Consumer<KillRecord> sink)
 	{
-		machine.tick(client.getTickCount());
+		machine.tick(client.getTickCount(), sink);
 	}
 
 	private int keyFor(NPC npc)

@@ -8,7 +8,9 @@ import com.everykill.model.Confidence;
 import com.everykill.model.DeathSignal;
 import com.everykill.model.KillRecord;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -245,9 +247,27 @@ public class KillStateMachine
 		tracked.remove(key);
 	}
 
-	/** Bounded memory. Without this a busy area accumulates records forever. */
-	public void tick(int now)
+	/**
+	 * End of tick. Hands over any kills that resolved during it, then ages everything
+	 * else.
+	 *
+	 * <p>The sink is called here rather than at the moment of death because loot lands
+	 * after the kill — see {@code resolve}.
+	 */
+	public void tick(int now, Consumer<KillRecord> sink)
 	{
+		if (!held.isEmpty())
+		{
+			// copy first: a consumer that kills something during the callback would
+			// otherwise be appending to the list we're walking.
+			final List<KillRecord> ready = new ArrayList<>(held);
+			held.clear();
+			for (KillRecord kill : ready)
+			{
+				sink.accept(kill);
+			}
+		}
+
 		for (Iterator<Map.Entry<Integer, Record>> it = tracked.entrySet().iterator(); it.hasNext(); )
 		{
 			final Record r = it.next().getValue();
@@ -325,7 +345,22 @@ public class KillStateMachine
 
 		emitted.put(key, tick);
 
-		sink.accept(new KillRecord(
+		// park it, don't emit it. the loot for this kill hasn't arrived yet - measured
+		// 2026-08-24, four cyclops kills, every one of them logging in this order:
+		//
+		//   Kill: npc_id=7271 ...        <- here
+		//   loottracker_add_loot ...     <- loot, same second
+		//   loot expired unclaimed       <- nobody left to give it to
+		//
+		// so anything downstream reading drops off a kill record would see an empty
+		// list forever. holding to the tick boundary is not a tuned delay: it's where
+		// LootManager flushes its own pending script loot, so it's the earliest moment
+		// the answer can be complete.
+		//
+		// monsters that drop late (the nightmare, up to 15 ticks) stay explicit
+		// exceptions rather than a wider window for everything - a window wide enough
+		// for the worst case is wide enough to collect the next kill's loot too.
+		held.add(new KillRecord(
 			UUID.randomUUID().toString(),
 			r.npcId,
 			r.name == null ? "Unknown NPC " + r.npcId : r.name,
@@ -340,6 +375,15 @@ public class KillStateMachine
 			r.maxHit,
 			System.currentTimeMillis()));
 	}
+
+	/**
+	 * Kills resolved this tick, waiting for their loot.
+	 *
+	 * <p>Not a queue with a timeout — everything in here leaves on the next
+	 * {@code tick}. It exists for the gap between "the monster died" and "the server
+	 * said what it dropped", which is under one tick.
+	 */
+	private final List<KillRecord> held = new ArrayList<>();
 
 	private static final class Record
 	{
