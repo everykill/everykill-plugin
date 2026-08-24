@@ -1597,3 +1597,38 @@ int qty    = (int) scriptEvent.getArguments()[4];
 
 **Not decided, not built.** This is prior art for a product decision that belongs to the user.
 **Source:** [Warcraft Logs ranks guide](https://www.warcraftlogs.com/help/ranks/), [Glicko system](https://www.glicko.net/glicko/glicko.pdf) and Lichess provisional-rating convention, [MLB rate stat qualifiers](https://www.mlb.com/glossary/standard-stats/rate-stats-qualifiers) (Official Baseball Rule 9.22), [speedrun.com API run statuses](https://github.com/speedruncomorg/api/blob/master/version1/runs.md), all read 2026-08-24.
+
+---
+
+## 2026-08-24 — ironman contested kills are lootless by rule, which makes the ironman drop-rate filter simpler than the main one
+
+**Status:** verified (the rule), **UNVERIFIED** (one detectability gap, below)
+**Method:** Read [Ironman Mode](https://oldschool.runescape.wiki/w/Ironman_Mode) restrictions section after the question "can someone hit my bloodveld mid-fight and steal the kill and drop".
+
+**The answer is harsher than "they take the drop".** The wiki:
+
+> *"No loot will drop whatsoever if another player has attacked that monster. For some monsters, **even zero points of damage** dealt by another player will prevent the Ironman from getting any loot. This does not apply if that monster was weakened by other monsters."*
+>
+> *"In addition, if the monster attacks other players too much, the Ironman will not get loot to prevent tanking."*
+>
+> *"No loot will drop whatsoever if another player has used a goading potion to draw aggressiveness from monsters."*
+
+So the drop **never spawns**. It is not awarded to the other player and it is not sitting on the ground unpickable — it does not exist. A single hit from a passer-by, or on some monsters an attack dealing **zero damage**, voids it. Assisted kills also void Achievement Diary monster tasks.
+
+**Why this matters to us: for an ironman, "contested" and "lootless" are the same event.** On a main a contested kill still rolls and the question is who wins it, which is why the encounter class matters — most-damage for ordinary monsters and world bosses, a minimum threshold at team bosses like Nex, no contest at all when instanced. **None of that applies to an ironman.** Another player's involvement is binary.
+
+**Consequence for the site's ironman filter, which is being built:**
+
+| | Main | Ironman |
+|---|---|---|
+| Kill count | all grades | all grades — **unaffected**, you killed it |
+| Contested kill, drop-rate denominator | depends on the encounter's own rule | **always excluded** |
+
+For ironman accounts the rule needs no threshold and no per-boss lookup: **any kill with `othersDamage > 0` is ineligible for a drop-rate denominator.** Simpler than the main-account case and absolute. Including those kills would make every published ironman rate read *too rare* — the same one-directional bias `spec-drop-attribution.md` already warns about for `unknown` grades.
+
+**The data supports it as of `eaa8443`.** `NpcStat` and `DayTally` now carry `myDamageTotal`, `othersDamageTotal` and `killsWithDamage`, so "kills where nobody else touched it" is directly answerable per npc and per day.
+
+**THE GAP, and it is a real hole rather than a nicety.** The wiki says *"for some monsters, even zero points of damage"* without naming which monsters, and without saying whether such an attack is observable client-side. **A splash or a blocked hit may produce no `HitsplatApplied` event at all**, in which case `othersDamage` stays 0, the kill looks clean to us, and the game has already voided the drop. If that is real, an ironman filter built on `othersDamage > 0` will silently over-count eligible kills — precisely the failure mode this project keeps finding: books balance, nothing errors, the number is wrong.
+
+**Do not build the ironman filter on `othersDamage > 0` until this is tested in a client.** The test needs a second account splashing a monster an ironman is killing, and a check of whether any hitsplat reaches the plugin.
+**Source:** [Ironman Mode](https://oldschool.runescape.wiki/w/Ironman_Mode), Restrictions section, read 2026-08-24.
