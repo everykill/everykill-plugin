@@ -1905,3 +1905,31 @@ It still needs no invented constant — the hold is *"finish the tick"*, because
 
 **Sample size warning.** One cyclops, two ghosts. This confirms the pipeline is wired correctly and the ordering is wrong; it does **not** establish how often the server reports, whether the `npc_id` join survives a crowd, or what happens when two identical monsters die on one tick. Those are still the step-2 questions in `plan-step6-loot.md` and remain unmeasured.
 **Source:** live measurement 2026-08-24; `ItemID`/`always_drops.tsv` cross-check.
+
+---
+
+## 2026-08-24 — decision: record every drop, not just rares. The corpse counter cannot work without the junk
+
+**Status:** decision, grounded in the existing spec and today's measurement
+
+**Question raised:** should the plugin track all drops or only rare ones?
+
+**Answer: all, and this is not a convenience call.** `spec-data-model.md` already specifies `drops[]` on the kill event, and the corpse counter — the mechanism that proves a loot pile contains exactly our kills — **is built on guaranteed drops**, which are almost entirely junk:
+
+> *"Uses guaranteed drops to prove a loot pile contains exactly our kills."*
+
+`data/always_drops.tsv` holds **4,339 rows across 2,798 npcs**, of which **4,104 are countable** (non-stackable, so a pile of them can be counted). Bones, ashes, scales. Discard commons and that verification is gone, and with it the ability to tell *"this pile is exactly our three kills"* from *"someone else's kill is mixed in"*.
+
+Today's cyclops session is the proof it already works: `always_drops` predicted Big bones (532) for npc 7271, and the server delivered 532 on **4 of 4** kills. That cross-check is only possible because the junk is recorded.
+
+**Rare-only is not a lighter option. It is a broken one.**
+
+**On the leaderboard idea it enables.** Rarity does not have to be computed or curated — the wiki publishes it in the same drops bucket `always_drops.tsv` is built from (`tools/fetch-always-drops.py`, bucket `dropsline`). So a drop can be scored automatically against its published rate, and a 1/5000 landing at 200 KC is identifiable without anyone maintaining a hand-written list of "items that count".
+
+That composes with a rule already in `spec-data-model.md` for competitive boards:
+
+> *"a batched drop is recorded at the **highest** possible KC in the batch. Nobody gains rank from uncertainty."*
+
+**The cost, and whose problem it is.** Every bone and every 3-coin drop gets recorded and uploaded. Locally that is nothing. For the site it is an ingest and storage question, which is Gage's lane per `PRODUCT-DIRECTION.md` line 7 — worth telling him the volume decision is settled and why, because it shapes his schema.
+
+**What this does not decide:** whether every drop is *displayed*. Recording all and showing all are different questions, and the panel showing a scrolling list of bones would be its own problem. Display is unspecified.
