@@ -22,6 +22,7 @@ import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.NpcChanged;
 import net.runelite.api.events.NpcDespawned;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.game.NpcUtil;
 
 /**
@@ -47,6 +48,7 @@ import net.runelite.client.game.NpcUtil;
  * They can extend that list whenever they like, so hold the trigger rule rather than
  * the current wording.
  */
+@Slf4j
 @Singleton
 public class KillDetector
 {
@@ -134,6 +136,14 @@ public class KillDetector
 
 		final NPC npc = (NPC) actor;
 		final Integer key = actorKeys.get(actor);
+		final boolean dying = npcUtil.isDying(npc);
+
+		// temp: remove with the NpcChanged pair - see BUILD-ORDER step 4.
+		// KQ's form 1 produced deathAt=-1 on 2026-08-23, which is the right ANSWER and
+		// a useless measurement: it reads the same whether the gate ate the signal or
+		// ActorDeath never fired. log the arrival itself so the next run can tell.
+		log.debug("temp: ActorDeath. npc_id={} name={} isDying={} tracked={} tick={}",
+			npc.getId(), npc.getName(), dying, key != null, client.getTickCount());
 
 		// ActorDeath fires on health ratio hitting zero, which for a rockslug or a
 		// gargoyle is a flat lie - it sits there at 0 hp until you salt it. we counted
@@ -145,7 +155,7 @@ public class KillDetector
 		// per-monster knowledge, and core already curates it.
 		if (key != null)
 		{
-			machine.death(key, client.getTickCount(), npcUtil.isDying(npc), sink);
+			machine.death(key, client.getTickCount(), dying, sink);
 		}
 	}
 

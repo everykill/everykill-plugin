@@ -309,24 +309,30 @@ matters because the recommended order below was written assuming familiarity wit
 fights, and the first Zulrah attempt ended in a death at 338/500 damage. Re-derive
 account capability from the collection log, not from quest or gear access.
 
-**Recommended order — revised 2026-08-22 after the Zulrah run:**
+**Recommended order — revised 2026-08-23 after two failed boss trips.**
 
-1. **Kalphite Queen.** No quest gate, and it is now the highest-value target rather than
-   the last resort. Its first form is **genuinely killed** before the transformation —
-   20 game ticks of transition per the wiki — so it exercises the `ActorDeath`-fires-
-   mid-fight path that Zulrah structurally cannot. #15394 was reported against KQ.
-   Account B has the melee stats and gear for it. This is the fight that can still
-   falsify Step 4.
-2. **Grotesque Guardians (Dusk).** Phase boss *and* transform-death monster. Core's
-   `NpcUtil` lists `GARGBOSS_DUSK_PHASE4` and `GARGBOSS_DUSK_DEATH` by name, so this
-   exercises the `isDying()` gate added 2026-08-21 on a boss rather than a rockslug.
-3. **Vorkath.** Also an XP-attribution case — GAME-MECHANICS records a +20% experience
-   bonus against a published +0%, so measured XP should disagree with the naive
-   expectation in a *specific, predicted* direction. A good falsifiable test.
-4. **Zulrah.** ~~The purest test of carry-forward.~~ **Done 2026-08-22** — nine
-   transitions, mechanism confirmed. Worth returning to only for a completed kill, and
-   it is a hard fight to learn. Any multi-phase boss now satisfies the outstanding
-   acceptance criterion equally well, so pick the easiest one, not this.
+**Use Nightmare Zone. Not a dangerous boss.** Core's `NpcUtil` transform list is full of
+`NZONE_` entries — the instanced minigame at Yanille, where *"if you die here, you will
+not lose any of your items"*. This was available the whole time and two deaths were spent
+before anyone read past the gargoyle constants in that file. See FINDINGS 2026-08-23.
+
+1. **Nazastarool, in a Nightmare Zone practice dream.** Shilo Village boss, appears in
+   core as `NZONE_ZQ_MAINZOMBIE1`/`2`. **Transforms twice per fight** — zombie, skeleton,
+   ghost — so it exercises the carry-forward branch more times per attempt than KQ does,
+   in a safe instance, repeatable back to back, at a difficulty scaled for a mid account.
+   A practice dream can be set to that boss alone. **This is the cheapest remaining way
+   to close the acceptance criterion.**
+2. **Damis** (`NZONE_FD_DAMIS_NORMAL`), same dream, as a second transforming case.
+3. **Kalphite Queen.** ~~Highest-value target.~~ **Attempted 2026-08-23** — form-1 death
+   confirmed to emit no phantom kill, which was the #15394 exposure. Only worth
+   revisiting for a completed kill, and it killed the player on the first attempt.
+4. **Grotesque Guardians.** **Gated harder than it looks:** needs Slayer 75 *and* an
+   active gargoyle task *and* a one-time brittle key at **1/150** from gargoyles on task.
+   The account has none of the three as of 2026-08-23. Not the cheap option.
+5. **Zulrah.** **Done 2026-08-22** — nine transitions, mechanism confirmed, player died at
+   338/500. Hard fight to learn; no reason to return.
+6. **Vorkath.** Still an interesting XP-attribution case (+20% measured against a
+   published +0%), but that is a Step 5 question, not a Step 4 one.
 
 ### Still blocked
 

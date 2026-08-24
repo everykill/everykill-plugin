@@ -1293,3 +1293,55 @@ After the fix: **4,339 rows, 2,798 npc ids with a guaranteed drop, 2,710 countab
 
 56 rows carry blank quantities where version blocks disagree (Black demon, Lesser demon and similar carry different ash quantities per variant); those are emitted `countable=0` rather than guessed.
 **Source:** none — direct testing.
+
+---
+
+## 2026-08-23 — Kalphite Queen's form-1 death produced no phantom kill; the isDying() gate holds on the monster #15394 was filed against
+
+**Status:** verified
+**Method:** Live dev client, main account, first-ever KQ attempt (KC 0 going in). Same temporary carry-forward logging as the Zulrah run. Ended in a player death during form 2.
+**Finding:** One transition, and it is the one that mattered:
+
+```
+temp: NpcChanged carry-forward. 963 -> 965 name=Kalphite Queen -> Kalphite Queen
+myDamage=258 othersDamage=0 deathAt=-1 revoked=false tick=2043
+```
+
+**KQ's first form genuinely dies before transforming** — unlike Zulrah, whose forms never zero their health ratio. This is the exact case `BUILD-ORDER` Step 4 flagged as unverified exposure, citing runelite/runelite#15394, which was reported against KQ specifically. **Zero kills were emitted across the whole fight.** A naive implementation would have banked one here and another on the real death.
+
+`deathAt=-1` is why. Core's `NpcUtil` lists `KALPHITE_QUEEN` under *"These NPCs die, but transform into forms which are attackable or interactable, so it would be jarring for them to be considered dead when reaching 0hp"*, so `isDying()` returns false and `KillStateMachine.death()` discards the signal at its first guard before `deathSignalledAt` is ever set. **The gate added 2026-08-21 is doing exactly the job it was added for, now demonstrated on a boss rather than a rockslug.**
+
+**One thing this run cannot distinguish, and it should not be claimed either way.** `deathAt=-1` is consistent with two different stories: `ActorDeath` fired and the gate swallowed it, or `ActorDeath` never fired at all. `KillDetector.onActorDeath` does not log, so the two are indistinguishable from the outside. The *outcome* is correct regardless — no phantom kill — but **"ActorDeath fires mid-transition on KQ" remains unmeasured.** A one-line debug log in `onActorDeath` would settle it on the next run.
+
+Player death then produced the correct terminal behaviour again, on both the boss and an add:
+
+```
+Discarded a despawn we had damage on: npc_id=965 name=Kalphite Queen myDamage=270 flaggedDead=false ...
+Discarded a despawn we had damage on: npc_id=961 name=Kalphite Worker myDamage=2 flaggedDead=false ...
+```
+
+**Step 4 remains 🟡 partial.** Two of three questions are now answered — the branch executes (Zulrah, nine times) and a mid-fight form death does not fabricate a kill (KQ). The outstanding one is still the plain acceptance criterion: **one completed fight producing exactly one kill.** Both attempts ended in a player death.
+**Source:** none — direct observation. Wiki consulted for KQ mechanics: oldschool.runescape.wiki/w/Kalphite_Queen/Strategies.
+
+---
+
+## 2026-08-23 — transforming bosses exist inside a safe instance, and core's own source said so all along
+
+**Status:** verified (source + wiki), untested in play
+**Method:** Read the full "dies but transforms" switch in `rlsrc/net/runelite/client/game/NpcUtil.java` after two failed boss trips, then cross-checked the account's quest completions.
+**Finding:** The list is not all dangerous bosses. A large block of it carries an **`NZONE_`** prefix — Nightmare Zone, the instanced minigame north-west of Yanille:
+
+```
+NZONE_SHAPESHIFTERGLOB_NORMAL / _HARD
+NZONE_SHAPESHIFTERSPIDER_NORMAL / _HARD
+NZONE_SHAPESHIFTERBEAR_NORMAL / _HARD
+NZONE_ZQ_MAINZOMBIE1 / 2 _NORMAL / _HARD     <- Nazastarool, Shilo Village
+NZONE_FD_DAMIS_NORMAL / _HARD                <- Damis, Desert Treasure I
+```
+
+The wiki is unambiguous about the risk: *"This is a safe activity in an instanced area. If you die here, you will not lose any of your items."*
+
+**Nazastarool transforms twice in one fight** — zombie to skeleton to ghost, three forms — which is **more transitions per fight than Kalphite Queen's single one**, in a fight scaled for a mid-level account, repeatable back to back, with a Practice dream that can be configured to that boss alone. Every prerequisite quest on this account is finished (Shilo Village, Desert Treasure I, Fremennik Isles, Contact!, 204 total).
+
+**Why this was missed, and it is the same failure this log keeps recording.** `rlsrc` was unpacked earlier the same day *specifically* so core could be read instead of guessed at. `NpcUtil` was then opened and grepped for gargoyle constants — and the `NZONE_` block sat directly underneath, unread. Two player deaths (Zulrah 338/500, KQ during form 2) were spent on the assumption that mid-fight phase transitions require a dangerous boss. **They do not.** Grepping a file for the thing you already expect is not reading it.
+**Source:** rlsrc `net/runelite/client/game/NpcUtil.java`; oldschool.runescape.wiki/w/Nightmare_Zone.
