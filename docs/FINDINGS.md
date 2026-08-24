@@ -1933,3 +1933,34 @@ That composes with a rule already in `spec-data-model.md` for competitive boards
 **The cost, and whose problem it is.** Every bone and every 3-coin drop gets recorded and uploaded. Locally that is nothing. For the site it is an ingest and storage question, which is Gage's lane per `PRODUCT-DIRECTION.md` line 7 — worth telling him the volume decision is settled and why, because it shapes his schema.
 
 **What this does not decide:** whether every drop is *displayed*. Recording all and showing all are different questions, and the panel showing a scrolling list of bones would be its own problem. Display is unspecified.
+
+---
+
+## 2026-08-24 — confirmed: the full drop is captured, guaranteed and random alike
+
+**Status:** verified — four cyclops kills, 2026-08-24
+
+Answering "were the other drops recorded, or just the bones": **all of them.**
+
+| kill | eventId | guaranteed | rolled |
+|---|---|---|---|
+| 1 | 77265 | Big bones (532) | Steel longsword (1295) |
+| 2 | 77266 | Big bones (532) | Coins ×99 (995) |
+| 3 | 77267 | Big bones (532) | Black longsword (1297) |
+| 4 | 77268 | Big bones (532) | Black knife ×8 (869) |
+
+Item ids resolved against `ItemID` in `runelite-api-1.12.36.jar`, not guessed.
+
+The loot script fires **once per item**, and `LootDetector.record` merges fires sharing an `eventId` into one entry, so a kill's whole drop stays together instead of arriving as separate pseudo-kills. **Quantities are the server's** — the ×99 and ×8 came from the script's `qty` argument, not inferred from a ground pile.
+
+**The cross-check runs in both directions.** `always_drops.tsv` predicted Big bones on all four and got 4/4; the second item differed every time. That is what separates *guaranteed* from *rolled* with no hardcoding: an item the table names is expected, an item it doesn't is a roll.
+
+---
+
+### Decisions taken (user, 2026-08-24)
+
+1. **Store all drops locally.** Confirmed — see the corpse-counter entry above for why rare-only is structurally broken.
+2. **Filter by mob in the UI.** A per-monster filter, so "all drops" stays usable without a scrolling wall of bones. This is the *display* answer the previous entry deliberately left open.
+3. **Rare drops get their own leaderboard**, designed later with Gage. Rarity comes from the wiki's drops bucket that `always_drops.tsv` is already built from, so nothing needs hand-curating.
+
+**Client-side consequence of (2), the only part in this repo's lane:** filtering by mob needs drops stored *per npc_id*, which `NpcStat` already keys on. No new structure — but the drop list must hang off the npc row rather than a flat session log, or the filter has nothing to filter on.
