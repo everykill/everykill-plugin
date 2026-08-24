@@ -7,6 +7,13 @@ package com.everykill;
 import com.everykill.detect.KillDetector;
 import com.everykill.detect.LootDetector;
 import com.everykill.ledger.LocalLedger;
+import com.everykill.model.Confidence;
+import com.everykill.model.Drop;
+import com.everykill.model.LootConfidence;
+import net.runelite.client.game.ItemStack;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import com.everykill.model.KillRecord;
 import com.everykill.model.NpcStat;
 import com.everykill.notice.MilestoneNotifier;
@@ -216,7 +223,7 @@ public class EverykillPlugin extends Plugin
 
 		// kills resolved during this tick come out here, not at the moment of death -
 		// their loot arrives after they do. see KillStateMachine.resolve.
-		detector.onGameTick(event, this::onKill);
+		detector.onGameTick(event, this::onKillWithLoot);
 		xpService.drain(ledger::addXp);
 
 		// after the kills for this tick have resolved, so anything still buffered is
@@ -311,6 +318,91 @@ public class EverykillPlugin extends Plugin
 
 	// ------------------------------------------------------------------
 
+	/**
+	 * Attaches the server's loot to a kill, then records it.
+	 *
+	 * <p>Runs on the tick boundary, after the kill was held for exactly this — the
+	 * loot event lands after the death, measured 2026-08-24.
+	 */
+	private void onKillWithLoot(KillRecord kill)
+	{
+		final List<LootDetector.ServerLoot> reported =
+			lootDetector.drainFor(kill.npcId, client.getTickCount());
+
+		onKill(attachLoot(kill, reported));
+	}
+
+	/**
+	 * Decides what a kill's loot is, and how much that answer can be trusted.
+	 *
+	 * <p>Static and free of client state so the decision can be tested directly. The
+	 * hard case is two of the same monster dying together: the server reports two
+	 * drops for one npc id and nothing distinguishes which kill earned which. That is
+	 * {@code UNKNOWN}, and per spec-drop-attribution those kills leave drop-rate
+	 * denominators entirely rather than being counted as dry.
+	 */
+	static KillRecord attachLoot(KillRecord kill, List<LootDetector.ServerLoot> reported)
+	{
+		if (reported.isEmpty())
+		{
+			// NOT "dropped nothing". could be a genuinely lootless monster, an
+			// ironman's voided drop, or us missing it - LootConfidence.NONE says so.
+			return kill.withLoot(Collections.emptyList(), LootConfidence.NONE);
+		}
+
+		if (reported.size() > 1)
+		{
+			// two same-id kills on one tick. we have the items but not which kill they
+			// belong to, so hand them over labelled rather than guessing or dropping
+			// them on the floor.
+			final List<Drop> all = new ArrayList<>();
+			for (LootDetector.ServerLoot loot : reported)
+			{
+				addAll(all, loot);
+			}
+			return kill.withLoot(all, LootConfidence.UNKNOWN);
+		}
+
+		final List<Drop> drops = new ArrayList<>();
+		addAll(drops, reported.get(0));
+
+		// the loot is unambiguous; whether it's rate-eligible is the KILL's problem.
+		// a contested kill's drop is real and ours, it just can't sit in a denominator.
+		final LootConfidence confidence = kill.grade == Confidence.UNCONTESTED
+			? LootConfidence.CONFIRMED
+			: LootConfidence.PROBABLE;
+
+		return kill.withLoot(drops, confidence);
+	}
+
+	private static void addAll(List<Drop> into, LootDetector.ServerLoot loot)
+	{
+		for (ItemStack item : loot.getItems())
+		{
+			into.add(new Drop(item.getId(), item.getQuantity()));
+		}
+	}
+
+	/** Compact drop list for the kill log, so a hand check can read it. */
+	private static String describe(List<Drop> drops)
+	{
+		if (drops.isEmpty())
+		{
+			return "-";
+		}
+
+		final StringBuilder sb = new StringBuilder();
+		for (Drop drop : drops)
+		{
+			if (sb.length() > 0)
+			{
+				sb.append(',');
+			}
+			sb.append(drop.itemId).append('x').append(drop.quantity);
+		}
+		return sb.toString();
+	}
+
 	private void onKill(KillRecord kill)
 	{
 		final NpcStat before = ledger.get(kill.npcId);
@@ -320,10 +412,11 @@ public class EverykillPlugin extends Plugin
 
 		// what a hand count gets checked against. without it a wrong total is just a
 		// wrong number. needs --debug.
-		log.debug("Kill: npc_id={} name={} grade={} signal={} region={} dmg={}/{} attacks={} hits={} maxHit={} kc={} xp={} sessionKills={} unallocatedXp={}",
+		log.debug("Kill: npc_id={} name={} grade={} signal={} region={} dmg={}/{} attacks={} hits={} maxHit={} kc={} xp={} sessionKills={} unallocatedXp={} loot={} drops={}",
 			kill.npcId, kill.npcName, kill.grade, kill.signal, kill.regionId,
 			kill.myDamage, kill.totalDamage(), kill.attacksCount, kill.hitsCount, kill.maxHit,
-			after.total(), after.xp, ledger.getSessionKills(), xpService.getUnallocatedXp());
+			after.total(), after.xp, ledger.getSessionKills(), xpService.getUnallocatedXp(),
+			kill.lootConfidence, describe(kill.drops));
 
 		notifier.onKillRecorded(kill, after, firstEver);
 		panel.refresh();

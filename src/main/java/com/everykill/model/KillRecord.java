@@ -4,6 +4,10 @@
  */
 package com.everykill.model;
 
+import java.util.List;
+
+import java.util.Collections;
+
 /**
  * One graded kill, as it leaves the detector.
  *
@@ -47,9 +51,29 @@ public class KillRecord
 
 	public final long timestampMillis;
 
+	/**
+	 * What the server said this kill dropped. Empty until loot resolves on the tick
+	 * boundary, and empty forever for a kill that never got a loot event — see
+	 * {@link #lootConfidence} before reading anything into that.
+	 */
+	public final List<Drop> drops;
+
+	/** How much the {@link #drops} list can be trusted. Never null. */
+	public final LootConfidence lootConfidence;
+
 	public KillRecord(String eventId, int npcId, String npcName, int combatLevel, int regionId,
 		Confidence grade, DeathSignal signal, int myDamage, int othersDamage,
 		int attacksCount, int hitsCount, int maxHit, long timestampMillis)
+	{
+		this(eventId, npcId, npcName, combatLevel, regionId, grade, signal, myDamage,
+			othersDamage, attacksCount, hitsCount, maxHit, timestampMillis,
+			Collections.emptyList(), LootConfidence.NONE);
+	}
+
+	public KillRecord(String eventId, int npcId, String npcName, int combatLevel, int regionId,
+		Confidence grade, DeathSignal signal, int myDamage, int othersDamage,
+		int attacksCount, int hitsCount, int maxHit, long timestampMillis,
+		List<Drop> drops, LootConfidence lootConfidence)
 	{
 		this.eventId = eventId;
 		this.npcId = npcId;
@@ -64,6 +88,22 @@ public class KillRecord
 		this.hitsCount = hitsCount;
 		this.maxHit = maxHit;
 		this.timestampMillis = timestampMillis;
+		this.drops = Collections.unmodifiableList(drops);
+		this.lootConfidence = lootConfidence;
+	}
+
+	/**
+	 * The same kill with its loot attached.
+	 *
+	 * <p>A copy rather than a setter because everything else on this class is final and
+	 * a record that can change after it's been handed out is how two readers end up
+	 * disagreeing about the same kill.
+	 */
+	public KillRecord withLoot(List<Drop> drops, LootConfidence lootConfidence)
+	{
+		return new KillRecord(eventId, npcId, npcName, combatLevel, regionId, grade, signal,
+			myDamage, othersDamage, attacksCount, hitsCount, maxHit, timestampMillis,
+			drops, lootConfidence);
 	}
 
 	// ours + everyone else's, but only since we engaged - the record opens on the
