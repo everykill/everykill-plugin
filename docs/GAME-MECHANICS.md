@@ -68,7 +68,7 @@ All rows verified 2026-08-16 against the OSRS Wiki. Re-check per OSRS update bat
 | Splashing | Base cast XP is still paid; damage XP is not | [Combat spells](https://oldschool.runescape.wiki/w/Combat_spells) |
 | **Overkill** | **Grants no XP.** Capped at the target's remaining HP | [Gemstone Crab](https://oldschool.runescape.wiki/w/Gemstone_Crab) |
 | Poison damage | **No XP** (but full Slayer XP, even if the poison was not yours) | [Poison](https://oldschool.runescape.wiki/w/Poison) |
-| Dwarf multicannon | **2 Ranged per damage, zero Hitpoints XP** | [Dwarf multicannon](https://oldschool.runescape.wiki/w/Dwarf_multicannon) |
+| Dwarf multicannon | **2 Ranged per damage, zero Hitpoints XP** — confirmed in play 2026-08-24, see below | [Dwarf multicannon](https://oldschool.runescape.wiki/w/Dwarf_multicannon) |
 | Combat dummies | No XP at all | [Combat dummy](https://oldschool.runescape.wiki/w/Combat_dummy) |
 | Barbarian Assault | *"The minigame does not provide any combat experience for any action"* | [Barbarian Assault](https://oldschool.runescape.wiki/w/Barbarian_Assault) |
 | Nightmare Zone | Reduces the **base cast** XP of (nz) runes only; damage XP unaffected. NMZ bosses carry normal per-NPC bonuses | [Nightmare Zone](https://oldschool.runescape.wiki/w/Nightmare_Zone) |

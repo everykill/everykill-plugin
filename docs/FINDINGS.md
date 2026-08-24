@@ -1498,3 +1498,30 @@ Earlier today it was recorded that offset 0 never occurred in 109 allocations, t
 
 **The snakeling fix therefore has to come from the settle-timing direction**, not from reordering the search.
 **Source:** none — direct measurement.
+
+---
+
+## 2026-08-24 — cannon XP confirmed in play, and it is a clean demonstration of why XP is measured rather than derived
+
+**Status:** verified
+**Method:** Cannoned dagannoths at Waterbirth with the fixed allocator. Compared per-npc ledger totals against both possible bounds, using hitpoints and `experience_bonus` from the reference table.
+**Finding:** The wiki states it directly:
+
+> *"Damage with the cannon yields **2 Ranged experience per damage** rather than the standard 4, and **does not yield any Hitpoints experience**."*
+
+That was already recorded in `GAME-MECHANICS.md`. It is now confirmed against live measurement:
+
+| npc | hp | measured XP/kill | all-melee | all-cannon |
+|---|---|---|---|---|
+| 970 | 70 | **224** | 373 | 140 |
+| 971 | 70 | **224** | 373 | 140 |
+| 973 | 120 | **322** | 640 | 240 |
+| 974 | 120 | **466** | 640 | 240 |
+| 972 | 70 | **311** | 373 | 140 |
+
+**Every value falls between the two bounds**, which is exactly what a kill split between cannon and melee must produce. The implied cannon share ranges from 27% to 80% across ids — just how much the cannon happened to contribute on those particular kills.
+
+**This is the strongest argument yet for the measured-XP decision** (Step 5, `GAME-MECHANICS.md` 2026-08-16). To *derive* these numbers, the client would have to know what fraction of each kill's damage came from the cannon versus the whip, apply 2/damage to one and 4 + 1.33/damage to the other, and get the split exactly right — per kill, per skill. **The game already did that arithmetic. Measuring reads the answer.** Overkill, per-monster bonuses and rounding are the other three reasons; this is a fourth, and it appears on any Slayer task where a cannon is used, which is most of them.
+
+**Process note.** This was flagged mid-session as a possible allocator bug — "measured XP is about half what the formula predicts". It was not a bug, and **the answer was already sitting in `GAME-MECHANICS.md`, which exists for precisely this purpose.** The register worked; it was not consulted before raising the alarm. Third occurrence this week of concluding before checking (placeholder bank data 2026-08-22, the 273-row drop pull and the cumulative-ledger misread 2026-08-23/24).
+**Source:** [Dwarf multicannon](https://oldschool.runescape.wiki/w/Dwarf_multicannon), Damage and experience section, read 2026-08-24.
