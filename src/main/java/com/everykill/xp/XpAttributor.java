@@ -104,6 +104,10 @@ public class XpAttributor
 
 	// zero is not damage. blocks come through as ours with amount 0, and an empty pool
 	// would soak up xp that belongs to a real hit. leave the guard.
+	/**
+	 * Our damage on an NPC. Accumulates into this tick's pool and nothing else —
+	 * allocation happens on the tick boundary, in {@link #settle(int)}.
+	 */
 	public void damage(int npcId, int amount, int tick)
 	{
 		if (amount <= 0)
@@ -111,8 +115,19 @@ public class XpAttributor
 			return;
 		}
 
+		// this used to call settle() right here, and that made a multi-monster pool
+		// impossible. xp lands a tick before its hitsplat, so it's always already
+		// waiting - the FIRST hitsplat of the next tick would allocate the whole drop
+		// against a pool holding only itself, and everything else hit on that tick got
+		// nothing. 392 measured allocations over two venues, every one single-monster,
+		// cannon or not. FINDINGS 2026-08-24.
+		//
+		// core does not do this anywhere. SpecialCounterPlugin accumulates hitsplats
+		// and decides in onGameTick, LootManager collects item spawns and clears them
+		// on the tick, XpTrackerPlugin the same. their reason is ours: "the weapon
+		// hitsplat is always last, after other hitsplats which occur on the same tick".
+		// you cannot judge a tick from its first event.
 		damageByTick.computeIfAbsent(tick, t -> new LinkedHashMap<>()).merge(npcId, amount, Integer::sum);
-		settle(tick);
 	}
 
 	/**
@@ -171,19 +186,12 @@ public class XpAttributor
 			return 0L;
 		}
 
-		allocate(skill, delta, tick);
+		// queue it, don't place it. xp arrives a tick before the hitsplat that earned
+		// it, so at this moment the damage pool it belongs to usually does not exist
+		// yet - and placing it against whatever pool IS open pays the wrong monster.
+		// settle() on the tick boundary does the placing.
+		pending.add(new Pending(skill, delta, tick, !damageByTick.isEmpty()));
 		return delta;
-	}
-
-	private void allocate(CombatSkill skill, long xp, int tick)
-	{
-		if (!allocateAt(skill, xp, tick))
-		{
-			// remember whether we were mid-fight when this turned up. by the time it
-			// gets written off the pools may have been trimmed, and "was there damage
-			// when it arrived" is the question that matters.
-			pending.add(new Pending(skill, xp, tick, !damageByTick.isEmpty()));
-		}
 	}
 
 	// own tick, then forward, then back. order matters: xp lands early so the damage

@@ -36,6 +36,8 @@ public class XpAttributorTest
 		xp.damage(ABYSSAL_DEMON, 10, 100);
 		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 100);
 
+		xp.settle(101);
+
 		Assert.assertEquals(40L, xp.xpFor(ABYSSAL_DEMON));
 		Assert.assertEquals(0L, xp.getUnallocatedXp());
 	}
@@ -46,6 +48,8 @@ public class XpAttributorTest
 		xp.damage(ABYSSAL_DEMON, 30, 100);
 		xp.damage(BLOODVELD, 10, 100);
 		xp.xpChanged(CombatSkill.ATTACK, 1_000_160, 100);
+
+		xp.settle(101);
 
 		Assert.assertEquals("three quarters of the damage, three quarters of the xp",
 			120L, xp.xpFor(ABYSSAL_DEMON));
@@ -61,8 +65,10 @@ public class XpAttributorTest
 		xp.damage(2, 1, 100);
 		xp.damage(3, 1, 100);
 		xp.xpChanged(CombatSkill.ATTACK, 1_000_007, 100);
+		xp.settle(101);
 
 		final long sum = xp.xpFor(1) + xp.xpFor(2) + xp.xpFor(3);
+
 		Assert.assertEquals("allocation must conserve the total", 7L, sum);
 		Assert.assertEquals(0L, xp.getUnallocatedXp());
 	}
@@ -122,6 +128,8 @@ public class XpAttributorTest
 		xp.damage(BLOODVELD, 5, 101);
 		xp.xpChanged(CombatSkill.ATTACK, 1_000_020, 101);
 
+		xp.settle(102);
+
 		Assert.assertEquals("current tick wins when it has damage", 20L, xp.xpFor(BLOODVELD));
 	}
 
@@ -135,6 +143,8 @@ public class XpAttributorTest
 		xp.damage(ABYSSAL_DEMON, 0, 101);
 		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 101);
 
+		xp.settle(102);
+
 		Assert.assertEquals(40L, xp.xpFor(ABYSSAL_DEMON));
 		Assert.assertEquals(0L, xp.getUnallocatedXp());
 	}
@@ -144,6 +154,8 @@ public class XpAttributorTest
 	{
 		xp.damage(ABYSSAL_DEMON, 10, 100);
 		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 101);
+
+		xp.settle(102);
 
 		Assert.assertEquals(40L, xp.xpFor(ABYSSAL_DEMON));
 	}
@@ -182,6 +194,8 @@ public class XpAttributorTest
 		xp.damage(ABYSSAL_DEMON, 10, 101);
 		xp.xpChanged(CombatSkill.MAGIC, 8_000_020, 101);
 
+		xp.settle(102);
+
 		Assert.assertEquals(20L, xp.xpFor(ABYSSAL_DEMON));
 	}
 
@@ -191,6 +205,8 @@ public class XpAttributorTest
 		xp.damage(ABYSSAL_DEMON, 10, 100);
 		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 100);
 		xp.xpChanged(CombatSkill.HITPOINTS, 500_013, 100);
+
+		xp.settle(101);
 
 		Assert.assertEquals("attack plus hitpoints", 53L, xp.xpFor(ABYSSAL_DEMON));
 	}
@@ -277,16 +293,15 @@ public class XpAttributorTest
 	{
 		xp.prime(CombatSkill.RANGED, 1_000_000);
 
-		// same tick, same two monsters, same 64 xp. the only difference is that the xp
-		// was already waiting - which it always is, it arrives a tick early - so
-		// damage()'s settle() fires on the FIRST hitsplat against a pool holding only
-		// that one monster. the second hitsplat finds the xp already spent.
+		// same tick, same two monsters, same 64 xp. the xp is already waiting - it
+		// always is, it arrives a tick early - and both hitsplats land before the tick
+		// boundary. this used to pay the first hitsplat everything, because damage()
+		// settled on the spot against a pool holding one monster.
 		//
-		// this is why a multi-npc pool has never been observed in play, and it's the
-		// general form of the snakeling theft: first hitsplat processed takes the lot.
+		// settle() only runs on the game tick now, so the pool has both by the time
+		// anything is allocated. FINDINGS 2026-08-24.
 		xp.xpChanged(CombatSkill.RANGED, 1_000_064, 100);
 		xp.damage(DAGANNOTH_A, 10, 101);
-		xp.settle(101);
 		xp.damage(DAGANNOTH_B, 6, 101);
 		xp.settle(101);
 
@@ -299,6 +314,8 @@ public class XpAttributorTest
 	{
 		xp.damage(ABYSSAL_DEMON, 10, 100);
 		xp.xpChanged(CombatSkill.ATTACK, 1_000_040, 100);
+
+		xp.settle(101);
 
 		Assert.assertEquals(40L, (long) xp.drain().get(ABYSSAL_DEMON).get(CombatSkill.ATTACK));
 		Assert.assertEquals("the buffer is empty after a drain", 0L, xp.xpFor(ABYSSAL_DEMON));
