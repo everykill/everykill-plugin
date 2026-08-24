@@ -1632,3 +1632,113 @@ For ironman accounts the rule needs no threshold and no per-boss lookup: **any k
 
 **Do not build the ironman filter on `othersDamage > 0` until this is tested in a client.** The test needs a second account splashing a monster an ironman is killing, and a check of whether any hitsplat reaches the plugin.
 **Source:** [Ironman Mode](https://oldschool.runescape.wiki/w/Ironman_Mode), Restrictions section, read 2026-08-24.
+
+---
+
+## 2026-08-24 — SUPERSEDED: a foreign splash arrives with isOthers() FALSE, so the ironman filter cannot be built on damage
+
+> **WRONG, corrected the same hour by more data.** This entry generalised from a single
+> `type=1` line before the test had produced a `BLOCK_OTHER`. A foreign splash **is**
+> visible and **is** flagged `others=true` — see the entry below. The `type=1` line is
+> real but is something else. Kept because the error is instructive: one observation was
+> treated as the mechanism.
+
+**Status:** verified — measured live, two accounts, Edgeville Dungeon multicombat
+**Method:** Zelnork (ironman) attacked giant rats while a second player attacked the same rat, first landing real hits and then deliberately splashing. Temporary instrumentation in `KillDetector.onHitsplatApplied` logged **every** hitsplat on an NPC including the ones the existing filter discards, because "no event arrived" and "event arrived and we binned it" are indistinguishable from outside.
+
+**The setup was proven good before the result was taken.** The other player's real hits appear on the exact npc the ironman was fighting:
+
+```
+npc=Giant rat id=2864 amount=2 mine=false others=true  type=17 tick=896
+npc=Giant rat id=2864 amount=6 mine=false others=true  type=17 tick=1018
+```
+
+Same `id=2864`, `others=true`. So: correct target, genuine multicombat, foreign hitsplats reaching the plugin normally. That rules out the two boring explanations for a null result.
+
+**The splash, one tick after his real hit and on the same tick as one of ours:**
+
+```
+npc=Giant rat id=2864 amount=0 mine=false others=FALSE type=1 tick=906
+```
+
+**`isOthers()` is false.** The event does arrive — it is not missing — but RuneLite does not flag it as another player's, so it dies at the first guard in `onHitsplatApplied`:
+
+```java
+if (!mine && !others) { return; }   // foreign splash discarded here
+```
+
+**This is worse than the bug predicted from the unit test.** `ForeignSplashTest` reproduced the problem as *"amount is 0, so `othersDamage += 0` does nothing"* — implying a fix inside `KillStateMachine` counting foreign attacks. That fix would never fire: the event is thrown away one layer earlier, in the detector, before the state machine is called at all.
+
+**Hitsplat types observed**, against `HitsplatID` in `runelite-api-1.12.36.jar`:
+
+| type | constant | who |
+|---|---|---|
+| 12 | `BLOCK_ME` | **our** splash — correctly attributed to us |
+| 16 | `DAMAGE_ME` | our hits |
+| 17 | `DAMAGE_OTHER` | their hits |
+| **1** | **not a named constant in 1.12.36** | **their splash** |
+
+Our own splash is attributed to us (`BLOCK_ME`, `mine=true`, logged at tick 673) — but the foreign equivalent arrives as an unnamed type 1 with **both** ownership flags false, indistinguishable at that guard from a heal or someone else's poison tick, which is exactly what the guard's comment says it is there to reject.
+
+**Consequence for the ironman drop-rate filter, which was about to be built on `othersDamage > 0`:** that predicate is unsound. The wiki rule is that *"even zero points of damage"* from another player voids an ironman's drop entirely, and the zero-damage case is precisely the one the client currently cannot see. An ironman kill that the game has already made lootless reads to us as a clean solo kill. Every published ironman drop rate would be biased **too rare**, one-directionally, and nothing would error.
+
+**What is still unknown, and must not be guessed:**
+- **What type 1 actually is.** It is not `BLOCK_ME` (12). It may be a generic block/miss splat with no owner, but that is inference. It needs looking up in the cache or a newer API version before any code keys on it.
+- **Whether type 1 is reliably a foreign miss**, or whether NPC-on-NPC and other ownerless events share it. Keying the ironman filter on "type 1 on a monster we are fighting" could catch a monster being weakened by *other monsters* — which the wiki explicitly says does **not** void the drop.
+
+**Do not implement the ironman filter yet.** The mechanism is now understood well enough to know the obvious implementation is wrong, which is the point of having run the test.
+**Source:** live measurement 2026-08-24; [Ironman Mode](https://oldschool.runescape.wiki/w/Ironman_Mode) for the drop-void rule.
+
+---
+
+## 2026-08-24 — a foreign splash IS visible: BLOCK_OTHER, others=true, amount=0. The filter is buildable
+
+**Status:** verified — measured live, two accounts, Edgeville Dungeon multicombat
+**Method:** As the superseded entry above. The correction came from letting the test keep running instead of writing up the first zero-damage line that appeared.
+
+**All four zero-damage hitsplats captured in the session:**
+
+```
+npc=Giant rat id=2864 amount=0 mine=true  others=false type=12  tick=673    BLOCK_ME
+npc=Giant rat id=2864 amount=0 mine=false others=false type=1   tick=906    (unnamed)
+npc=Giant rat id=2863 amount=0 mine=false others=true  type=13  tick=1236   BLOCK_OTHER
+npc=Giant rat id=2863 amount=0 mine=false others=false type=1   tick=1245   (unnamed)
+```
+
+Against `HitsplatID` in `runelite-api-1.12.36.jar`:
+
+| type | constant | flags | meaning |
+|---|---|---|---|
+| 12 | `BLOCK_ME` | `mine=true` | **our** splash — already visible |
+| 13 | **`BLOCK_OTHER`** | **`others=true`** | **their splash — visible, correctly attributed** |
+| 16 | `DAMAGE_ME` | `mine=true` | our hit |
+| 17 | `DAMAGE_OTHER` | `others=true` | their hit |
+| 1 | **not in `HitsplatID` at all** | both false | unknown, see below |
+
+**The important correction: `BLOCK_OTHER` (13) passes the existing `!mine && !others` guard.** The event reaches `KillStateMachine.damage()` with `mine=false`, so it lands in the `else` branch — and there the bug reproduced in `ForeignSplashTest` is exactly as the unit test described:
+
+```java
+else { r.othersDamage += amount; }   // amount is 0, so this records nothing
+```
+
+So the ironman problem is real but **shallower than the superseded entry claimed**. The event is not being discarded by the detector's ownership guard; it arrives and is then silently lost because only its *amount* is recorded and its amount is zero. The fix is the one the unit test already implies: count foreign **attacks**, not just foreign **damage**, mirroring what `attacksCount` has always done for our own zero splats — *"a zero splat is still an attempt"*.
+
+**`type=1` remains unexplained and must not be assumed.** It is not a constant in `HitsplatID` for 1.12.36, it carries both ownership flags false, and it appeared twice — each time within a few ticks of a foreign action on a rat the ironman was fighting. It may be the other player's *attack* rendered on a target they do not own, or something unrelated. **Do not key any filter on type 1** until it is identified; the guard's own comment says ownerless splats are heals and other players' poison ticks, and a monster weakened by *other monsters* explicitly does **not** void an ironman drop.
+
+**Corroborating the drop rule from the same session** — perfect correlation across 8 kills, `loottracker_add_loot` present or absent:
+
+| kill | damage | server loot event |
+|---|---|---|
+| 2864 UNCONTESTED | 10/10 | **yes** |
+| 2856 UNCONTESTED | 5/5 | **yes** |
+| 2856 UNCONTESTED | 5/5 | **yes** |
+| **2864 AMBIGUOUS** | **9/11** | **NO** |
+| **2864 AMBIGUOUS** | **5/11** | **NO** |
+| 2856 UNCONTESTED | 5/5 | **yes** |
+| **2856 AMBIGUOUS** | **1/5** | **NO** |
+| 2863 UNCONTESTED | 11/11 | **yes** |
+
+**Every clean kill produced loot. Every contested kill produced none.** The `9/11` row is the one that matters: **82% of the damage and still nothing**, which confirms the ironman rule is absolute rather than majority-based. On a main that kill wins the drop comfortably.
+
+**Still not tested: a kill where the other player ONLY splashed and never landed a hit.** Every AMBIGUOUS kill above contains real foreign damage. The wiki's *"even zero points of damage"* clause is therefore still unconfirmed in play, and it is the case that decides whether `othersDamage > 0` alone is unsound or merely incomplete.
+**Source:** live measurement 2026-08-24; `HitsplatID` from `runelite-api-1.12.36.jar`; [Ironman Mode](https://oldschool.runescape.wiki/w/Ironman_Mode).
