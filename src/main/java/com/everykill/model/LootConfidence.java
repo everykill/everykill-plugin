@@ -44,9 +44,12 @@ public enum LootConfidence
 	 *   <li>we missed it</li>
 	 * </ul>
 	 *
-	 * {@code always_drops.tsv} settles the first case: a monster with a guaranteed
-	 * drop and no loot event was <b>not</b> dry. That cross-check isn't wired up yet,
-	 * so until it is, treat this as unresolved rather than empty.
+	 * {@code always_drops.tsv} settles the first case — a monster with a guaranteed
+	 * drop and no loot event was <b>not</b> dry. That check runs <b>server-side at
+	 * ingest, never here</b>: {@code spec-reference-data.md} rules the reference table
+	 * off the client entirely (Hub review, wiki licensing, staleness, and keeping
+	 * interpretation reversible). So this stays ambiguous by design, and the client
+	 * uploads enough for the server to resolve it.
 	 */
 	NONE("No loot reported");
 

@@ -134,7 +134,10 @@ so `othersAttacks > 0` must not void a GIM's kill. Core already models the disti
 3. The hold-the-kill change, with the 29 tests updated.
 4. Attribution + loot grading per the spec's existing table.
 5. Account-type gate.
-6. `always_drops` cross-check.
+6. `always_drops` cross-check — **NOT here.** `spec-reference-data.md:45` keeps the
+   reference table server-side and off the client entirely. The check runs at ingest,
+   where the table already lives; the client just uploads `npc_id`, the drops and the
+   loot grade. See the FINDINGS entry dated 2026-08-24 for the four reasons.
 7. Tile coincidence as a **fallback** for monsters the server does not report — only once
    step 2 has shown which those are.
 

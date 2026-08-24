@@ -1991,3 +1991,33 @@ Item ids resolved against `ItemID` in `runelite-api-1.12.36.jar`: **Big bones**,
 **Still unverified, and the sample cannot speak to it:** every kill here was sequential and uncontested. **Two of the same monster dying on one tick has still never happened in a client**, so the `UNKNOWN` path — the reason `attachLoot` exists in the shape it does — is covered by unit tests only. Same for `PROBABLE`, which needs a contested or deduced kill with loot.
 
 **Note on the ghosts.** Two Ghost kills earlier in the same session predate the `loot=` field being added, so they are not evidence of the `NONE` path either way. The earlier finding that ghosts produce no loot event still stands on its own.
+
+---
+
+## 2026-08-24 — the always_drops cross-check does NOT belong in the client, and the spec already said so
+
+**Status:** correction, caught before writing code
+
+Having verified Step 6's attribution live, the obvious next step looked like wiring `data/always_drops.tsv` into the plugin so `LootConfidence.NONE` could distinguish three cases it currently cannot:
+
+| kill | table says | verdict |
+|---|---|---|
+| Ghost, no loot event | nothing guaranteed | genuinely empty |
+| Cyclops, no loot event | **always Big bones** | **we missed it** |
+
+That reasoning is sound. **The placement was wrong**, and `spec-reference-data.md:45` says so in one line:
+
+> *"the reference table stays server-side and is never shipped to the client."*
+
+Both routes to getting it client-side are named and rejected at `:240-241` — *"Shipping the table in the jar"* and *"Fetching it from the client at runtime"*. Four reasons, in the spec's own order of harm:
+
+1. **`PRODUCT-DIRECTION.md`: first Hub submission is local-only, no upload.** A runtime fetch drags third-party disclosure and a server dependency back into the first review — the exact surface that decision removed.
+2. **`LICENSING.md:54` — wiki content is CC BY-NC-SA 3.0, non-commercial**, with share-alike sitting badly against a BSD plugin. Keeping wiki-derived data off the client keeps that problem on our own infrastructure.
+3. **Bundling goes stale.** A jar-shipped table needs a plugin release for new content, against `PROJECT.md`'s *"new content works on release day"*.
+4. **Read-time interpretation is reversible.** A wiki correction retroactively fixes every historical kill; baked into the client it is frozen at whatever we believed that day.
+
+**Where the check actually goes: the server, at ingest.** The client already uploads everything it needs — `npc_id`, the drop list, and `lootConfidence`. The table lives next to the ingest, so *"cyclops with no loot event"* is a flag raised there and fixed there.
+
+**What that means for `LootConfidence.NONE`:** it stays deliberately ambiguous in the client, and that is correct rather than incomplete. Its javadoc already says the cross-check *"isn't wired up yet"* — that wording should read *"is a server-side concern"*, because the client is never going to resolve it.
+
+**Process note.** `EverykillPlugin`'s own header says the plugin **records and does not analyse**. The plan I wrote this morning (`plan-step6-loot.md`, step 6 of the order of work) lists "always_drops cross-check" without saying where it runs, and I read that as client-side work. Checking the spec before writing took under a minute and would have cost an afternoon of building something that had to be torn out — and worse, something that would have failed Hub review for a network call.
