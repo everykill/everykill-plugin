@@ -135,6 +135,10 @@ public class LootDetector
 	 * <p>Loot nobody claimed is a real signal, not noise — it means the server reported
 	 * a drop for a monster we never recorded a kill for, which is a hole in kill
 	 * detection rather than in loot. Logged rather than silently binned.
+	 *
+	 * <p><b>Until attribution exists, everything looks unclaimed</b>, because nothing
+	 * calls {@link #drainFor}. The log line says so rather than crying wolf on every
+	 * drop in the game.
 	 */
 	public void expire(int tick)
 	{
@@ -142,7 +146,8 @@ public class LootDetector
 		{
 			if (loot.tick < tick)
 			{
-				log.debug("unclaimed server loot: npc={} name={} items={} tick={}",
+				log.debug("server loot expired unclaimed (nothing claims yet): "
+						+ "npc={} name={} items={} tick={}",
 					loot.npcId, loot.npcName, loot.items.size(), loot.tick);
 				return true;
 			}

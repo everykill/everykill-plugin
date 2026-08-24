@@ -1866,3 +1866,42 @@ Corroborated independently by `DailyTasksPlugin.java:212`, which comments `!= 2 
 3. Resolve the six-mode mapping, and treat **group** ironman separately — a groupmate is not an outsider.
 4. Do not assume the varbit is available at login; core reads it live at the point of use rather than caching it at startup.
 **Source:** `rlsrc` RuneLite 1.12.36 `GroundItemsPlugin.java:275,768`; `VarbitID` from `runelite-api-1.12.36.jar`; [Ironman Mode](https://oldschool.runescape.wiki/w/Ironman_Mode).
+
+---
+
+## 2026-08-24 — step 6 first light: the server loot pipeline works, and the kill is emitted before its loot arrives
+
+**Status:** verified — live, first `ServerNpcLoot` capture
+**Method:** `LootDetector` wired in capture-only (commit `5e050e6`), ordinary killing in a client. No attribution, nothing branching on the events.
+
+**The full chain verified itself against three independent sources.** One cyclops kill:
+
+```
+15:38:56  Kill: npc_id=7271 name=Cyclops grade=UNCONTESTED dmg=75/75
+15:38:56  loottracker_add_loot npc=7271 event=77265 item=532  qty=1
+15:38:56  loottracker_add_loot npc=7271 event=77265 item=1295 qty=1
+15:38:56  (loot expired unclaimed)
+```
+
+| source | claim |
+|---|---|
+| `data/always_drops.tsv` row `7271` | Cyclops **always drops Big bones** |
+| server event | `item=532` |
+| `ItemID` in `runelite-api-1.12.36.jar` | **532 = `BIG_BONES`** |
+
+They agree. `1295` is `STEEL_LONGSWORD`, an ordinary random drop. **This is the `always_drops` cross-check working for the first time** — the table predicted the guaranteed drop and the server delivered exactly it. That is the falsifiable, two-directional check `spec-drop-attribution.md` wants and no other tracker has.
+
+**The negative case held too.** Two Ghost kills (7263, 7264) produced **zero** loot events, and `always_drops.tsv` has **no rows for Ghost**. Reference data says "guaranteed drop: none", live behaviour says "no event". Those kills are correctly *loot-empty*, not *loot_unknown* — and without the table there would be no way to tell those two apart.
+
+**THE ORDERING PROBLEM, now measured rather than predicted.** Everything above lands in the same second, in this order:
+
+1. the kill is emitted
+2. the server's loot events arrive
+3. the loot expires with nobody to give it to
+
+**`resolve()` emits the kill before its loot exists.** This is exactly what the deferred "hold the kill" change (option 1, "try 1") was for: park the record, emit after loot resolves on the tick boundary. It was deferred because it touches all 29 `KillStateMachineTest` cases for zero behaviour change while no loot code existed. Loot code now exists, and this log is the evidence that the hold is required rather than merely tidy.
+
+It still needs no invented constant — the hold is *"finish the tick"*, because that is when `LootManager` flushes pending script loot (`processScriptLoot` on `GameTick`).
+
+**Sample size warning.** One cyclops, two ghosts. This confirms the pipeline is wired correctly and the ordering is wrong; it does **not** establish how often the server reports, whether the `npc_id` join survives a crowd, or what happens when two identical monsters die on one tick. Those are still the step-2 questions in `plan-step6-loot.md` and remain unmeasured.
+**Source:** live measurement 2026-08-24; `ItemID`/`always_drops.tsv` cross-check.
