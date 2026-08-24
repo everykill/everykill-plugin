@@ -1525,3 +1525,40 @@ That was already recorded in `GAME-MECHANICS.md`. It is now confirmed against li
 
 **Process note.** This was flagged mid-session as a possible allocator bug — "measured XP is about half what the formula predicts". It was not a bug, and **the answer was already sitting in `GAME-MECHANICS.md`, which exists for precisely this purpose.** The register worked; it was not consulted before raising the alarm. Third occurrence this week of concluding before checking (placeholder bank data 2026-08-22, the 273-row drop pull and the cumulative-ledger misread 2026-08-23/24).
 **Source:** [Dwarf multicannon](https://oldschool.runescape.wiki/w/Dwarf_multicannon), Damage and experience section, read 2026-08-24.
+
+---
+
+## 2026-08-24 — the server tells the client exactly what dropped: `ServerNpcLoot` supersedes tile coincidence
+
+**Status:** verified (present in the 1.12.36 jars we compile against)
+**Method:** Read `rlsrc/net/runelite/client/game/LootManager.java` and `plugins/loottracker/LootTrackerPlugin.java`, then confirmed both symbols exist in the resolved dependency jars with `javap`.
+
+**`spec-drop-attribution.md` is built entirely on tile coincidence** — watch `ItemSpawned`, remember what appeared on which tile on which tick, and when an NPC dies check its footprint. That is what `LootManager` has always done, and the spec's core mechanic section describes it faithfully.
+
+**It is no longer how core does it.** `LootManager` also subscribes to `ScriptPreFired` for `ScriptID.LOOTTRACKER_ADD_LOOT` (**7192**), which the server fires with explicit arguments:
+
+```java
+int npcId  = (int) scriptEvent.getArguments()[1];
+int eventId = (int) scriptEvent.getArguments()[2];
+int itemId = (int) scriptEvent.getArguments()[3];
+int qty    = (int) scriptEvent.getArguments()[4];
+```
+
+**The server names the NPC and the item.** No tile maths, no footprint iteration, no coincidence. Items accumulate under an `eventId`, and a change of `eventId` flushes the previous group as one `ServerNpcLoot` event carrying an `NPCComposition` and its `ItemStack`s.
+
+**Core's own loot tracker has moved over.** `LootTrackerPlugin` subscribes to `onServerNpcLoot`. **`NpcLootReceived` — the tile-coincidence event — has zero subscribers anywhere in `rlsrc/net/runelite/client/plugins/`.** The old path still runs and still posts, but nothing in core listens to it.
+
+**Both are available to us**, verified against the resolved jars, not just the source:
+
+| symbol | status |
+|---|---|
+| `net.runelite.client.events.ServerNpcLoot` | in `client-1.12.36.jar` |
+| `net.runelite.client.events.NpcLootReceived` | in `client-1.12.36.jar` |
+| `ScriptID.LOOTTRACKER_ADD_LOOT` = **7192** | in `runelite-api-1.12.36.jar` |
+
+**Why this matters more for us than for a loot tracker.** Everykill's whole claim is per-monster data that can be trusted. Tile coincidence is inference — *items appeared where something died, so they are probably its drop* — and the spec's own guards (contested tiles, multiple corpses on one tile, a stack merging into existing ground items) exist to manage the error in that inference. **A server-sourced npcId and itemId is not an inference.** It removes the error rather than bounding it.
+
+**What it does not remove.** The npcId in the script arguments is the NPC's *id*, not the record we opened when we damaged it — the join back to a specific kill is still ours to make, and that is still where a wrong answer would hide. It also cannot cover anything the server does not fire the script for; the delayed path (The Nightmare) and the Kraken/Zulrah special cases still exist in `LootManager` for a reason.
+
+**Consequence for Step 6.** The step as written implements the mechanism core has moved away from. It should be re-planned around `ServerNpcLoot` as the primary source, with tile coincidence kept only as a documented fallback for cases the script does not cover — and the fallback should be built second, once the primary is proven, rather than first.
+**Source:** `rlsrc` RuneLite 1.12.36, `LootManager.java` lines 282-349, `LootTrackerPlugin.java` line 773.
