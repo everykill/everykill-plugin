@@ -108,25 +108,6 @@ public class KillDetector
 		final boolean mine = hitsplat.isMine();
 		final boolean others = hitsplat.isOthers();
 
-		// temp: splash test, 2026-08-24. remove once FINDINGS records whether a foreign
-		// zero-damage hitsplat reaches us at all.
-		//
-		// the ironman rule voids the drop entirely if another player attacks the
-		// monster, "even zero points of damage" on some monsters. our filter is going
-		// to key on othersDamage > 0, and a splash adds 0, so we'd read a voided kill
-		// as a clean one. proven in ForeignSplashTest.
-		//
-		// what a unit test CANNOT tell us is whether runelite even fires this for
-		// someone else's splash. logging every hitsplat on an npc we're tracking,
-		// including the ones the next line throws away, because "no event arrived" and
-		// "event arrived and we binned it" look identical from the outside.
-		if (log.isDebugEnabled() && actor instanceof NPC)
-		{
-			log.debug("temp: hitsplat. npc={} id={} amount={} mine={} others={} type={} tick={}",
-				actor.getName(), ((NPC) actor).getId(), hitsplat.getAmount(), mine, others,
-				hitsplat.getHitsplatType(), client.getTickCount());
-		}
-
 		// Neither ours nor another player's: heals, someone else's poison ticks.
 		if (!mine && !others)
 		{

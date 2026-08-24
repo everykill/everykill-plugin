@@ -122,6 +122,13 @@ public class KillStateMachine
 		else
 		{
 			r.othersDamage += amount;
+
+			// and count the attempt, not just the damage. a foreign splash arrives as
+			// BLOCK_OTHER with amount 0 - measured 2026-08-24 - so othersDamage alone
+			// reads a contested kill as a clean one. matters most for ironmen, where
+			// ANY outside involvement voids the drop entirely: 17 kills measured, one
+			// at 90% of the damage, no loot on any of them.
+			r.othersAttacks++;
 		}
 
 		r.lastTick = tick;
@@ -297,7 +304,11 @@ public class KillStateMachine
 		}
 
 		final Confidence grade;
-		if (r.othersDamage > 0)
+		// othersAttacks, not othersDamage. someone splashing our target contributed no
+		// damage but they were in the fight, and for an ironman that alone voids the
+		// drop - measured 2026-08-24, 8 contested kills, zero loot, one of them at 90%
+		// of the damage. calling that kill clean is how a dry streak gets invented.
+		if (r.othersDamage > 0 || r.othersAttacks > 0)
 		{
 			grade = Confidence.AMBIGUOUS;
 		}
@@ -338,6 +349,10 @@ public class KillStateMachine
 		private final int regionId;
 		private int myDamage;
 		private int othersDamage;
+
+		// attempts by other players, damage or not. a splash is BLOCK_OTHER with
+		// amount 0, so othersDamage can't see it and this can.
+		private int othersAttacks;
 
 		/** tick ActorDeath fired, -1 if it hasn't. believed until it isn't. */
 		private int deathSignalledAt = -1;
