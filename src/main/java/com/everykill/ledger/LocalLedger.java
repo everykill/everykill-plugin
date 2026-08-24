@@ -180,7 +180,17 @@ public class LocalLedger
 
 		// NPC names can change between game updates; keep the latest.
 		stat.name = kill.npcName;
-		stat.combatLevel = kill.combatLevel;
+
+		// but never let a zero overwrite a level we already knew. getCombatLevel()
+		// returns 0 when the composition wasn't loaded at the moment we asked, and
+		// blindly assigning it means one unlucky kill blanks the level forever - which
+		// is why Dagannoth and Ankou showed with no level while everything else had
+		// one. the display rollup keys on (name, level), so a blanked level also
+		// silently merges Dagannoth Rex, Prime and Supreme into one row.
+		if (kill.combatLevel > 0)
+		{
+			stat.combatLevel = kill.combatLevel;
+		}
 		stat.record(kill.grade, kill.timestampMillis, kill.myDamage, kill.othersDamage);
 
 		final NpcStat sessionStat = session.computeIfAbsent(kill.npcId,

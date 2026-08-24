@@ -153,7 +153,14 @@ public class KillStateMachine
 		// of the LAST form is the kill. measured 2026-08-22 and 2026-08-23.
 		r.npcId = npcId;
 		r.name = name;
-		r.combatLevel = combatLevel;
+
+		// same zero guard as the ledger. a transform's composition is often not loaded
+		// on the tick it changes, and taking a 0 here would blank the level on the very
+		// monsters most likely to have one worth keeping.
+		if (combatLevel > 0)
+		{
+			r.combatLevel = combatLevel;
+		}
 		r.lastTick = tick;
 	}
 
