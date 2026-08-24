@@ -5,6 +5,7 @@
 package com.everykill;
 
 import com.everykill.detect.LootDetector;
+import com.everykill.model.AccountType;
 import com.everykill.model.Confidence;
 import com.everykill.model.DeathSignal;
 import com.everykill.model.KillRecord;
@@ -48,8 +49,7 @@ public class AttachLootTest
 	public void aCleanKillWithOneReportedDropIsConfirmed()
 	{
 		// the measured shape: big bones plus one rolled item, one event id.
-		final KillRecord out = EverykillPlugin.attachLoot(kill(Confidence.UNCONTESTED),
-			Collections.singletonList(loot(77265, BIG_BONES, 1, COINS, 99)));
+		final KillRecord out = EverykillPlugin.attachLoot(kill(Confidence.UNCONTESTED), Collections.singletonList(loot(77265, BIG_BONES, 1, COINS, 99)), AccountType.MAIN);
 
 		Assert.assertEquals(LootConfidence.CONFIRMED, out.lootConfidence);
 		Assert.assertEquals(2, out.drops.size());
@@ -62,8 +62,7 @@ public class AttachLootTest
 	{
 		// the drop is real and ours. it just can't sit in a denominator, because the
 		// kill it came from wasn't clean.
-		final KillRecord out = EverykillPlugin.attachLoot(kill(Confidence.AMBIGUOUS),
-			Collections.singletonList(loot(77265, BIG_BONES, 1)));
+		final KillRecord out = EverykillPlugin.attachLoot(kill(Confidence.AMBIGUOUS), Collections.singletonList(loot(77265, BIG_BONES, 1)), AccountType.MAIN);
 
 		Assert.assertEquals(LootConfidence.PROBABLE, out.lootConfidence);
 		Assert.assertEquals(1, out.drops.size());
@@ -72,8 +71,7 @@ public class AttachLootTest
 	@Test
 	public void aDeducedKillsLootIsProbable()
 	{
-		final KillRecord out = EverykillPlugin.attachLoot(kill(Confidence.INFERRED),
-			Collections.singletonList(loot(77265, BIG_BONES, 1)));
+		final KillRecord out = EverykillPlugin.attachLoot(kill(Confidence.INFERRED), Collections.singletonList(loot(77265, BIG_BONES, 1)), AccountType.MAIN);
 
 		Assert.assertEquals(LootConfidence.PROBABLE, out.lootConfidence);
 	}
@@ -84,11 +82,67 @@ public class AttachLootTest
 		// the whole reason this method exists. two cyclopes died together, the server
 		// reported both drops against id 7271, and nothing says which is which.
 		// UNKNOWN keeps them out of denominators instead of inventing an owner.
-		final KillRecord out = EverykillPlugin.attachLoot(kill(Confidence.UNCONTESTED),
-			java.util.Arrays.asList(loot(77265, BIG_BONES, 1), loot(77266, BIG_BONES, 1)));
+		final KillRecord out = EverykillPlugin.attachLoot(kill(Confidence.UNCONTESTED), java.util.Arrays.asList(loot(77265, BIG_BONES, 1), loot(77266, BIG_BONES, 1)), AccountType.MAIN);
 
 		Assert.assertEquals(LootConfidence.UNKNOWN, out.lootConfidence);
 		Assert.assertEquals("the items are kept, just not attributed", 2, out.drops.size());
+	}
+
+	@Test
+	public void anIronmansContestedKillCannotHaveConfirmedLoot()
+	{
+		// measured 2026-08-24: 8 contested kills on an ironman, zero loot events, one
+		// of them at 90% of the damage. so loot arriving on a contested ironman kill
+		// means our contest detection and the server disagree - and ours is the one to
+		// distrust. UNKNOWN either way, out of denominators.
+		final KillRecord contested = new KillRecord("evt", CYCLOPS, "Cyclops", 56, 6556,
+			Confidence.AMBIGUOUS, DeathSignal.OBSERVED, 68, 7, 6, 6, 18, 1_756_000_000_000L);
+
+		final KillRecord out = EverykillPlugin.attachLoot(contested,
+			Collections.singletonList(loot(77265, BIG_BONES, 1)), AccountType.IRONMAN);
+
+		Assert.assertEquals(LootConfidence.UNKNOWN, out.lootConfidence);
+		Assert.assertEquals("the items are still recorded", 1, out.drops.size());
+	}
+
+	@Test
+	public void aMainsContestedKillKeepsItsLoot()
+	{
+		// the asymmetry that makes the account gate necessary. same kill, same drop,
+		// different account type - a main who dealt the most damage WINS this, so
+		// filtering it would discard a real drop.
+		final KillRecord contested = new KillRecord("evt", CYCLOPS, "Cyclops", 56, 6556,
+			Confidence.AMBIGUOUS, DeathSignal.OBSERVED, 68, 7, 6, 6, 18, 1_756_000_000_000L);
+
+		final KillRecord out = EverykillPlugin.attachLoot(contested,
+			Collections.singletonList(loot(77265, BIG_BONES, 1)), AccountType.MAIN);
+
+		Assert.assertEquals(LootConfidence.PROBABLE, out.lootConfidence);
+	}
+
+	@Test
+	public void anIronmansCleanKillIsStillConfirmed()
+	{
+		// the gate must only fire on contested kills. an iron killing something alone
+		// is the most trustworthy data we have.
+		final KillRecord out = EverykillPlugin.attachLoot(kill(Confidence.UNCONTESTED),
+			Collections.singletonList(loot(77265, BIG_BONES, 1)), AccountType.IRONMAN);
+
+		Assert.assertEquals(LootConfidence.CONFIRMED, out.lootConfidence);
+	}
+
+	@Test
+	public void anUnresolvedAccountIsNotTreatedAsAnIronman()
+	{
+		// a group ironman reads as unresolved until the clan-settings check exists.
+		// treating them as an iron would void every legitimate group kill they make.
+		final KillRecord contested = new KillRecord("evt", CYCLOPS, "Cyclops", 56, 6556,
+			Confidence.AMBIGUOUS, DeathSignal.OBSERVED, 68, 7, 6, 6, 18, 1_756_000_000_000L);
+
+		final KillRecord out = EverykillPlugin.attachLoot(contested,
+			Collections.singletonList(loot(77265, BIG_BONES, 1)), AccountType.GROUP_UNRESOLVED);
+
+		Assert.assertEquals(LootConfidence.PROBABLE, out.lootConfidence);
 	}
 
 	@Test
@@ -96,8 +150,7 @@ public class AttachLootTest
 	{
 		// ghosts really do drop nothing (measured), but so does an ironman's voided
 		// kill and so does one we missed. NONE says "no answer", not "no drop".
-		final KillRecord out = EverykillPlugin.attachLoot(kill(Confidence.UNCONTESTED),
-			Collections.emptyList());
+		final KillRecord out = EverykillPlugin.attachLoot(kill(Confidence.UNCONTESTED), Collections.emptyList(), AccountType.MAIN);
 
 		Assert.assertEquals(LootConfidence.NONE, out.lootConfidence);
 		Assert.assertTrue(out.drops.isEmpty());
@@ -107,8 +160,7 @@ public class AttachLootTest
 	public void theOriginalKillIsNotMutated()
 	{
 		final KillRecord original = kill(Confidence.UNCONTESTED);
-		final KillRecord out = EverykillPlugin.attachLoot(original,
-			Collections.singletonList(loot(77265, BIG_BONES, 1)));
+		final KillRecord out = EverykillPlugin.attachLoot(original, Collections.singletonList(loot(77265, BIG_BONES, 1)), AccountType.MAIN);
 
 		Assert.assertTrue("the record handed in stays as it was", original.drops.isEmpty());
 		Assert.assertEquals(LootConfidence.NONE, original.lootConfidence);
@@ -119,8 +171,7 @@ public class AttachLootTest
 	@Test
 	public void dropsCannotBeMutatedThroughTheRecord()
 	{
-		final KillRecord out = EverykillPlugin.attachLoot(kill(Confidence.UNCONTESTED),
-			Collections.singletonList(loot(77265, BIG_BONES, 1)));
+		final KillRecord out = EverykillPlugin.attachLoot(kill(Confidence.UNCONTESTED), Collections.singletonList(loot(77265, BIG_BONES, 1)), AccountType.MAIN);
 
 		try
 		{

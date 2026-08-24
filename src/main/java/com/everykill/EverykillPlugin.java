@@ -7,6 +7,8 @@ package com.everykill;
 import com.everykill.detect.KillDetector;
 import com.everykill.detect.LootDetector;
 import com.everykill.ledger.LocalLedger;
+import com.everykill.model.AccountType;
+import net.runelite.api.gameval.VarbitID;
 import com.everykill.model.Confidence;
 import com.everykill.model.Drop;
 import com.everykill.model.LootConfidence;
@@ -329,7 +331,7 @@ public class EverykillPlugin extends Plugin
 		final List<LootDetector.ServerLoot> reported =
 			lootDetector.drainFor(kill.npcId, client.getTickCount());
 
-		onKill(attachLoot(kill, reported));
+		onKill(attachLoot(kill, reported, accountType()));
 	}
 
 	/**
@@ -341,13 +343,35 @@ public class EverykillPlugin extends Plugin
 	 * {@code UNKNOWN}, and per spec-drop-attribution those kills leave drop-rate
 	 * denominators entirely rather than being counted as dry.
 	 */
-	static KillRecord attachLoot(KillRecord kill, List<LootDetector.ServerLoot> reported)
+	static KillRecord attachLoot(KillRecord kill, List<LootDetector.ServerLoot> reported,
+		AccountType accountType)
 	{
 		if (reported.isEmpty())
 		{
 			// NOT "dropped nothing". could be a genuinely lootless monster, an
 			// ironman's voided drop, or us missing it - LootConfidence.NONE says so.
 			return kill.withLoot(Collections.emptyList(), LootConfidence.NONE);
+		}
+
+		// an ironman whose kill someone else touched should not have received this at
+		// all - measured 2026-08-24, 8 contested kills, zero loot, one at 90% of the
+		// damage. so if loot turns up on one anyway, our contest detection and the
+		// server disagree about the same kill, and the safe reading is that ours is
+		// wrong. UNKNOWN keeps it out of denominators either way.
+		//
+		// a MAIN in the same position is fine and must not be filtered: most damage
+		// wins the drop, so a contested kill paying out is exactly correct.
+		final boolean voided = accountType.outsideDamageVoidsLoot()
+			&& (kill.othersDamage > 0 || kill.grade == Confidence.AMBIGUOUS);
+
+		if (voided)
+		{
+			final List<Drop> all = new ArrayList<>();
+			for (LootDetector.ServerLoot loot : reported)
+			{
+				addAll(all, loot);
+			}
+			return kill.withLoot(all, LootConfidence.UNKNOWN);
 		}
 
 		if (reported.size() > 1)
@@ -403,6 +427,22 @@ public class EverykillPlugin extends Plugin
 		return sb.toString();
 	}
 
+	/**
+	 * What kind of account we're on, read live rather than cached at login.
+	 *
+	 * <p>Core reads this varbit at the point of use too. People de-iron mid-session,
+	 * hardcores die and become regular irons, and {@code spec-data-model.md} stores
+	 * account type <b>per session, not per player</b> for exactly that reason.
+	 */
+	private AccountType accountType()
+	{
+		if (client.getGameState() != GameState.LOGGED_IN)
+		{
+			return AccountType.UNKNOWN;
+		}
+		return AccountType.fromVarbit(client.getVarbitValue(VarbitID.IRONMAN));
+	}
+
 	private void onKill(KillRecord kill)
 	{
 		final NpcStat before = ledger.get(kill.npcId);
@@ -412,10 +452,10 @@ public class EverykillPlugin extends Plugin
 
 		// what a hand count gets checked against. without it a wrong total is just a
 		// wrong number. needs --debug.
-		log.debug("Kill: npc_id={} name={} grade={} signal={} region={} dmg={}/{} attacks={} hits={} maxHit={} kc={} xp={} sessionKills={} unallocatedXp={} loot={} drops={}",
+		log.debug("Kill: npc_id={} name={} grade={} signal={} region={} dmg={}/{} attacks={} hits={} maxHit={} kc={} xp={} sessionKills={} unallocatedXp={} account={} loot={} drops={}",
 			kill.npcId, kill.npcName, kill.grade, kill.signal, kill.regionId,
 			kill.myDamage, kill.totalDamage(), kill.attacksCount, kill.hitsCount, kill.maxHit,
-			after.total(), after.xp, ledger.getSessionKills(), xpService.getUnallocatedXp(),
+			after.total(), after.xp, ledger.getSessionKills(), xpService.getUnallocatedXp(), accountType(),
 			kill.lootConfidence, describe(kill.drops));
 
 		notifier.onKillRecorded(kill, after, firstEver);
