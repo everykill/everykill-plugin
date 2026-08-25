@@ -190,6 +190,30 @@ public class UploadIdentity
 		}
 	}
 
+	/**
+	 * Deletes the identity entirely, after a server-side erasure.
+	 *
+	 * <p>Unlike {@link #clearToken()} this drops the client id too, and it must. The
+	 * id is what register is idempotent on, so keeping it would silently re-register
+	 * into a brand new empty account on the next flush — which looks exactly like the
+	 * deletion having failed.
+	 */
+	public synchronized void forget()
+	{
+		clientId = null;
+		token = null;
+		recoveryCode = null;
+
+		try
+		{
+			Files.deleteIfExists(path);
+		}
+		catch (IOException e)
+		{
+			log.warn("everykill: could not delete {}", path, e);
+		}
+	}
+
 	/** Forgets the token but keeps the id, so the next register recovers the history. */
 	public synchronized void clearToken()
 	{

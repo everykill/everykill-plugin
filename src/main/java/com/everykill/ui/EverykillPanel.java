@@ -33,6 +33,7 @@ import javax.inject.Inject;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingConstants;
@@ -692,6 +693,81 @@ public class EverykillPanel extends PluginPanel
 		return p;
 	}
 
+	/** Export and delete, as the privacy policy promises. */
+	private JPanel dataRights()
+	{
+		final JPanel row = new JPanel(new java.awt.GridLayout(1, 2, 6, 0));
+		row.setOpaque(false);
+		row.setAlignmentX(LEFT_ALIGNMENT);
+		row.setMaximumSize(new Dimension(Short.MAX_VALUE, 16));
+
+		row.add(actionLabel("Export my data", () ->
+			uploadService.exportData(
+				path -> SwingUtilities.invokeLater(() ->
+					JOptionPane.showMessageDialog(this, "Saved to: " + path,
+						"Everykill", JOptionPane.INFORMATION_MESSAGE)),
+				err -> SwingUtilities.invokeLater(() ->
+					JOptionPane.showMessageDialog(this, err,
+						"Everykill", JOptionPane.WARNING_MESSAGE)))));
+
+		row.add(actionLabel("Delete my data", () ->
+		{
+			// irreversible and keeps no tombstone, so it has to be asked plainly
+			// rather than done on one click.
+			final int answer = JOptionPane.showConfirmDialog(this,
+				"Permanently delete every kill you have uploaded? "
+					+ "This cannot be undone and your ranks will disappear.",
+				"Everykill", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+
+			if (answer != JOptionPane.YES_OPTION)
+			{
+				return;
+			}
+
+			uploadService.eraseData(
+				msg -> SwingUtilities.invokeLater(() ->
+				{
+					JOptionPane.showMessageDialog(this, msg,
+						"Everykill", JOptionPane.INFORMATION_MESSAGE);
+					rebuild();
+				}),
+				err -> SwingUtilities.invokeLater(() ->
+					JOptionPane.showMessageDialog(this, err,
+						"Everykill", JOptionPane.WARNING_MESSAGE)));
+		}));
+
+		return row;
+	}
+
+	private static JLabel actionLabel(String text, Runnable action)
+	{
+		final JLabel l = new JLabel(text);
+		l.setFont(FontManager.getRunescapeSmallFont());
+		l.setForeground(SITE_FG_FAINT);
+		l.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		l.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseClicked(MouseEvent e)
+			{
+				action.run();
+			}
+
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				l.setForeground(SITE_ACC);
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				l.setForeground(SITE_FG_FAINT);
+			}
+		});
+		return l;
+	}
+
 	private void buildSession()
 	{
 		monsterHeader.setText("THIS SESSION");
@@ -762,6 +838,19 @@ public class EverykillPanel extends PluginPanel
 			monsterList.add(detailLine("waiting", String.valueOf(queued)));
 		}
 
+		// a halt is a client fault, not a hiccup. it says so and stays saying so.
+		final String halted = uploadService.getHalted();
+		if (halted != null)
+		{
+			final JLabel warn = new JLabel("<html>" + halted
+				+ "<br>Your kills are safe and still queued.</html>");
+			warn.setFont(FontManager.getRunescapeSmallFont());
+			warn.setForeground(SITE_ACC);
+			warn.setAlignmentX(LEFT_ALIGNMENT);
+			warn.setBorder(BorderFactory.createEmptyBorder(2, 0, 4, 0));
+			monsterList.add(warn);
+		}
+
 		final int dropped = uploadService.dropped();
 		if (dropped > 0)
 		{
@@ -769,6 +858,9 @@ public class EverykillPanel extends PluginPanel
 			// user is entitled to know their data is not all arriving.
 			monsterList.add(detailLine("dropped", String.valueOf(dropped)));
 		}
+
+		// the published policy promises both of these work from inside the plugin.
+		monsterList.add(dataRights());
 
 		monsterList.add(javax.swing.Box.createVerticalStrut(6));
 		monsterList.add(sectionLine("BY MONSTER"));

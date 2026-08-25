@@ -149,7 +149,7 @@ public interface EverykillConfig extends Config
 	@ConfigItem(
 		keyName = "uploadEnabled",
 		name = "Upload to the site",
-		description = "Sends your recorded kills so your profile and hiscore ranks update. Each kill sends: monster id and name, combat level, region, kill grade, your damage and other players' damage, hit counts, fight length, and the items dropped. Your account is identified by a salted hash - your RSN is never sent.",
+		description = "Sends your recorded kills so you are ranked. Each kill sends: monster id and name, combat level, region, kill grade, your damage and other players' damage, hit counts, fight length, and the items dropped. Your account name is NEVER sent - you are identified by a random id generated on this computer. Uploading ranks you pseudonymously; putting a name on a public leaderboard is a separate opt-in below.",
 		warning = "This feature submits your IP address to a 3rd-party server not controlled or verified by RuneLite developers",
 		position = 31,
 		section = uploadSection
@@ -177,6 +177,30 @@ public interface EverykillConfig extends Config
 	default String uploadUrl()
 	{
 		return "";
+	}
+
+	/**
+	 * The second consent, and the only path an account name takes to the server.
+	 *
+	 * <p>GDPR 7(2) wants a consent request distinguishable from other matters, and
+	 * bundling "send my kills" with "publish my name" is the bundled consent that
+	 * gets invalidated. They are also two genuinely different asks: plenty of people
+	 * want dryness maths without their name on a board.
+	 *
+	 * <p>Nothing reads this yet. It is here so the config text matches the published
+	 * policy before the feature exists, not after.
+	 */
+	@ConfigItem(
+		keyName = "publishName",
+		name = "Publish my name",
+		description = "Shows your display name on public leaderboards. Off means you are still ranked, just not named. Requires uploading. Turning this off later deletes the name from the site.",
+		warning = "This feature submits your IP address to a 3rd-party server not controlled or verified by RuneLite developers",
+		position = 33,
+		section = uploadSection
+	)
+	default boolean publishName()
+	{
+		return false;
 	}
 
 	enum NoticeLevel

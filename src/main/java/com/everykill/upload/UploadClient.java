@@ -214,6 +214,18 @@ public class UploadClient
 					}
 
 					final JsonObject json = gson.fromJson(rb.string(), JsonObject.class);
+
+					// a whole batch rejected for one identical reason is a CLIENT
+					// fault, not bad data. treating those as ordinary rejections
+					// drains the entire history into nothing inside a 200 - which is
+					// exactly what my UNCONTESTED enum bug would have done.
+					final String systemic = systemicReason(json);
+					if (systemic != null)
+					{
+						onDone.accept(Result.systemic(systemic));
+						return;
+					}
+
 					onDone.accept(Result.of(
 						value(json, "accepted"),
 						value(json, "duplicate"),
@@ -223,6 +235,153 @@ public class UploadClient
 				{
 					log.debug("everykill: could not read the upload reply", e);
 					onRetry.accept(0);
+				}
+			}
+		});
+	}
+
+	/** The server's systemic reason, or null when the batch was ordinary. */
+	private static String systemicReason(JsonObject json)
+	{
+		if (json == null || !json.has("systemic") || json.get("systemic").isJsonNull())
+		{
+			return null;
+		}
+
+		final JsonObject systemic = json.getAsJsonObject("systemic");
+		return systemic.has("reason") ? systemic.get("reason").getAsString() : "client fault";
+	}
+
+	/**
+	 * Publishes or withdraws the display name on public leaderboards.
+	 *
+	 * <p><b>The only call that ever carries an account name.</b> Deliberately separate
+	 * from {@link #send}: a name on the kill batch would ride along on every upload,
+	 * and "did we send a name" has to be answerable by reading one method rather than
+	 * auditing every path into a batch.
+	 *
+	 * <p>A null name withdraws. That deletes the name server-side rather than hiding
+	 * it — a {@code published = false} column with the name still in it is the version
+	 * that leaks.
+	 */
+	public void publish(String baseUrl, String token, String displayName,
+		Consumer<String> onDone, Consumer<String> onError)
+	{
+		final HttpUrl url = endpoint(baseUrl, "publish");
+		if (url == null)
+		{
+			onError.accept("Upload address is not a valid URL");
+			return;
+		}
+
+		final JsonObject body = new JsonObject();
+		body.addProperty("publish", displayName != null);
+		if (displayName != null)
+		{
+			body.addProperty("displayName", displayName);
+		}
+
+		final Request request = new Request.Builder()
+			.url(url)
+			.header("Authorization", "Bearer " + token)
+			.post(RequestBody.create(JSON, gson.toJson(body)))
+			.build();
+
+		httpClient.newCall(request).enqueue(new Callback()
+		{
+			@Override
+			public void onFailure(Call call, IOException e)
+			{
+				onError.accept("Could not reach the server: " + e.getMessage());
+			}
+
+			@Override
+			public void onResponse(Call call, Response response)
+			{
+				try (ResponseBody rb = response.body())
+				{
+					if (!response.isSuccessful())
+					{
+						onError.accept("Server said " + response.code());
+						return;
+					}
+					onDone.accept(displayName == null
+						? "Name removed from leaderboards"
+						: "Publishing as " + displayName);
+				}
+				catch (RuntimeException e)
+				{
+					onError.accept("Could not read the reply: " + e.getMessage());
+				}
+			}
+		});
+	}
+
+	/**
+	 * Everything the server holds about this account, as JSON. GDPR articles 15/20.
+	 *
+	 * <p>Handed back as raw text rather than parsed — the plugin writes it to a file
+	 * and never needs to understand it, and parsing it would mean tracking a schema
+	 * that is deliberately the server's business.
+	 */
+	public void export(String baseUrl, String token, Consumer<String> onDone,
+		Consumer<String> onError)
+	{
+		me(baseUrl, token, "GET", onDone, onError);
+	}
+
+	/**
+	 * Erases the account, its kills, drops and tokens. GDPR article 17.
+	 *
+	 * <p>Irreversible and keeps no tombstone, so the caller must have asked first.
+	 */
+	public void erase(String baseUrl, String token, Consumer<String> onDone,
+		Consumer<String> onError)
+	{
+		me(baseUrl, token, "DELETE", onDone, onError);
+	}
+
+	private void me(String baseUrl, String token, String method,
+		Consumer<String> onDone, Consumer<String> onError)
+	{
+		final HttpUrl url = endpoint(baseUrl, "me");
+		if (url == null)
+		{
+			onError.accept("Upload address is not a valid URL");
+			return;
+		}
+
+		final Request.Builder builder = new Request.Builder()
+			.url(url)
+			.header("Authorization", "Bearer " + token);
+
+		final Request request = "DELETE".equals(method)
+			? builder.delete().build()
+			: builder.get().build();
+
+		httpClient.newCall(request).enqueue(new Callback()
+		{
+			@Override
+			public void onFailure(Call call, IOException e)
+			{
+				onError.accept("Could not reach the server: " + e.getMessage());
+			}
+
+			@Override
+			public void onResponse(Call call, Response response)
+			{
+				try (ResponseBody rb = response.body())
+				{
+					if (!response.isSuccessful() || rb == null)
+					{
+						onError.accept("Server said " + response.code());
+						return;
+					}
+					onDone.accept(rb.string());
+				}
+				catch (IOException | RuntimeException e)
+				{
+					onError.accept("Could not read the reply: " + e.getMessage());
 				}
 			}
 		});
@@ -294,27 +453,42 @@ public class UploadClient
 		public final int rejected;
 		public final boolean unauthorised;
 
-		private Result(int accepted, int duplicate, int rejected, boolean unauthorised)
+		/**
+		 * Set when every record failed for the same reason.
+		 *
+		 * <p>Inverts the normal rule: KEEP the batch, stop uploading, and say so. The
+		 * records are fine; we are the broken part.
+		 */
+		public final String systemicReason;
+
+		private Result(int accepted, int duplicate, int rejected, boolean unauthorised,
+			String systemicReason)
 		{
 			this.accepted = accepted;
 			this.duplicate = duplicate;
 			this.rejected = rejected;
 			this.unauthorised = unauthorised;
+			this.systemicReason = systemicReason;
 		}
 
 		static Result of(int accepted, int duplicate, int rejected)
 		{
-			return new Result(accepted, duplicate, rejected, false);
+			return new Result(accepted, duplicate, rejected, false, null);
 		}
 
 		static Result unauthorised()
 		{
-			return new Result(0, 0, 0, true);
+			return new Result(0, 0, 0, true, null);
 		}
 
 		static Result dropped()
 		{
-			return new Result(0, 0, 0, false);
+			return new Result(0, 0, 0, false, null);
+		}
+
+		static Result systemic(String reason)
+		{
+			return new Result(0, 0, 0, false, reason);
 		}
 	}
 }

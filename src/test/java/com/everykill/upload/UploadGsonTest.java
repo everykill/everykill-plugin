@@ -131,4 +131,28 @@ public class UploadGsonTest
 		Assert.assertTrue("body must start with [", json.startsWith("["));
 		Assert.assertTrue("body must end with ]", json.endsWith("]"));
 	}
+
+	@Test
+	public void noKillFieldCouldEverHoldAName()
+	{
+		// stronger than checking a few key names: NOTHING on the wire may be a string
+		// that isn't one of the three the contract names. a future field called
+		// "owner" or "who" would fail this without anyone remembering to add it.
+		final JsonObject json = serialise(kill(Confidence.UNCONTESTED, LootConfidence.CONFIRMED));
+
+		final java.util.Set<String> allowedStrings =
+			new java.util.HashSet<>(java.util.Arrays.asList(
+				"eventId", "npcName", "grade", "signal", "lootConfidence"));
+
+		for (String key : json.keySet())
+		{
+			if (json.get(key).isJsonPrimitive() && json.get(key).getAsJsonPrimitive().isString())
+			{
+				Assert.assertTrue(
+					"a new string field '" + key + "' is on the wire. if it can hold a "
+						+ "player name, the publish opt-in is no longer the only path.",
+					allowedStrings.contains(key));
+			}
+		}
+	}
 }

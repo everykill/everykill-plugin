@@ -7,6 +7,15 @@ package com.everykill.upload;
 import com.everykill.EverykillConfig;
 import com.everykill.model.KillRecord;
 import java.util.List;
+import net.runelite.api.Client;
+import net.runelite.api.Player;
+import net.runelite.client.callback.ClientThread;
+import net.runelite.client.RuneLite;
+import java.util.function.Consumer;
+import java.nio.file.Path;
+import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -43,6 +52,8 @@ public class UploadService
 	private final UploadClient client;
 	private final UploadIdentity identity;
 	private final ScheduledExecutorService executor;
+	private final Client gameClient;
+	private final ClientThread clientThread;
 	private final PendingKills pending = new PendingKills();
 
 	/** One flush at a time. Two in flight would ack each other's records. */
@@ -53,17 +64,30 @@ public class UploadService
 	/** Earliest millis we may send again, honouring the server's own retryAfter. */
 	private volatile long nextAllowedMillis;
 
+	/**
+	 * Set when the server reports a client-wide fault. Stops all uploading.
+	 *
+	 * <p>Not cleared by a later success, because there won't be one — every batch
+	 * carries the same broken field until the client is fixed and restarted.
+	 */
+	private volatile String halted;
+
+	/** What the server currently believes, so we only call on a real change. */
+	private volatile boolean publishedState;
+
 	@Getter
 	private volatile String status = "Not uploading";
 
 	@Inject
 	UploadService(EverykillConfig config, UploadClient client, UploadIdentity identity,
-		ScheduledExecutorService executor)
+		ScheduledExecutorService executor, Client gameClient, ClientThread clientThread)
 	{
 		this.config = config;
 		this.client = client;
 		this.identity = identity;
 		this.executor = executor;
+		this.gameClient = gameClient;
+		this.clientThread = clientThread;
 	}
 
 	/** Queues a kill. Cheap and non-blocking — safe from the client thread. */
@@ -102,6 +126,15 @@ public class UploadService
 
 	private void flush()
 	{
+		if (halted != null)
+		{
+			// deliberately sticky. it clears on restart or on toggling upload, both
+			// of which follow fixing the client - retrying a known-broken payload on
+			// a timer just burns the rate limit.
+			status = halted;
+			return;
+		}
+
 		if (!config.uploadEnabled() || config.uploadUrl().trim().isEmpty())
 		{
 			status = "Uploading is off";
@@ -131,6 +164,7 @@ public class UploadService
 				return;
 			}
 
+			syncPublishState();
 			sendNextBatch();
 		}
 		catch (RuntimeException e)
@@ -193,6 +227,18 @@ public class UploadService
 		client.send(config.uploadUrl(), identity.getToken(), batch,
 			result ->
 			{
+				if (result.systemicReason != null)
+				{
+					// every record failed the same way, so the data is fine and we
+					// are not. keep the batch, stop trying, and make it visible -
+					// a player whose uploads have silently halted deserves to know.
+					halted = "Upload stopped: " + result.systemicReason;
+					status = halted;
+					log.warn("everykill: upload halted, client fault: {}", result.systemicReason);
+					inFlight.set(false);
+					return;
+				}
+
 				if (result.unauthorised)
 				{
 					// token is dead, the batch stays. clearing only the token keeps
@@ -247,6 +293,128 @@ public class UploadService
 	public void acknowledgeRecoveryCode()
 	{
 		identity.acknowledgeRecoveryCode();
+	}
+
+	/**
+	 * Sends the publish state when the toggle has moved, and nothing otherwise.
+	 *
+	 * <p>The name is read from the client HERE and never stored: no field on
+	 * {@code KillRecord}, nothing in {@link UploadIdentity}, nothing in the ledger. A
+	 * name that is never held cannot ride along by accident.
+	 *
+	 * <p>{@code getLocalPlayer().getName()} is the display name. {@code getUsername()}
+	 * is the LOGIN, which on a Jagex account is an email address — a credential, and
+	 * the published policy states we hold none. It must never be sent.
+	 */
+	private void syncPublishState()
+	{
+		final boolean wanted = config.publishName();
+		if (wanted == publishedState)
+		{
+			return;
+		}
+
+		if (!wanted)
+		{
+			client.publish(config.uploadUrl(), identity.getToken(), null,
+				msg ->
+				{
+					publishedState = false;
+					log.debug("everykill: {}", msg);
+				},
+				err -> log.debug("everykill: could not withdraw name: {}", err));
+			return;
+		}
+
+		// read on the client thread, used once, not kept.
+		clientThread.invoke(() ->
+		{
+			final Player me = gameClient.getLocalPlayer();
+			final String name = me == null ? null : me.getName();
+			if (name == null || name.isEmpty())
+			{
+				// not logged in yet. try again on the next flush rather than
+				// publishing a blank.
+				return;
+			}
+
+			client.publish(config.uploadUrl(), identity.getToken(), name,
+				msg ->
+				{
+					publishedState = true;
+					log.debug("everykill: {}", msg);
+				},
+				err -> log.debug("everykill: could not publish name: {}", err));
+		});
+	}
+
+	/**
+	 * Writes everything the server holds to a file the user can open.
+	 *
+	 * <p>Runs on the scheduler: the request is async but the file write is not, and
+	 * neither belongs on the client thread.
+	 */
+	public void exportData(Consumer<String> onDone, Consumer<String> onError)
+	{
+		if (!identity.isRegistered())
+		{
+			onError.accept("Nothing uploaded yet");
+			return;
+		}
+
+		client.export(config.uploadUrl(), identity.getToken(),
+			json -> executor.execute(() ->
+			{
+				try
+				{
+					final Path out = RuneLite.RUNELITE_DIR.toPath()
+						.resolve("everykill-plugin")
+						.resolve("everykill-export.json");
+					Files.createDirectories(out.getParent());
+					Files.write(out, json.getBytes(StandardCharsets.UTF_8));
+					onDone.accept(out.toString());
+				}
+				catch (IOException e)
+				{
+					onError.accept("Could not write the file: " + e.getMessage());
+				}
+			}),
+			onError);
+	}
+
+	/**
+	 * Erases everything server-side, then forgets the local identity.
+	 *
+	 * <p>The local wipe matters: keeping the client id after the account is gone
+	 * would silently re-register into a new empty account on the next flush, which
+	 * looks like the deletion failed.
+	 */
+	public void eraseData(Consumer<String> onDone, Consumer<String> onError)
+	{
+		if (!identity.isRegistered())
+		{
+			onError.accept("Nothing uploaded yet");
+			return;
+		}
+
+		client.erase(config.uploadUrl(), identity.getToken(),
+			json -> executor.execute(() ->
+			{
+				identity.forget();
+				synchronized (pending)
+				{
+					pending.clear();
+				}
+				status = "Deleted";
+				onDone.accept("Deleted from the server");
+			}),
+			onError);
+	}
+
+	/** Non-null when uploading has stopped because of a client fault. */
+	public String getHalted()
+	{
+		return halted;
 	}
 
 	/** Kills queued but not yet sent. */
