@@ -32,9 +32,6 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.border.CompoundBorder;
-import javax.swing.JComponent;
-import javax.swing.JMenuItem;
-import javax.swing.JPopupMenu;
 import net.runelite.client.util.LinkBrowser;
 import okhttp3.HttpUrl;
 import net.runelite.client.game.ItemManager;
@@ -302,13 +299,11 @@ public class EverykillPanel extends PluginPanel
 		final List<NpcStat> rows = statsForWindow();
 		monsterHeader.setText(window.tooltip.toUpperCase() + " · " + rows.size());
 
-		int shown = 0;
+		// no cap. it used to stop at 12, which quietly hid the 13th row the header was
+		// already counting - and expanding a row pushed others off the end, so the list
+		// appeared to lose monsters when you clicked one. the panel scrolls; let it.
 		for (NpcStat stat : rows)
 		{
-			if (shown++ >= 12)
-			{
-				break;
-			}
 			monsterList.add(row(stat));
 		}
 
@@ -607,17 +602,46 @@ public class EverykillPanel extends PluginPanel
 		LinkBrowser.browse(url.toString());
 	}
 
-	/** Right-click menu with a wiki link, so a left click still expands the row. */
-	private static void wikiMenu(JComponent on, String type, int id, String name)
+	/**
+	 * A small "w" button that opens the wiki.
+	 *
+	 * <p>Visible rather than a right-click menu - a hidden context menu is a feature
+	 * nobody finds. Kept to one character because the panel is 225px and the button
+	 * sits beside a name that can already be long.
+	 */
+	private static JLabel wikiButton(String type, int id, String name)
 	{
-		final JPopupMenu menu = new JPopupMenu();
-		menu.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
+		final JLabel b = new JLabel("w");
+		b.setFont(FontManager.getRunescapeSmallFont());
+		b.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+		b.setBorder(BorderFactory.createEmptyBorder(0, 6, 0, 4));
+		b.setToolTipText("Open the wiki page");
+		b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-		final JMenuItem open = new JMenuItem("Wiki");
-		open.addActionListener(e -> wiki(type, id, name));
-		menu.add(open);
+		b.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseClicked(MouseEvent e)
+			{
+				// consume it, or the row's own listener toggles the expand as well.
+				e.consume();
+				wiki(type, id, name);
+			}
 
-		on.setComponentPopupMenu(menu);
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				b.setForeground(ColorScheme.BRAND_ORANGE);
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				b.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+			}
+		});
+
+		return b;
 	}
 
 	/** 1.2m, 340k, 900. Long numbers in a 225px panel are unreadable. */
@@ -639,8 +663,8 @@ public class EverykillPanel extends PluginPanel
 	{
 		final JPanel p = new JPanel(new BorderLayout());
 		p.setBackground(NEST_BG);
-		p.setBorder(BorderFactory.createEmptyBorder(1, 7, 1, 7));
-		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 14));
+		p.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 8));
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 17));
 		p.setAlignmentX(LEFT_ALIGNMENT);
 
 		final JLabel l = new JLabel(label);
@@ -686,7 +710,7 @@ public class EverykillPanel extends PluginPanel
 		// ours read as a wall - see the panel research in FINDINGS.
 		final JPanel p = new JPanel(new BorderLayout());
 		p.setBackground(TITLE_BG);
-		p.setBorder(BorderFactory.createEmptyBorder(5, 7, 5, 7));
+		p.setBorder(BorderFactory.createEmptyBorder(7, 8, 7, 6));
 
 		final JLabel name = new JLabel((expandable ? (open ? "▾ " : "▸ ") : "") + label(stat));
 		name.setFont(FontManager.getRunescapeSmallFont());
@@ -696,13 +720,18 @@ public class EverykillPanel extends PluginPanel
 		count.setFont(FontManager.getRunescapeSmallFont());
 		count.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 
+		final JPanel right = new JPanel(new BorderLayout());
+		right.setOpaque(false);
+		right.add(count, BorderLayout.CENTER);
+		right.add(wikiButton("npc", stat.npcId, stat.name), BorderLayout.EAST);
+
 		p.add(name, BorderLayout.WEST);
-		p.add(count, BorderLayout.EAST);
+		p.add(right, BorderLayout.EAST);
 
 		final JPanel wrap = new JPanel();
 		wrap.setLayout(new BoxLayout(wrap, BoxLayout.Y_AXIS));
 		wrap.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		wrap.setBorder(BorderFactory.createEmptyBorder(0, 0, 4, 0));
+		wrap.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
 		wrap.setToolTipText(tooltip(stat));
 		wrap.add(p);
 
@@ -710,9 +739,6 @@ public class EverykillPanel extends PluginPanel
 		// children for exactly this reason - a row that highlights in pieces looks
 		// broken.
 		hoverable(wrap, p);
-
-		// right-click rather than left, so the left click still expands the row.
-		wikiMenu(wrap, "npc", stat.npcId, stat.name);
 
 		// no sparkline, no grade bar under every row. a 35-day sparkline on a monster
 		// you killed today is one tick in an empty box, and a coloured bar under each
@@ -795,7 +821,7 @@ public class EverykillPanel extends PluginPanel
 		l.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
 		l.setOpaque(true);
 		l.setBackground(NEST_BG);
-		l.setBorder(BorderFactory.createEmptyBorder(4, 7, 2, 0));
+		l.setBorder(BorderFactory.createEmptyBorder(6, 10, 3, 0));
 		l.setAlignmentX(LEFT_ALIGNMENT);
 		return l;
 	}
@@ -811,8 +837,8 @@ public class EverykillPanel extends PluginPanel
 	{
 		final JPanel p = new JPanel(new BorderLayout());
 		p.setBackground(NEST_BG);
-		p.setBorder(BorderFactory.createEmptyBorder(1, 7, 1, 7));
-		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 18));
+		p.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 8));
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 20));
 		p.setAlignmentX(LEFT_ALIGNMENT);
 
 		// an id is not a name, but it beats showing nothing when the composition
@@ -880,18 +906,21 @@ public class EverykillPanel extends PluginPanel
 			p.setToolTipText(tip.append("</html>").toString());
 		}
 
+		final JPanel tail = new JPanel(new BorderLayout());
+		tail.setOpaque(false);
+		tail.add(count, BorderLayout.CENTER);
 		try
 		{
-			wikiMenu(p, "item", Integer.parseInt(itemId), tally.name);
+			tail.add(wikiButton("item", Integer.parseInt(itemId), tally.name), BorderLayout.EAST);
 		}
 		catch (NumberFormatException e)
 		{
-			// a key that isn't an id can't be looked up. no menu, row still draws.
+			// a key that isn't an id can't be looked up. no button, row still draws.
 		}
 
 		p.add(icon, BorderLayout.WEST);
 		p.add(left, BorderLayout.CENTER);
-		p.add(count, BorderLayout.EAST);
+		p.add(tail, BorderLayout.EAST);
 		return p;
 	}
 

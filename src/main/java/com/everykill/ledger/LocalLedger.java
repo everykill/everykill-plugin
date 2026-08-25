@@ -198,8 +198,10 @@ public class LocalLedger
 		// should read "0 kills dry", not 1. only CONFIRMED and PROBABLE loot is filed:
 		// UNKNOWN means we couldn't say which of two identical monsters earned it, and
 		// filing it anyway would put a guess in the drop history permanently.
-		if (kill.lootConfidence == LootConfidence.CONFIRMED
-			|| kill.lootConfidence == LootConfidence.PROBABLE)
+		final boolean fileDrops = kill.lootConfidence == LootConfidence.CONFIRMED
+			|| kill.lootConfidence == LootConfidence.PROBABLE;
+
+		if (fileDrops)
 		{
 			stat.recordDrops(kill.drops, kill.timestampMillis);
 		}
@@ -207,6 +209,14 @@ public class LocalLedger
 		final NpcStat sessionStat = session.computeIfAbsent(kill.npcId,
 			k -> new NpcStat(kill.npcId, kill.npcName));
 		sessionStat.record(kill.grade, kill.timestampMillis, kill.myDamage, kill.othersDamage);
+
+		// the session row needs its own copy. it isn't the same object as the all-time
+		// row, so filing drops once only fed the All tab and the Now tab showed a
+		// monster with no drops under it.
+		if (fileDrops)
+		{
+			sessionStat.recordDrops(kill.drops, kill.timestampMillis);
+		}
 
 		sessionKills++;
 		sessionGrades.merge(kill.grade, 1, Integer::sum);
