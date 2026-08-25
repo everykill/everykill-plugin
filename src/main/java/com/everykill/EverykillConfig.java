@@ -149,7 +149,7 @@ public interface EverykillConfig extends Config
 	@ConfigItem(
 		keyName = "uploadEnabled",
 		name = "Upload to the site",
-		description = "Sends your recorded kills so your profile and hiscore ranks update.",
+		description = "Sends your recorded kills so your profile and hiscore ranks update. Each kill sends: monster id and name, combat level, region, kill grade, your damage and other players' damage, hit counts, fight length, and the items dropped. Your account is identified by a salted hash - your RSN is never sent.",
 		warning = "This feature submits your IP address to a 3rd-party server not controlled or verified by RuneLite developers",
 		position = 31,
 		section = uploadSection

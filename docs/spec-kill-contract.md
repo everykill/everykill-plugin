@@ -40,9 +40,36 @@ One kill, as it leaves the detector.
 | `hitsCount` | int | Our hitsplats with damage > 0. |
 | `maxHit` | int | Our largest single hitsplat this fight. |
 | `timestampMillis` | long | Client clock. |
+| `fightTicks` | int | Ticks from **our first damage** to the kill resolving. **`0` means unmeasured, not instant** — a kill we never damaged never reaches the ledger at all, so 0 here means the fight length could not be established. Never treat it as a real duration. |
+| `drops` | array | What the server said this kill dropped. Empty is not "no loot" — see `lootConfidence`. Each entry: `itemId` int, `quantity` int, `name` string (may be null), `price` int (may be 0). |
+| `lootConfidence` | enum | `confirmed` / `probable` / `unknown` / `none`. See below. |
 
 `totalDamage()` is `myDamage + othersDamage` and is derived — do not store it as a
 column you can disagree with.
+
+### `lootConfidence` — how much the drop list can be trusted
+
+Separate from `grade`, which is about the *kill*. A kill can be perfectly attributed
+and its loot still ambiguous.
+
+| Value | Means | Safe for drop rates? |
+|---|---|---|
+| `confirmed` | One loot event, kill uncontested | **Yes** |
+| `probable` | Loot is ours, but the kill was deduced or contested | Totals only |
+| `unknown` | Two same-id monsters died on one tick; we cannot say which earned it | **No** |
+| `none` | Server reported nothing | **No** — see below |
+
+**`none` does not mean "dropped nothing".** It is any of: a genuinely lootless
+monster, an ironman's voided drop, or us missing the event. The client cannot tell
+these apart and does not try. Resolving it is an **ingest-side** job using
+`always_drops` — a monster with a guaranteed drop and no loot event was not dry, we
+missed it. `spec-reference-data.md` keeps that table server-side deliberately.
+
+**Ironman accounts:** outside damage voids the drop entirely, so a contested kill on
+an ironman is `unknown` rather than `probable`. Measured 2026-08-24: 9 clean kills →
+9 loot events, 8 contested → **zero**, including one at 90% damage share. The rule is
+absolute, not proportional. Group ironman is conservative — a groupmate is not an
+outsider, but the record does not carry who dealt what.
 
 ### Dedupe on `(account, eventId)`
 
