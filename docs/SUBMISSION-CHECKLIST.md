@@ -11,15 +11,15 @@ Review focuses on **two things only**: security, and Jagex game-rule compliance.
 ## 1. Mechanical requirements
 
 - [ ] **Public GitHub repository**
-- [ ] **`LICENSE` at repo root** — BSD 2-Clause, `Copyright (c) 2026, Delkyy`
-- [ ] **Java 11** language level in `build.gradle`
-- [ ] **`runeLiteVersion = 'latest.release'`**
-- [ ] **`runelite-plugin.properties`** complete: `displayName`, `author`, `description`, `tags`, `plugins`, `version`, `build`
-- [ ] **`build=standard`** — replaces our `build.gradle`/`settings.gradle` at submission and qualifies for **expedited review**. Only possible with zero custom dependencies
-- [ ] **`icon.png`** at repo root, max **48×72 px**, a genuine PNG (not a renamed JPEG or ICO), optimised — Java loads images at full resolution in memory
-- [ ] **README** describing what the plugin does
-- [ ] **No `META-INF/services/net.runelite.client.plugins.Plugin` file**
-- [ ] **No build artifacts committed** — no `.class` files, no `out/`, no `.tmp` directories
+- [x] **`LICENSE` at repo root** — BSD 2-Clause, `Copyright (c) 2026, Delkyy`
+- [x] **Java 11** language level in `build.gradle` — `options.release.set(11)`, verified 2026-08-25
+- [x] **`runeLiteVersion = 'latest.release'`** — verified 2026-08-25
+- [x] **`runelite-plugin.properties`** complete: `displayName`, `author`, `description`, `tags`, `plugins`, `version`, `build`
+- [x] **`build=standard`** — replaces our `build.gradle`/`settings.gradle` at submission and qualifies for **expedited review**. Only possible with zero custom dependencies
+- [x] **`icon.png`** at repo root — 48x48 RGBA PNG, 578 bytes, magic-byte checked 2026-08-25;, max **48×72 px**, a genuine PNG (not a renamed JPEG or ICO), optimised — Java loads images at full resolution in memory
+- [x] **README** describing what the plugin does
+- [x] **No `META-INF/services/net.runelite.client.plugins.Plugin` file** — verified absent 2026-08-25
+- [x] **No build artifacts committed** — `git ls-files` finds zero `.class`/`out/` 2026-08-25 — no `.class` files, no `out/`, no `.tmp` directories
 
 ---
 
@@ -27,12 +27,12 @@ Review focuses on **two things only**: security, and Jagex game-rule compliance.
 
 The template ships with placeholder names. Every one must be gone.
 
-- [ ] Package path renamed — no `com.example`
-- [ ] Class names renamed
-- [ ] **Config group renamed** — must be specific (`everykill`, not `example` or `everykill`)
-- [ ] `build.gradle` group renamed
-- [ ] `settings.gradle` project name renamed
-- [ ] `runelite-plugin.properties` updated
+- [x] Package path renamed — no `com.example`
+- [x] Class names renamed
+- [x] **Config group renamed** — `everykill`, verified 2026-08-25 — must be specific (`everykill`, not `example` or `everykill`)
+- [x] `build.gradle` group renamed
+- [x] `settings.gradle` project name renamed
+- [x] `runelite-plugin.properties` updated
 
 ⚠️ **The config group rename must happen before any real user data exists.** Renaming a config group without a migration silently resets every user's saved settings.
 
@@ -42,10 +42,10 @@ The template ships with placeholder names. Every one must be gone.
 
 Automated scanning checks for these. Any one is an instant rejection.
 
-- [ ] No **reflection**
-- [ ] No **JNI or JNA**
-- [ ] No native memory access via **Unsafe** or **LWJGL**
-- [ ] No **`Process` or `ProcessBuilder`**
+- [x] No **reflection** — only `java.lang.reflect.Type` for Gson `TypeToken`, which is core's own pattern; no `invoke`/`setAccessible`/`forName`. Verified 2026-08-25
+- [x] No **JNI or JNA** — verified 2026-08-25
+- [x] No native memory access via **Unsafe** or **LWJGL** — verified 2026-08-25
+- [x] No **`Process` or `ProcessBuilder`** — verified 2026-08-25
 - [ ] No **downloading or dynamic loading of code**, including classloading
 - [ ] No **runtime code generation**
 - [ ] No **Java serialization**
