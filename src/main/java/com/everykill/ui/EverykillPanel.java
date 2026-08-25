@@ -111,7 +111,8 @@ public class EverykillPanel extends PluginPanel
 	{
 		KILLS("Kill log"),
 		SESSION("Session"),
-		RECORDS("Records");
+		RECORDS("Records"),
+		ACCOUNT("Account");
 
 		private final String label;
 
@@ -616,6 +617,11 @@ public class EverykillPanel extends PluginPanel
 	 */
 	private JPanel recoveryBanner(String code)
 	{
+		// wording note: this used to say the code alone was the way back. it is the
+		// code AND the account still existing server-side. delk kept a code from a
+		// dev run and it was worthless, because the salt had rotated and the server
+		// had never heard of that client id. on a real deployment the salt is fixed
+		// and the promise holds - but the banner should not claim more than it can.
 		final JPanel p = new JPanel();
 		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
 		p.setBackground(SITE_PANEL);
@@ -635,7 +641,8 @@ public class EverykillPanel extends PluginPanel
 		value.setAlignmentX(LEFT_ALIGNMENT);
 
 		final JLabel why = new JLabel("<html>Shown once. Your account name is never sent,"
-			+ " so this is the only way back to your history if you reinstall.</html>");
+			+ " so this code and the id on this computer are the only way back to your"
+			+ " history.</html>");
 		why.setFont(FontManager.getRunescapeSmallFont());
 		why.setForeground(SITE_FG_DIM);
 		why.setAlignmentX(LEFT_ALIGNMENT);
@@ -692,6 +699,57 @@ public class EverykillPanel extends PluginPanel
 	}
 
 	/** Export and delete, as the privacy policy promises. */
+	/**
+	 * Upload state, the recovery code, and the data rights buttons.
+	 *
+	 * <p>Everything here is about the ACCOUNT rather than the current sitting, which
+	 * is why it left the Session tab — a recovery banner sitting on top of your
+	 * kills/xp/elapsed pushed the actual session data down the panel and stayed there
+	 * until dismissed.
+	 */
+	private void buildAccount()
+	{
+		monsterHeader.setText("ACCOUNT");
+
+		final String recovery = uploadService.getRecoveryCode();
+		if (recovery != null)
+		{
+			monsterList.add(recoveryBanner(recovery));
+			monsterList.add(javax.swing.Box.createVerticalStrut(6));
+		}
+
+		monsterList.add(sectionLine("UPLOAD"));
+		monsterList.add(detailLine("status", uploadService.getStatus()));
+
+		final int queued = uploadService.queued();
+		if (queued > 0)
+		{
+			monsterList.add(detailLine("waiting", String.valueOf(queued)));
+		}
+
+		final int dropped = uploadService.dropped();
+		if (dropped > 0)
+		{
+			monsterList.add(detailLine("dropped", String.valueOf(dropped)));
+		}
+
+		final String halted = uploadService.getHalted();
+		if (halted != null)
+		{
+			final JLabel warn = new JLabel("<html>" + halted
+				+ "<br>Your kills are safe and still queued.</html>");
+			warn.setFont(FontManager.getRunescapeSmallFont());
+			warn.setForeground(SITE_ACC);
+			warn.setAlignmentX(LEFT_ALIGNMENT);
+			warn.setBorder(BorderFactory.createEmptyBorder(2, 0, 4, 0));
+			monsterList.add(warn);
+		}
+
+		monsterList.add(javax.swing.Box.createVerticalStrut(8));
+		monsterList.add(sectionLine("YOUR DATA"));
+		monsterList.add(dataRights());
+	}
+
 	private JPanel dataRights()
 	{
 		final JPanel row = new JPanel(new java.awt.GridLayout(1, 2, 6, 0));
@@ -770,12 +828,6 @@ public class EverykillPanel extends PluginPanel
 	{
 		monsterHeader.setText("THIS SESSION");
 
-		final String recovery = uploadService.getRecoveryCode();
-		if (recovery != null)
-		{
-			monsterList.add(recoveryBanner(recovery));
-			monsterList.add(javax.swing.Box.createVerticalStrut(6));
-		}
 
 		final int kills = ledger.getSessionKills();
 		final long xp = ledger.sessionXp();
@@ -811,8 +863,8 @@ public class EverykillPanel extends PluginPanel
 			return;
 		}
 
-		// spec-plugin-ux 1b: upload state plain and always visible. a queue that is
-		// silently not draining is the failure mode people only notice weeks later.
+		// spec-plugin-ux 1b wants upload state always visible, so a one-line summary
+		// stays here; the detail and the account controls live on the Account tab.
 		monsterList.add(sectionLine("UPLOAD"));
 		monsterList.add(detailLine("status", uploadService.getStatus()));
 
@@ -821,30 +873,6 @@ public class EverykillPanel extends PluginPanel
 		{
 			monsterList.add(detailLine("waiting", String.valueOf(queued)));
 		}
-
-		// a halt is a client fault, not a hiccup. it says so and stays saying so.
-		final String halted = uploadService.getHalted();
-		if (halted != null)
-		{
-			final JLabel warn = new JLabel("<html>" + halted
-				+ "<br>Your kills are safe and still queued.</html>");
-			warn.setFont(FontManager.getRunescapeSmallFont());
-			warn.setForeground(SITE_ACC);
-			warn.setAlignmentX(LEFT_ALIGNMENT);
-			warn.setBorder(BorderFactory.createEmptyBorder(2, 0, 4, 0));
-			monsterList.add(warn);
-		}
-
-		final int dropped = uploadService.dropped();
-		if (dropped > 0)
-		{
-			// surfaced rather than swallowed. if the queue is shedding records the
-			// user is entitled to know their data is not all arriving.
-			monsterList.add(detailLine("dropped", String.valueOf(dropped)));
-		}
-
-		// the published policy promises both of these work from inside the plugin.
-		monsterList.add(dataRights());
 
 		monsterList.add(javax.swing.Box.createVerticalStrut(6));
 		monsterList.add(sectionLine("BY MONSTER"));
@@ -1278,6 +1306,12 @@ public class EverykillPanel extends PluginPanel
 		if (view == View.SESSION)
 		{
 			buildSession();
+			return;
+		}
+
+		if (view == View.ACCOUNT)
+		{
+			buildAccount();
 			return;
 		}
 
