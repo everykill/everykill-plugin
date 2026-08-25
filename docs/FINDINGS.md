@@ -1644,7 +1644,7 @@ For ironman accounts the rule needs no threshold and no per-boss lookup: **any k
 > treated as the mechanism.
 
 **Status:** verified — measured live, two accounts, Edgeville Dungeon multicombat
-**Method:** Zelnork (ironman) attacked giant rats while a second player attacked the same rat, first landing real hits and then deliberately splashing. Temporary instrumentation in `KillDetector.onHitsplatApplied` logged **every** hitsplat on an NPC including the ones the existing filter discards, because "no event arrived" and "event arrived and we binned it" are indistinguishable from outside.
+**Method:** the ironman account attacked giant rats while a second player attacked the same rat, first landing real hits and then deliberately splashing. Temporary instrumentation in `KillDetector.onHitsplatApplied` logged **every** hitsplat on an NPC including the ones the existing filter discards, because "no event arrived" and "event arrived and we binned it" are indistinguishable from outside.
 
 **The setup was proven good before the result was taken.** The other player's real hits appear on the exact npc the ironman was fighting:
 
@@ -1748,7 +1748,7 @@ So the ironman problem is real but **shallower than the superseded entry claimed
 ## 2026-08-24 — measured: an ironman gets NOTHING from a contested kill, even at 90% of the damage
 
 **Status:** verified — 17 kills, live, two accounts, Edgeville Dungeon multicombat
-**Method:** Zelnork (ironman) killed giant rats while a second player attacked the same rats. Kills and `loottracker_add_loot` script events matched **by timestamp**, not by proximity in the log (see the method warning below).
+**Method:** the ironman account killed giant rats while a second player attacked the same rats. Kills and `loottracker_add_loot` script events matched **by timestamp**, not by proximity in the log (see the method warning below).
 
 | kill | my damage | share | server loot event |
 |---|---|---|---|
@@ -2026,7 +2026,7 @@ Both routes to getting it client-side are named and rejected at `:240-241` — *
 
 ## 2026-08-24 — account type verified live: GROUP_IRONMAN resolves through the clan channel, not the varbit
 
-**Status:** verified — live, 2026-08-24 16:25, account Zelnork (group ironman)
+**Status:** verified — live, 2026-08-24 16:25, account the group-ironman account
 
 ```
 Kill: npc_id=7263 name=Ghost grade=UNCONTESTED ... account=GROUP_IRONMAN loot=NONE drops=-
@@ -2038,7 +2038,7 @@ One line, three things proven:
 2. **The varbit-only path was right to refuse.** Before the clan check existed, the same account reported `GROUP_UNRESOLVED` rather than guessing at `MAIN` or `IRONMAN`. Both guesses would have been wrong and neither would have looked wrong.
 3. **`loot=NONE drops=-` on a ghost is correct, not a miss.** `always_drops.tsv` has no rows for Ghost, and the server reported nothing. Reference data and live behaviour agree.
 
-**Process note, and it cost time.** `account=GROUP_UNRESOLVED` appeared on a kill, and it was assumed to be account osiriz — a main — which made it look like a mapping bug. Temporary diagnostics went in to chase it. The user corrected it in three words: that was Zelnork, a group ironman, and the plugin had been reporting the truth the whole time.
+**Process note, and it cost time.** `account=GROUP_UNRESOLVED` appeared on a kill, and it was assumed to be a main account — a main — which made it look like a mapping bug. Temporary diagnostics went in to chase it. The user corrected it in three words: that was the ironman account, a group ironman, and the plugin had been reporting the truth the whole time.
 
 **The account in use is part of the evidence.** A log line saying something surprising about account type is not evidence of a bug until you know which account produced it. Same shape as reading a cumulative field as a per-kill one: the number was right, the assumption about what it described was not.
 

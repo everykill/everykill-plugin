@@ -492,7 +492,7 @@ public class EverykillPlugin extends Plugin
 
 		// group ironman isn't in that varbit at all - core's own switch has no case for
 		// it and falls through. it lives in the group's clan channel instead, which is
-		// how NameAutocompleter finds it. verified live 2026-08-24: zelnork is a GIM and
+		// how NameAutocompleter finds it. verified live 2026-08-24: the test account is a GIM and
 		// the varbit alone reported UNRESOLVED.
 		if (fromVarbit == AccountType.GROUP_UNRESOLVED
 			&& client.getClanSettings(ClanID.GROUP_IRONMAN) != null)
