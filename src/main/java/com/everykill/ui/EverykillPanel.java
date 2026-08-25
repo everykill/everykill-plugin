@@ -623,46 +623,6 @@ public class EverykillPanel extends PluginPanel
 	private static final Color NEST_BG = SITE_PANEL;
 
 	/**
-	 * Highlights a whole row on hover.
-	 *
-	 * <p>Recurses into children because a row that lights up in pieces looks broken -
-	 * {@code GrandExchangeItemPanel.matchComponentBackground} does the same. The title
-	 * strip keeps its own darker shade, so it is passed separately rather than being
-	 * flattened to match the body.
-	 */
-	private static void hoverable(JPanel row, JPanel title)
-	{
-		row.addMouseListener(new MouseAdapter()
-		{
-			@Override
-			public void mouseEntered(MouseEvent e)
-			{
-				paint(SITE_LINE, SITE_LINE.darker());
-			}
-
-			@Override
-			public void mouseExited(MouseEvent e)
-			{
-				paint(SITE_PANEL, TITLE_BG);
-			}
-
-			private void paint(Color body, Color header)
-			{
-				row.setBackground(body);
-				for (Component c : row.getComponents())
-				{
-					if (c == title)
-					{
-						continue;
-					}
-					c.setBackground(body);
-				}
-				title.setBackground(header);
-			}
-		});
-	}
-
-	/**
 	 * What this pile is worth, for sorting. Zero when the price is unknown.
 	 *
 	 * <p>Sorting on value rather than quantity is the difference between a drop list
@@ -869,11 +829,6 @@ public class EverykillPanel extends PluginPanel
 		wrap.setToolTipText(tooltip(stat));
 		wrap.add(p);
 
-		// hover the whole row, not just the label under the pointer. core recurses into
-		// children for exactly this reason - a row that highlights in pieces looks
-		// broken.
-		hoverable(wrap, p);
-
 		// no sparkline, no grade bar under every row. a 35-day sparkline on a monster
 		// you killed today is one tick in an empty box, and a coloured bar under each
 		// row is the wall the box layout just fixed. both facts live in the tooltip.
@@ -950,29 +905,33 @@ public class EverykillPanel extends PluginPanel
 		return wrap;
 	}
 
-	/** Separator above the drop list, so it doesn't read as more skill lines. */
-	private static JLabel dropHeader(NpcStat stat)
+	/** DROPS heading with the pile's total value aligned over the gp column. */
+	private static JPanel dropHeader(NpcStat stat)
 	{
-
 		long total = 0L;
 		for (Map.Entry<String, NpcStat.DropTally> e : stat.drops.entrySet())
 		{
 			total += valueOf(e.getValue());
 		}
 
-		final JLabel l = new JLabel("DROPS" + (total > 0 ? "   " + gp(total) + " gp" : ""));
+		final JPanel p = new JPanel(new BorderLayout());
+		p.setBackground(NEST_BG);
+		p.setBorder(BorderFactory.createEmptyBorder(0, 0, 3, 0));
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 14));
+		p.setAlignmentX(LEFT_ALIGNMENT);
+
+		final JLabel l = new JLabel("DROPS");
 		l.setFont(FontManager.getRunescapeSmallFont());
 		l.setForeground(SITE_FG_FAINT);
-		l.setOpaque(true);
-		l.setBackground(NEST_BG);
 
-		// a hairline above it, so the drops read as their own group rather than more
-		// detail lines. cheaper than a gap and it survives a narrow panel.
-		l.setBorder(BorderFactory.createCompoundBorder(
-			BorderFactory.createMatteBorder(1, 0, 0, 0, SITE_LINE),
-			BorderFactory.createEmptyBorder(6, 10, 3, 0)));
-		l.setAlignmentX(LEFT_ALIGNMENT);
-		return l;
+		// sits directly above the per-item gp, so the column adds up visually.
+		final JLabel t = new JLabel(total > 0 ? gp(total) + " gp" : "");
+		t.setFont(FontManager.getRunescapeSmallFont());
+		t.setForeground(SITE_FG_FAINT);
+
+		p.add(l, BorderLayout.WEST);
+		p.add(t, BorderLayout.EAST);
+		return p;
 	}
 
 	/**
@@ -1018,23 +977,24 @@ public class EverykillPanel extends PluginPanel
 			// no icon is survivable; a missing row is not.
 		}
 
-		final StringBuilder right = new StringBuilder();
-		right.append(tally.quantity);
-		if (tally.drops > 1 && tally.quantity != tally.drops)
-		{
-			// 400 bones over 400 drops says nothing extra. 3960 coins over 40 drops
-			// does, so only show the split when the two differ.
-			right.append("  (").append(tally.drops).append(')');
-		}
-
-		final JLabel count = new JLabel(right.toString());
+		// how many on the left of the name, what it's worth on the right. the two
+		// numbers answer different questions and putting both on the same side made
+		// you read them as one.
+		final JLabel count = new JLabel(String.valueOf(tally.quantity));
 		count.setFont(FontManager.getRunescapeSmallFont());
-		count.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		count.setForeground(SITE_FG_DIM);
+		count.setHorizontalAlignment(SwingConstants.RIGHT);
+		count.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
+		count.setPreferredSize(new Dimension(24, count.getPreferredSize().height));
+
+		final long value = valueOf(tally);
+		final JLabel worth = new JLabel(value > 0 ? gp(value) : "");
+		worth.setFont(FontManager.getRunescapeSmallFont());
+		worth.setForeground(SITE_FG_DIM);
 
 		// gp and dry streak in the tooltip. both are worth knowing and neither is worth
 		// a permanent column in a 225px panel.
 		final StringBuilder tip = new StringBuilder("<html>");
-		final long value = valueOf(tally);
 		if (value > 0)
 		{
 			tip.append(gp(value)).append(" gp total");
@@ -1092,9 +1052,14 @@ public class EverykillPanel extends PluginPanel
 			// a key that isn't an id can't be looked up. no link, row still draws.
 		}
 
-		p.add(icon, BorderLayout.WEST);
+		final JPanel head = new JPanel(new BorderLayout());
+		head.setOpaque(false);
+		head.add(count, BorderLayout.WEST);
+		head.add(icon, BorderLayout.EAST);
+
+		p.add(head, BorderLayout.WEST);
 		p.add(left, BorderLayout.CENTER);
-		p.add(count, BorderLayout.EAST);
+		p.add(worth, BorderLayout.EAST);
 		return p;
 	}
 
