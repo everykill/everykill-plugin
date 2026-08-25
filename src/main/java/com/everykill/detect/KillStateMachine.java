@@ -110,6 +110,12 @@ public class KillStateMachine
 
 		if (mine)
 		{
+			if (r.firstDamageTick == 0)
+			{
+				// a zero splat still starts the fight - you swung and connected with
+				// its defence. it's an attempt, and attacksCount already counts it.
+				r.firstDamageTick = tick;
+			}
 			r.myDamage += amount;
 
 			// a zero splat is still an attempt. blocks and splashes are the whole point
@@ -380,7 +386,12 @@ public class KillStateMachine
 			r.attacksCount,
 			r.hitsCount,
 			r.maxHit,
-			System.currentTimeMillis()));
+			System.currentTimeMillis(),
+			java.util.Collections.emptyList(),
+			com.everykill.model.LootConfidence.NONE,
+			// ticks we were actually fighting it. 0 when we never damaged it, so
+			// nothing downstream mistakes "unknown" for "instant".
+			r.firstDamageTick == 0 ? 0 : Math.max(1, tick - r.firstDamageTick)));
 	}
 
 	/**
@@ -417,6 +428,15 @@ public class KillStateMachine
 		private int hitsCount;
 		private int maxHit;
 		private int lastTick;
+
+		/**
+		 * Tick of the first damage WE dealt, not of the spawn.
+		 *
+		 * <p>A fight starts when you hit it. Measuring from spawn would count the walk
+		 * over, and measuring from the first foreign hit would credit us someone else's
+		 * head start. 0 means we never damaged it.
+		 */
+		private int firstDamageTick;
 
 		private Record(int npcId, String name, int combatLevel, int regionId, int tick)
 		{

@@ -646,6 +646,33 @@ public class EverykillPanel extends PluginPanel
 			monsterList.add(javax.swing.Box.createVerticalStrut(4));
 		}
 
+		// fastest fight we've measured, across every monster. ticks * 0.6 = seconds.
+		NpcStat fastest = null;
+		for (NpcStat stat : all)
+		{
+			if (stat.fastestTicks > 0
+				&& (fastest == null || stat.fastestTicks < fastest.fastestTicks))
+			{
+				fastest = stat;
+			}
+		}
+
+		if (fastest != null)
+		{
+			monsterList.add(recordCard("FASTEST KILL",
+				String.format("%.1fs", fastest.fastestTicks * 0.6),
+				fastest.name + "  ·  " + fastest.fastestTicks + " ticks"));
+			monsterList.add(javax.swing.Box.createVerticalStrut(4));
+		}
+
+		final int bestSession = ledger.getBestSessionKills();
+		if (bestSession > 0)
+		{
+			monsterList.add(recordCard("BEST SESSION", bestSession + " kills",
+				"most in one sitting"));
+			monsterList.add(javax.swing.Box.createVerticalStrut(4));
+		}
+
 		// best day, summed across every monster. the day buckets already exist for the
 		// Day/Wk/Mth tabs - nothing new is stored for this.
 		final Map<String, Integer> byDay = new HashMap<>();

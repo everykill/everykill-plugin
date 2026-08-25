@@ -37,6 +37,11 @@ import net.runelite.client.config.ConfigManager;
 public class LocalLedger
 {
 	private static final String LEDGER_KEY = "ledger";
+
+	// its own key rather than a field inside the ledger json - the ledger persists a
+	// bare Map<String, NpcStat> and adding a sibling would change that shape for
+	// every existing save.
+	private static final String BEST_SESSION_KEY = "bestSessionKills";
 	private static final Type LEDGER_TYPE = new TypeToken<HashMap<String, NpcStat>>()
 	{
 	}.getType();
@@ -53,6 +58,8 @@ public class LocalLedger
 
 	@Getter
 	private int sessionKills;
+
+	private int bestSessionKills;
 
 	@Getter
 	private long sessionStartMillis = System.currentTimeMillis();
@@ -83,6 +90,10 @@ public class LocalLedger
 
 	public void load()
 	{
+		final Integer best = configManager.getRSProfileConfiguration(EverykillConfig.GROUP,
+			BEST_SESSION_KEY, int.class);
+		bestSessionKills = best == null ? 0 : best;
+
 		loadFailed = false;
 
 		try
@@ -193,6 +204,7 @@ public class LocalLedger
 			stat.combatLevel = kill.combatLevel;
 		}
 		stat.record(kill.grade, kill.timestampMillis, kill.myDamage, kill.othersDamage);
+		stat.recordFight(kill.fightTicks);
 
 		// after record(), so total() already counts this kill - a drop on kill 500
 		// should read "0 kills dry", not 1. only CONFIRMED and PROBABLE loot is filed:
@@ -209,6 +221,7 @@ public class LocalLedger
 		final NpcStat sessionStat = session.computeIfAbsent(kill.npcId,
 			k -> new NpcStat(kill.npcId, kill.npcName));
 		sessionStat.record(kill.grade, kill.timestampMillis, kill.myDamage, kill.othersDamage);
+		sessionStat.recordFight(kill.fightTicks);
 
 		// the session row needs its own copy. it isn't the same object as the all-time
 		// row, so filing drops once only fed the All tab and the Now tab showed a
@@ -219,6 +232,15 @@ public class LocalLedger
 		}
 
 		sessionKills++;
+
+		// high-water mark across every session, because only the CURRENT one is kept
+		// in memory - without this a personal best dies when the client closes.
+		if (sessionKills > bestSessionKills)
+		{
+			bestSessionKills = sessionKills;
+			configManager.setRSProfileConfiguration(EverykillConfig.GROUP,
+				BEST_SESSION_KEY, bestSessionKills);
+		}
 		sessionGrades.merge(kill.grade, 1, Integer::sum);
 
 		// the fight's xp landed before this row existed. claim it now.
@@ -291,6 +313,12 @@ public class LocalLedger
 	}
 
 	/** All-time stats, most-killed first. */
+	/** Most kills in any one session, ever. 0 until a session has ended a kill. */
+	public int getBestSessionKills()
+	{
+		return bestSessionKills;
+	}
+
 	public List<NpcStat> allTimeSorted()
 	{
 		final List<NpcStat> out = new ArrayList<>(allTime.values());

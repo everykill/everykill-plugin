@@ -71,6 +71,14 @@ public class NpcStat
 	/** kills that contributed to the damage totals above. the denominator. */
 	public int killsWithDamage;
 
+	/**
+	 * Fewest ticks from our first damage to the kill, ever. 0 when never measured.
+	 *
+	 * <p>Only kills we actually fought count - a kill we walked in on has no fight
+	 * length, and letting a 0 win the minimum would make every monster look instant.
+	 */
+	public int fastestTicks;
+
 	// what this monster has dropped, keyed by item id. a tally, not a log - storing
 	// every drop event grows without bound on something you kill thousands of times,
 	// and the panel wants "how many bones have i had", not when each one landed.
@@ -95,6 +103,15 @@ public class NpcStat
 	 * quantity — a monster dropping bones twice in one death is still one roll, and
 	 * counting it twice would inflate the numerator of every rate built on this.
 	 */
+	/** Keeps the fastest fight we've measured. Ignores 0, which means unmeasured. */
+	public void recordFight(int ticks)
+	{
+		if (ticks > 0 && (fastestTicks == 0 || ticks < fastestTicks))
+		{
+			fastestTicks = ticks;
+		}
+	}
+
 	public void recordDrops(List<Drop> kill, long whenMillis)
 	{
 		if (kill == null || kill.isEmpty())

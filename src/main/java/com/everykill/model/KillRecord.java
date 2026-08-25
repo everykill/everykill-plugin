@@ -52,6 +52,15 @@ public class KillRecord
 	public final long timestampMillis;
 
 	/**
+	 * Ticks from our first damage to the kill resolving, or 0 when unknown.
+	 *
+	 * <p>Ticks rather than millis because the game runs on them - a 0.6s tick is the
+	 * real resolution, and wall-clock adds jitter that isn't in the fight. 0 means we
+	 * never damaged it, so there is no fight to time.
+	 */
+	public final int fightTicks;
+
+	/**
 	 * What the server said this kill dropped. Empty until loot resolves on the tick
 	 * boundary, and empty forever for a kill that never got a loot event — see
 	 * {@link #lootConfidence} before reading anything into that.
@@ -67,13 +76,13 @@ public class KillRecord
 	{
 		this(eventId, npcId, npcName, combatLevel, regionId, grade, signal, myDamage,
 			othersDamage, attacksCount, hitsCount, maxHit, timestampMillis,
-			Collections.emptyList(), LootConfidence.NONE);
+			Collections.emptyList(), LootConfidence.NONE, 0);
 	}
 
 	public KillRecord(String eventId, int npcId, String npcName, int combatLevel, int regionId,
 		Confidence grade, DeathSignal signal, int myDamage, int othersDamage,
 		int attacksCount, int hitsCount, int maxHit, long timestampMillis,
-		List<Drop> drops, LootConfidence lootConfidence)
+		List<Drop> drops, LootConfidence lootConfidence, int fightTicks)
 	{
 		this.eventId = eventId;
 		this.npcId = npcId;
@@ -88,6 +97,7 @@ public class KillRecord
 		this.hitsCount = hitsCount;
 		this.maxHit = maxHit;
 		this.timestampMillis = timestampMillis;
+		this.fightTicks = fightTicks;
 		this.drops = Collections.unmodifiableList(drops);
 		this.lootConfidence = lootConfidence;
 	}
@@ -103,7 +113,7 @@ public class KillRecord
 	{
 		return new KillRecord(eventId, npcId, npcName, combatLevel, regionId, grade, signal,
 			myDamage, othersDamage, attacksCount, hitsCount, maxHit, timestampMillis,
-			drops, lootConfidence);
+			drops, lootConfidence, fightTicks);
 	}
 
 	// ours + everyone else's, but only since we engaged - the record opens on the
