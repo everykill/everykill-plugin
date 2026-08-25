@@ -339,9 +339,32 @@ public class EverykillPanel extends PluginPanel
 		left.add(mark, BorderLayout.WEST);
 		left.add(name, BorderLayout.CENTER);
 
+		// the whole lockup is the link, mark included - that's how the site's nav
+		// works and it's a much bigger target than 'site' on its own.
+		left.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		left.setToolTipText("Open everykill.gg");
+		left.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseClicked(MouseEvent e)
+			{
+				LinkBrowser.browse("https://everykill.gg");
+			}
+
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				name.setForeground(SITE_ACC);
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				name.setForeground(SITE_FG);
+			}
+		});
+
 		bar.add(left, BorderLayout.WEST);
-		bar.add(linkLabel("site ↗", "Open everykill.gg",
-			() -> LinkBrowser.browse("https://everykill.gg")), BorderLayout.EAST);
 		return bar;
 	}
 
@@ -623,11 +646,73 @@ public class EverykillPanel extends PluginPanel
 			monsterList.add(javax.swing.Box.createVerticalStrut(4));
 		}
 
+		// best day, summed across every monster. the day buckets already exist for the
+		// Day/Wk/Mth tabs - nothing new is stored for this.
+		final Map<String, Integer> byDay = new HashMap<>();
+		for (NpcStat stat : all)
+		{
+			if (stat.days == null)
+			{
+				continue;
+			}
+			for (Map.Entry<String, NpcStat.DayTally> e : stat.days.entrySet())
+			{
+				final NpcStat.DayTally d = e.getValue();
+				byDay.merge(e.getKey(), d.uncontested + d.inferred + d.ambiguous, Integer::sum);
+			}
+		}
+
+		String bestDay = null;
+		int bestDayKills = 0;
+		for (Map.Entry<String, Integer> e : byDay.entrySet())
+		{
+			if (e.getValue() > bestDayKills)
+			{
+				bestDayKills = e.getValue();
+				bestDay = e.getKey();
+			}
+		}
+
+		if (bestDay != null && bestDayKills > 0)
+		{
+			monsterList.add(recordCard("BEST DAY", bestDayKills + " kills", bestDay));
+			monsterList.add(javax.swing.Box.createVerticalStrut(4));
+		}
+
 		if (mostKilled != null && mostKilled.total() > 0)
 		{
 			monsterList.add(recordCard("MOST KILLED", mostKilled.name,
 				mostKilled.total() + " kills"));
 			monsterList.add(javax.swing.Box.createVerticalStrut(4));
+		}
+
+		// how far up MilestoneNotifier's own ladder the biggest monster has climbed,
+		// and what's next. same numbers it announces in chat, so they agree.
+		if (mostKilled != null)
+		{
+			final int[] ladder = {100, 250, 500, 1000, 2500, 5000, 10000};
+			int passed = 0;
+			int next = 0;
+			for (int rung : ladder)
+			{
+				if (mostKilled.total() >= rung)
+				{
+					passed = rung;
+				}
+				else
+				{
+					next = rung;
+					break;
+				}
+			}
+
+			if (passed > 0 || next > 0)
+			{
+				monsterList.add(recordCard("MILESTONE",
+					passed > 0 ? passed + " " + mostKilled.name : "none yet",
+					next > 0 ? (next - mostKilled.total()) + " to " + next : "ladder complete"));
+				monsterList.add(javax.swing.Box.createVerticalStrut(4));
+			}
 		}
 
 		if (firstEver != Long.MAX_VALUE)
