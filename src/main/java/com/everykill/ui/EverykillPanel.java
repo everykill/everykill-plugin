@@ -147,7 +147,7 @@ public class EverykillPanel extends PluginPanel
 		this.clientThread = clientThread;
 
 		setLayout(new BorderLayout());
-		setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 2));
+		setBorder(BorderFactory.createEmptyBorder(8, 0, 8, 0));
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
 
 		final JPanel body = new JPanel();
@@ -348,7 +348,7 @@ public class EverykillPanel extends PluginPanel
 		final JPanel p = new JPanel();
 		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
 		p.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		p.setBorder(BorderFactory.createEmptyBorder(7, 8, 7, 8));
+		p.setBorder(BorderFactory.createEmptyBorder(7, 5, 7, 5));
 		return p;
 	}
 
@@ -893,9 +893,13 @@ public class EverykillPanel extends PluginPanel
 	{
 		// the per-skill split is all-time and session only. day buckets keep a total,
 		// not a breakdown, so a windowed row has nothing honest to expand into.
+		// day buckets keep a total, not a breakdown - so in a windowed view the xp
+		// split and the drop list are ALL-TIME numbers, not that period's. they used to
+		// be suppressed entirely, which left Day/Wk/Mth rows with no dropdown at all.
+		// showing them labelled beats hiding them; spec says degrade, don't guess.
 		final boolean windowed = window != Window.ALL && window != Window.SESSION;
-		final boolean hasSkills = !windowed && stat.xpBySkill != null && !stat.xpBySkill.isEmpty();
-		final boolean hasDrops = !windowed && stat.drops != null && !stat.drops.isEmpty();
+		final boolean hasSkills = stat.xpBySkill != null && !stat.xpBySkill.isEmpty();
+		final boolean hasDrops = stat.drops != null && !stat.drops.isEmpty();
 		final boolean expandable = hasSkills || hasDrops;
 		final boolean open = expanded.contains(stat.npcId);
 
@@ -956,7 +960,7 @@ public class EverykillPanel extends PluginPanel
 				detail.setBackground(NEST_BG);
 				detail.setBorder(BorderFactory.createCompoundBorder(
 					BorderFactory.createMatteBorder(1, 0, 0, 0, SITE_LINE),
-					BorderFactory.createEmptyBorder(8, 4, 8, 4)));
+					BorderFactory.createEmptyBorder(8, 5, 8, 5)));
 				detail.setAlignmentX(LEFT_ALIGNMENT);
 
 				// the headline numbers as centred blocks - big value, small caption
@@ -968,8 +972,9 @@ public class EverykillPanel extends PluginPanel
 				stats.setMaximumSize(new Dimension(Short.MAX_VALUE, 34));
 
 				final long perKill = stat.total() > 0 ? stat.xp / stat.total() : 0L;
-				stats.add(statBlock(shortXp(perKill), "xp/kill"));
-				stats.add(statBlock(stat.uncontested + "/" + stat.total(), "clean"));
+				stats.add(statBlock(shortXp(perKill), windowed ? "xp/kill*" : "xp/kill"));
+				stats.add(statBlock(stat.uncontested + "/" + stat.total(),
+					windowed ? "clean*" : "clean"));
 				if (stat.lastKillMillis > 0)
 				{
 					stats.add(statBlock(ago(stat.lastKillMillis).replace(" ago", ""), "ago"));
@@ -980,7 +985,7 @@ public class EverykillPanel extends PluginPanel
 				if (hasSkills)
 				{
 					detail.add(javax.swing.Box.createVerticalStrut(10));
-					detail.add(sectionLine("XP"));
+					detail.add(sectionLine(windowed ? "XP  (ALL TIME)" : "XP"));
 					stat.xpBySkill.entrySet().stream()
 						.sorted(Map.Entry.<String, Long>comparingByValue().reversed())
 						.forEach(e -> detail.add(skillLine(e.getKey(), e.getValue())));
@@ -989,7 +994,7 @@ public class EverykillPanel extends PluginPanel
 				if (hasDrops)
 				{
 					detail.add(javax.swing.Box.createVerticalStrut(10));
-					detail.add(dropHeader(stat));
+					detail.add(dropHeader(stat, windowed));
 
 					// by total value, not quantity. nobody opens a drop list to find
 					// out how many bones they have.
@@ -1007,7 +1012,7 @@ public class EverykillPanel extends PluginPanel
 	}
 
 	/** DROPS heading with the pile's total value aligned over the gp column. */
-	private JPanel dropHeader(NpcStat stat)
+	private JPanel dropHeader(NpcStat stat, boolean windowed)
 	{
 		long total = 0L;
 		for (Map.Entry<String, NpcStat.DropTally> e : stat.drops.entrySet())
@@ -1021,7 +1026,7 @@ public class EverykillPanel extends PluginPanel
 		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 14));
 		p.setAlignmentX(LEFT_ALIGNMENT);
 
-		final JLabel l = new JLabel("DROPS");
+		final JLabel l = new JLabel(windowed ? "DROPS  (ALL TIME)" : "DROPS");
 		l.setFont(FontManager.getRunescapeSmallFont());
 		l.setForeground(SITE_FG_FAINT);
 
