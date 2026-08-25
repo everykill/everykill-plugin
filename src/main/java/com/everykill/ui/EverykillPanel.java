@@ -685,10 +685,12 @@ public class EverykillPanel extends PluginPanel
 		long firstEver = Long.MAX_VALUE;
 
 		String bestItem = null;
+		int bestItemId = -1;
 		long bestValue = 0L;
 		String bestFrom = null;
 
 		String driestItem = null;
+		int driestItemId = -1;
 		int driestKills = 0;
 		String driestFrom = null;
 
@@ -722,6 +724,7 @@ public class EverykillPanel extends PluginPanel
 				{
 					bestValue = each;
 					bestItem = tally.name == null ? "item " + e.getKey() : tally.name;
+					bestItemId = itemIdOf(e.getKey());
 					bestFrom = stat.name;
 				}
 
@@ -732,6 +735,7 @@ public class EverykillPanel extends PluginPanel
 					{
 						driestKills = since;
 						driestItem = tally.name == null ? "item " + e.getKey() : tally.name;
+						driestItemId = itemIdOf(e.getKey());
 						driestFrom = stat.name;
 					}
 				}
@@ -759,14 +763,14 @@ public class EverykillPanel extends PluginPanel
 		if (bestItem != null)
 		{
 			monsterList.add(recordCard("MOST VALUABLE DROP", bestItem,
-				gp(bestValue) + " gp  ·  " + bestFrom));
+				gp(bestValue) + " gp  ·  " + bestFrom, bestItemId));
 			monsterList.add(javax.swing.Box.createVerticalStrut(4));
 		}
 
 		if (driestItem != null && driestKills > 0)
 		{
 			monsterList.add(recordCard("LONGEST DRY STREAK", driestItem,
-				driestKills + " kills since  ·  " + driestFrom));
+				driestKills + " kills since  ·  " + driestFrom, driestItemId));
 			monsterList.add(javax.swing.Box.createVerticalStrut(4));
 		}
 
@@ -785,7 +789,8 @@ public class EverykillPanel extends PluginPanel
 		{
 			monsterList.add(recordCard("FASTEST KILL",
 				String.format("%.1fs", fastest.fastestTicks * 0.6),
-				fastest.name + "  ·  " + fastest.fastestTicks + " ticks"));
+				fastest.name + "  ·  " + fastest.fastestTicks + " ticks",
+				npcIcons.forName(fastest.name)));
 			monsterList.add(javax.swing.Box.createVerticalStrut(4));
 		}
 
@@ -833,7 +838,7 @@ public class EverykillPanel extends PluginPanel
 		if (mostKilled != null && mostKilled.total() > 0)
 		{
 			monsterList.add(recordCard("MOST KILLED", mostKilled.name,
-				mostKilled.total() + " kills"));
+				mostKilled.total() + " kills", npcIcons.forName(mostKilled.name)));
 			monsterList.add(javax.swing.Box.createVerticalStrut(4));
 		}
 
@@ -880,7 +885,33 @@ public class EverykillPanel extends PluginPanel
 	}
 
 	/** One record: a small caps heading, the answer, and what backs it. */
-	private static JPanel recordCard(String heading, String value, String detail)
+	/** The drops map is keyed on item id as a string. -1 when it isn't a number. */
+	private static int itemIdOf(String key)
+	{
+		try
+		{
+			return Integer.parseInt(key);
+		}
+		catch (NumberFormatException e)
+		{
+			return -1;
+		}
+	}
+
+	private JPanel recordCard(String heading, String value, String detail)
+	{
+		return recordCard(heading, value, detail, -1);
+	}
+
+	/**
+	 * A record card with the thing it is about drawn beside it.
+	 *
+	 * <p>{@code itemId} is a real item for drop records and a stand-in from
+	 * {@link NpcIcons} for monster records — the panel cannot tell the difference and
+	 * does not need to. -1 draws no icon, which is the normal case for a monster that
+	 * is not in the table.
+	 */
+	private JPanel recordCard(String heading, String value, String detail, int itemId)
 	{
 		final JPanel p = new JPanel();
 		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
@@ -912,7 +943,29 @@ public class EverykillPanel extends PluginPanel
 		p.add(h);
 		p.add(v);
 		p.add(d);
-		return p;
+
+		if (itemId <= 0)
+		{
+			return p;
+		}
+
+		// icon to the left of the whole card, so the text column still lines up with
+		// the cards that have no icon.
+		final JLabel face = new JLabel();
+		face.setPreferredSize(new Dimension(38, 32));
+		face.setHorizontalAlignment(SwingConstants.CENTER);
+		itemManager.getImage(itemId, 1, false).addTo(face);
+
+		final JPanel withIcon = new JPanel(new BorderLayout());
+		withIcon.setBackground(SITE_PANEL);
+		withIcon.setBorder(BorderFactory.createLineBorder(SITE_LINE, 1));
+		withIcon.setAlignmentX(LEFT_ALIGNMENT);
+		withIcon.setMaximumSize(new Dimension(Short.MAX_VALUE, 58));
+
+		p.setBorder(BorderFactory.createEmptyBorder(7, 4, 8, 8));
+		withIcon.add(face, BorderLayout.WEST);
+		withIcon.add(p, BorderLayout.CENTER);
+		return withIcon;
 	}
 
 	private void refreshPrices(List<NpcStat> rows)
@@ -1659,6 +1712,10 @@ public class EverykillPanel extends PluginPanel
 			}
 		}
 
+		// pin the height. without a maximum, BoxLayout treats every row as stretchable
+		// and redistributes space when a sibling expands - which is what squashed the
+		// collapsed rows and clipped their names.
+		wrap.setMaximumSize(new Dimension(Short.MAX_VALUE, wrap.getPreferredSize().height));
 		return wrap;
 	}
 
