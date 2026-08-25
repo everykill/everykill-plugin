@@ -55,9 +55,26 @@ import net.runelite.client.ui.PluginPanel;
  */
 public class EverykillPanel extends PluginPanel
 {
+	// the site's palette, from everykill-site/styles.css. one product, one look - and
+	// these are close enough to ColorScheme that the panel still reads as runelite.
+	//   --panel     #16181d   row background
+	//   --bg-alt    #101216   title strip, darker than the row
+	//   --line      #23262d   rules
+	//   --fg        #e8eaed   the thing itself
+	//   --fg-dim    #9aa0a8   supporting numbers
+	//   --fg-faint  #63696f   headings, absent values
+	//   --acc       #d94f2b   "rs-adjacent rust, not jagex gold"
+	private static final Color SITE_PANEL = new Color(0x16, 0x18, 0x1d);
+	private static final Color SITE_BG_ALT = new Color(0x10, 0x12, 0x16);
+	private static final Color SITE_LINE = new Color(0x23, 0x26, 0x2d);
+	private static final Color SITE_FG = new Color(0xe8, 0xea, 0xed);
+	private static final Color SITE_FG_DIM = new Color(0x9a, 0xa0, 0xa8);
+	private static final Color SITE_FG_FAINT = new Color(0x63, 0x69, 0x6f);
+	private static final Color SITE_ACC = new Color(0xd9, 0x4f, 0x2b);
+
 	// core's own supporting-text grey. was a hand-picked 0x8e8e8e, which is the same
 	// idea two shades off - matching ColorScheme is how the panel looks native.
-	private static final Color SUBTLE = ColorScheme.LIGHT_GRAY_COLOR;
+	private static final Color SUBTLE = SITE_FG_DIM;
 
 	private final LocalLedger ledger;
 	private final MilestoneNotifier notifier;
@@ -116,7 +133,7 @@ public class EverykillPanel extends PluginPanel
 		this.itemManager = itemManager;
 
 		setLayout(new BorderLayout());
-		setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+		setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 2));
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
 
 		final JPanel body = new JPanel();
@@ -144,7 +161,15 @@ public class EverykillPanel extends PluginPanel
 
 		// the default is 1px per notch, which makes a long list feel broken.
 		scroll.getVerticalScrollBar().setUnitIncrement(16);
-		scroll.getVerticalScrollBar().setPreferredSize(new Dimension(8, 0));
+
+		// PluginPanel hands us PANEL_WIDTH + SCROLLBAR_WIDTH and expects the extra 17px
+		// to belong to the bar - its own comment says "prevent scrollbar overlapping
+		// over contents". our scroll pane didn't reserve it, so the bar sat on top of
+		// the counts. give the bar its width and pad the content off it.
+		scroll.getVerticalScrollBar().setPreferredSize(new Dimension(9, 0));
+		scroll.getVerticalScrollBar().setBorder(
+			BorderFactory.createEmptyBorder(0, 2, 0, 2));
+		top.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 4));
 
 		add(scroll, BorderLayout.CENTER);
 	}
@@ -539,14 +564,14 @@ public class EverykillPanel extends PluginPanel
 	 * The title-strip background. Core uses {@code DARKER_GRAY_COLOR.darker()} on every
 	 * LootTrackerBox header so an entry reads as one object rather than adjacent lines.
 	 */
-	private static final Color TITLE_BG = ColorScheme.DARKER_GRAY_COLOR.darker();
+	private static final Color TITLE_BG = SITE_BG_ALT;
 
 	/**
 	 * Background for expanded detail. Slightly lifted off the row body so nesting is
 	 * visible - an 8px indent alone left skill and drop lines floating with nothing
 	 * tying them to their monster.
 	 */
-	private static final Color NEST_BG = new Color(38, 38, 38);
+	private static final Color NEST_BG = SITE_PANEL;
 
 	/**
 	 * Highlights a whole row on hover.
@@ -563,13 +588,13 @@ public class EverykillPanel extends PluginPanel
 			@Override
 			public void mouseEntered(MouseEvent e)
 			{
-				paint(ColorScheme.DARK_GRAY_HOVER_COLOR, ColorScheme.DARKER_GRAY_HOVER_COLOR);
+				paint(SITE_LINE, SITE_LINE.darker());
 			}
 
 			@Override
 			public void mouseExited(MouseEvent e)
 			{
-				paint(ColorScheme.DARKER_GRAY_COLOR, TITLE_BG);
+				paint(SITE_PANEL, TITLE_BG);
 			}
 
 			private void paint(Color body, Color header)
@@ -631,7 +656,7 @@ public class EverykillPanel extends PluginPanel
 	{
 		final JLabel b = new JLabel("w");
 		b.setFont(FontManager.getRunescapeSmallFont());
-		b.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+		b.setForeground(SITE_FG_FAINT);
 		b.setBorder(BorderFactory.createEmptyBorder(0, 6, 0, 4));
 		b.setToolTipText("Open the wiki page");
 		b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -649,13 +674,13 @@ public class EverykillPanel extends PluginPanel
 			@Override
 			public void mouseEntered(MouseEvent e)
 			{
-				b.setForeground(ColorScheme.BRAND_ORANGE);
+				b.setForeground(SITE_ACC);
 			}
 
 			@Override
 			public void mouseExited(MouseEvent e)
 			{
-				b.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+				b.setForeground(SITE_FG_FAINT);
 			}
 		});
 
@@ -687,11 +712,11 @@ public class EverykillPanel extends PluginPanel
 
 		final JLabel l = new JLabel(label);
 		l.setFont(FontManager.getRunescapeSmallFont());
-		l.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+		l.setForeground(SITE_FG_FAINT);
 
 		final JLabel v = new JLabel(value);
 		v.setFont(FontManager.getRunescapeSmallFont());
-		v.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		v.setForeground(SITE_FG_DIM);
 
 		p.add(l, BorderLayout.WEST);
 		p.add(v, BorderLayout.EAST);
@@ -713,6 +738,34 @@ public class EverykillPanel extends PluginPanel
 		return (mins / 1440) + "d ago";
 	}
 
+	/** The one-line facts row under a monster's name. */
+	private static JLabel summaryLine(String text)
+	{
+		final JLabel l = new JLabel(text);
+		l.setFont(FontManager.getRunescapeSmallFont());
+		l.setForeground(SITE_FG_DIM);
+		l.setOpaque(true);
+		l.setBackground(NEST_BG);
+		l.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 8));
+		l.setAlignmentX(LEFT_ALIGNMENT);
+		return l;
+	}
+
+	/** A small caps heading inside an expanded row, with a rule above it. */
+	private static JLabel sectionLine(String text)
+	{
+		final JLabel l = new JLabel(text);
+		l.setFont(FontManager.getRunescapeSmallFont());
+		l.setForeground(SITE_FG_FAINT);
+		l.setOpaque(true);
+		l.setBackground(NEST_BG);
+		l.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createMatteBorder(1, 0, 0, 0, SITE_LINE),
+			BorderFactory.createEmptyBorder(5, 10, 2, 0)));
+		l.setAlignmentX(LEFT_ALIGNMENT);
+		return l;
+	}
+
 	private JPanel row(NpcStat stat)
 	{
 		// the per-skill split is all-time and session only. day buckets keep a total,
@@ -732,11 +785,11 @@ public class EverykillPanel extends PluginPanel
 
 		final JLabel name = new JLabel((expandable ? (open ? "▾ " : "▸ ") : "") + label(stat));
 		name.setFont(FontManager.getRunescapeSmallFont());
-		name.setForeground(Color.WHITE);
+		name.setForeground(SITE_FG);
 
 		final JLabel count = new JLabel(String.valueOf(countFor(stat)));
 		count.setFont(FontManager.getRunescapeSmallFont());
-		count.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		count.setForeground(SITE_FG_DIM);
 
 		final JPanel right = new JPanel(new BorderLayout());
 		right.setOpaque(false);
@@ -748,7 +801,7 @@ public class EverykillPanel extends PluginPanel
 
 		final JPanel wrap = new JPanel();
 		wrap.setLayout(new BoxLayout(wrap, BoxLayout.Y_AXIS));
-		wrap.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		wrap.setBackground(SITE_PANEL);
 		wrap.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
 		wrap.setToolTipText(tooltip(stat));
 		wrap.add(p);
@@ -779,26 +832,38 @@ public class EverykillPanel extends PluginPanel
 
 			if (open)
 			{
-				// the facts that used to be a sparkline and a coloured bar. as text
-				// they say what they mean, and they only cost space when opened.
-				wrap.add(detailLine("xp per kill",
-					shortXp(stat.total() > 0 ? stat.xp / stat.total() : 0L)));
-
-				if (stat.total() > 0 && stat.uncontested < stat.total())
+				// one summary line, not four stacked label/value rows. these are facts
+				// you glance at - a table of them was the ugliest part of the panel.
+				final StringBuilder facts = new StringBuilder();
+				final long perKill = stat.total() > 0 ? stat.xp / stat.total() : 0L;
+				if (perKill > 0)
 				{
-					wrap.add(detailLine("clean kills",
-						stat.uncontested + " of " + stat.total()));
+					facts.append(shortXp(perKill)).append(" xp/kill");
 				}
-
 				if (stat.lastKillMillis > 0)
 				{
-					wrap.add(detailLine("last killed", ago(stat.lastKillMillis)));
+					if (facts.length() > 0)
+					{
+						facts.append("   ");
+					}
+					facts.append(ago(stat.lastKillMillis));
+				}
+				if (stat.total() > 0 && stat.uncontested < stat.total())
+				{
+					if (facts.length() > 0)
+					{
+						facts.append("   ");
+					}
+					facts.append(stat.uncontested).append('/').append(stat.total()).append(" clean");
+				}
+				if (facts.length() > 0)
+				{
+					wrap.add(summaryLine(facts.toString()));
 				}
 
-				// biggest first. nobody scans an alphabetical list looking for where
-				// their xp went.
 				if (hasSkills)
 				{
+					wrap.add(sectionLine("XP"));
 					stat.xpBySkill.entrySet().stream()
 						.sorted(Map.Entry.<String, Long>comparingByValue().reversed())
 						.forEach(e -> wrap.add(skillLine(e.getKey(), e.getValue())));
@@ -808,9 +873,8 @@ public class EverykillPanel extends PluginPanel
 				{
 					wrap.add(dropHeader(stat));
 
-					// by total value, not quantity. nobody opens a drop list to find out
-					// how many bones they have - the 400 bones would sit on top of the
-					// visitor's item forever.
+					// by total value, not quantity. nobody opens a drop list to find
+					// out how many bones they have.
 					stat.drops.entrySet().stream()
 						.sorted((a, b) -> Long.compare(valueOf(b.getValue()),
 							valueOf(a.getValue())))
@@ -834,14 +898,14 @@ public class EverykillPanel extends PluginPanel
 
 		final JLabel l = new JLabel("DROPS" + (total > 0 ? "   " + gp(total) + " gp" : ""));
 		l.setFont(FontManager.getRunescapeSmallFont());
-		l.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+		l.setForeground(SITE_FG_FAINT);
 		l.setOpaque(true);
 		l.setBackground(NEST_BG);
 
 		// a hairline above it, so the drops read as their own group rather than more
 		// detail lines. cheaper than a gap and it survives a narrow panel.
 		l.setBorder(BorderFactory.createCompoundBorder(
-			BorderFactory.createMatteBorder(1, 0, 0, 0, ColorScheme.DARKER_GRAY_COLOR),
+			BorderFactory.createMatteBorder(1, 0, 0, 0, SITE_LINE),
 			BorderFactory.createEmptyBorder(6, 10, 3, 0)));
 		l.setAlignmentX(LEFT_ALIGNMENT);
 		return l;
@@ -868,7 +932,7 @@ public class EverykillPanel extends PluginPanel
 
 		final JLabel left = new JLabel(label);
 		left.setFont(FontManager.getRunescapeSmallFont());
-		left.setForeground(Color.WHITE);
+		left.setForeground(SITE_FG);
 
 		// the icon, with the stack count drawn into it when there's more than one -
 		// that's what the quantity argument buys. async, so it appears when ready
@@ -945,13 +1009,13 @@ public class EverykillPanel extends PluginPanel
 				@Override
 				public void mouseEntered(MouseEvent e)
 				{
-					left.setForeground(ColorScheme.BRAND_ORANGE);
+					left.setForeground(SITE_ACC);
 				}
 
 				@Override
 				public void mouseExited(MouseEvent e)
 				{
-					left.setForeground(Color.WHITE);
+					left.setForeground(SITE_FG);
 				}
 			});
 		}
