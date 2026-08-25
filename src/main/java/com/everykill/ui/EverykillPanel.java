@@ -30,6 +30,8 @@ import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.ScrollPaneConstants;
+import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 import javax.swing.border.CompoundBorder;
 import net.runelite.client.util.LinkBrowser;
@@ -125,7 +127,26 @@ public class EverykillPanel extends PluginPanel
 		body.add(javax.swing.Box.createVerticalStrut(6));
 		body.add(buildMonsterBox());
 
-		add(body, BorderLayout.NORTH);
+		// a scroll pane, not add(body, NORTH). NORTH hands the child its full preferred
+		// height, so expanding a monster with a long drop list grew the panel until it
+		// stretched the whole client window. CENTER plus a scroll pane means the panel
+		// keeps its size and the content moves instead.
+		final JPanel top = new JPanel(new BorderLayout());
+		top.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		top.add(body, BorderLayout.NORTH);
+
+		final JScrollPane scroll = new JScrollPane(top,
+			ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+			ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+		scroll.setBorder(BorderFactory.createEmptyBorder());
+		scroll.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		scroll.getViewport().setBackground(ColorScheme.DARK_GRAY_COLOR);
+
+		// the default is 1px per notch, which makes a long list feel broken.
+		scroll.getVerticalScrollBar().setUnitIncrement(16);
+		scroll.getVerticalScrollBar().setPreferredSize(new Dimension(8, 0));
+
+		add(scroll, BorderLayout.CENTER);
 	}
 
 	private JPanel buildSessionBox()
@@ -804,7 +825,6 @@ public class EverykillPanel extends PluginPanel
 	/** Separator above the drop list, so it doesn't read as more skill lines. */
 	private static JLabel dropHeader(NpcStat stat)
 	{
-		final int kinds = stat.drops.size();
 
 		long total = 0L;
 		for (Map.Entry<String, NpcStat.DropTally> e : stat.drops.entrySet())
@@ -812,13 +832,17 @@ public class EverykillPanel extends PluginPanel
 			total += valueOf(e.getValue());
 		}
 
-		final JLabel l = new JLabel("drops  ·  " + kinds + (kinds == 1 ? " item" : " items")
-			+ (total > 0 ? "  ·  " + gp(total) + " gp" : ""));
+		final JLabel l = new JLabel("DROPS" + (total > 0 ? "   " + gp(total) + " gp" : ""));
 		l.setFont(FontManager.getRunescapeSmallFont());
 		l.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
 		l.setOpaque(true);
 		l.setBackground(NEST_BG);
-		l.setBorder(BorderFactory.createEmptyBorder(6, 10, 3, 0));
+
+		// a hairline above it, so the drops read as their own group rather than more
+		// detail lines. cheaper than a gap and it survives a narrow panel.
+		l.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createMatteBorder(1, 0, 0, 0, ColorScheme.DARKER_GRAY_COLOR),
+			BorderFactory.createEmptyBorder(6, 10, 3, 0)));
 		l.setAlignmentX(LEFT_ALIGNMENT);
 		return l;
 	}
@@ -903,33 +927,51 @@ public class EverykillPanel extends PluginPanel
 			p.setToolTipText(tip.append("</html>").toString());
 		}
 
-		final JPanel tail = new JPanel(new BorderLayout());
-		tail.setOpaque(false);
-		tail.add(count, BorderLayout.CENTER);
+		// the item name IS the link. a 'w' on every drop row was four extra glyphs in
+		// a column that's already icon + name + count, and the name is a bigger target.
 		try
 		{
-			tail.add(wikiButton("item", Integer.parseInt(itemId), tally.name), BorderLayout.EAST);
+			final int id = Integer.parseInt(itemId);
+			left.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+			left.addMouseListener(new MouseAdapter()
+			{
+				@Override
+				public void mouseClicked(MouseEvent e)
+				{
+					e.consume();
+					wiki("item", id, tally.name);
+				}
+
+				@Override
+				public void mouseEntered(MouseEvent e)
+				{
+					left.setForeground(ColorScheme.BRAND_ORANGE);
+				}
+
+				@Override
+				public void mouseExited(MouseEvent e)
+				{
+					left.setForeground(Color.WHITE);
+				}
+			});
 		}
 		catch (NumberFormatException e)
 		{
-			// a key that isn't an id can't be looked up. no button, row still draws.
+			// a key that isn't an id can't be looked up. no link, row still draws.
 		}
 
 		p.add(icon, BorderLayout.WEST);
 		p.add(left, BorderLayout.CENTER);
-		p.add(tail, BorderLayout.EAST);
+		p.add(count, BorderLayout.EAST);
 		return p;
 	}
 
-	private static JLabel skillLine(String skill, long xp)
+	private static JPanel skillLine(String skill, long xp)
 	{
-		final JLabel l = new JLabel(pretty(skill) + "  " + shortXp(xp));
-		l.setOpaque(true);
-		l.setBackground(NEST_BG);
-		l.setFont(FontManager.getRunescapeSmallFont());
-		l.setForeground(SUBTLE);
-		l.setBorder(BorderFactory.createEmptyBorder(0, 10, 1, 0));
-		return l;
+		// a label/value pair, not one string with spaces in it. the numbers line up on
+		// the right edge with everything else in the expanded row instead of floating
+		// wherever the skill name happens to end.
+		return detailLine(pretty(skill), shortXp(xp));
 	}
 
 	/** HITPOINTS -> Hitpoints. The enum shouts; the panel shouldn't. */
