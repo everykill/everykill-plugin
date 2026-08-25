@@ -179,6 +179,41 @@ public class EverykillPanelRollupTest
 	}
 
 	@Test
+	public void dropsSurviveTheMergeWithTheirNames() throws Exception
+	{
+		// caught live: the panel showed "item 532" while the saved ledger held
+		// "Big bones". every row the panel draws goes through rollUp, including
+		// single-id ones, so anything the merge forgets to copy is invisible.
+		final NpcStat a = stat(2856, "Giant rat", 3, 2);
+		a.recordDrops(java.util.Collections.singletonList(
+			new com.everykill.model.Drop(526, 1, "Bones")), WHEN);
+
+		final NpcStat m = rollUp(Arrays.asList(a)).get(0);
+
+		Assert.assertNotNull("drops carried over", m.drops);
+		Assert.assertEquals("Bones", m.drops.get("526").name);
+		Assert.assertEquals(1L, m.drops.get("526").quantity);
+	}
+
+	@Test
+	public void mergedDropsSumAcrossIds() throws Exception
+	{
+		final NpcStat a = stat(2856, "Giant rat", 3, 5);
+		a.recordDrops(java.util.Collections.singletonList(
+			new com.everykill.model.Drop(526, 1, "Bones")), WHEN);
+
+		final NpcStat b = stat(2864, "Giant rat", 3, 3);
+		b.recordDrops(java.util.Collections.singletonList(
+			new com.everykill.model.Drop(526, 2, "Bones")), WHEN);
+
+		final NpcStat m = rollUp(Arrays.asList(a, b)).get(0);
+
+		Assert.assertEquals(3L, m.drops.get("526").quantity);
+		Assert.assertEquals(2, m.drops.get("526").drops);
+		Assert.assertEquals("Bones", m.drops.get("526").name);
+	}
+
+	@Test
 	public void anEmptyLedgerIsNotAnError() throws Exception
 	{
 		Assert.assertTrue(rollUp(new ArrayList<>()).isEmpty());

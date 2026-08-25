@@ -425,6 +425,14 @@ public class EverykillPanel extends PluginPanel
 			{
 				final NpcStat.DropTally target =
 					into.drops.computeIfAbsent(item, k -> new NpcStat.DropTally());
+
+				// the name too. leaving it out is why the panel showed "item 532"
+				// while the saved ledger held "Big bones" - every row the panel draws
+				// comes through this merge, including single-id ones.
+				if (tally.name != null)
+				{
+					target.name = tally.name;
+				}
 				target.quantity += tally.quantity;
 				target.drops += tally.drops;
 
