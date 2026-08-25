@@ -2237,3 +2237,19 @@ Only an **exact multiple** counts as evidence. A near-match would be a guess, an
 ### Method note
 
 Three tests, one of which exists purely to stop this passing by accident: `theFitIsWhatPicksThePoolNotTheOrderOfSearch` runs the same shape with the wrong pool placed *after* the xp instead of before. If nearness were still deciding, it would pass anyway. A test that cannot fail is not evidence.
+
+---
+
+## 2026-08-24 — Step 8 is client-complete and blocked on one thing: an endpoint
+
+**Status:** the half that does not need a server is done and tested; the half that does is not started, deliberately.
+
+**Done:** `PendingKills` (queue, batching, overflow policy, 8 tests), the config toggle with the hub's mandated warning string and a description that now lists every field sent, and `spec-kill-contract.md` brought level with the code.
+
+**Not done, and not startable:** transport. `@Inject OkHttpClient` + `enqueue()` is twenty lines; what is missing is what to send it to. Writing a client against an imagined response shape means rewriting the retry logic once the real one lands.
+
+**Sent to Gage 2026-08-24 22:18** (cron `67f3e1c1b5b1` → `bot-chat:gage`) asking for five things, in priority order: endpoint URL and method; response shape on partial failure (per-record or all-or-nothing — this decides whether the queue acks per batch or per kill); the auth/identity envelope; batch size and rate limits; and confirmation that dedupe is on `(account, eventId)`.
+
+**Delivery caveat, recorded rather than assumed:** the three earlier Tyler→Gage cron messages today (`2196ac2284fe`, `946fb39286cf`, `123320ea2d8d`) all show `last_status: error` in the job table. Whether they reached him is unverified. Do not assume Gage has seen the damage-share correction, the Nex threshold correction, or the site briefing until he says so.
+
+**Sequencing consequence:** with the snakeling fixed and the Hub blocker list found to be already clear, there is no longer any local work gating the plugin. Everything remaining either needs Gage (transport) or is a feature rather than a fix (Session tab: kills/hr, xp/hr, supplies, task — spec-plugin-ux 1b).

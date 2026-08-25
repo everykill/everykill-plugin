@@ -20,10 +20,10 @@ every bug found so far was found in a client, not in a test run.
 | 2 | isDead despawn fallback | ✅ **verified** | both paths measured, gap is 6 ticks |
 | 3 | Transform deaths | ✅ **verified** | all three cases, twice — see the correction in-step |
 | 4 | NpcChanged phase handling | ✅ **verified** | Nazastarool: 3 deaths, 2 transforms, 1 kill |
-| 5 | Measured XP by damage share | 🟡 **partial** | settle timing fixed + verified; noise floor + snakeling left |
+| 5 | Measured XP by damage share | 🟡 **partial** | snakeling fixed 2026-08-24 (fit-not-nearness); noise floor still unmeasured |
 | 6 | Loot capture (ServerNpcLoot) | ✅ **verified** | cyclops: CONFIRMED, 532x1 + rolled item, live 2026-08-24 |
 | 7 | Loot attribution + account gate | ✅ **verified** | hold-the-kill live; account=GROUP_IRONMAN resolved via clan channel |
-| 8 | Grading, batching, upload | ⬜ not started | — |
+| 8 | Grading, batching, upload | 🟡 **partial** | queue + batching + disclosure done, 8 tests; transport blocked on an endpoint from Gage |
 | 0a | NPC stat table pull | 🟡 **partial** | 4,124 ids pulled and validated; script committed |
 | 0b | always_drops[] pull | ✅ **done (client side)** | 4,339 rows; the cross-check itself is server-side by spec |
 | 0c | Combat formula implementation | ⬜ not started | — |
