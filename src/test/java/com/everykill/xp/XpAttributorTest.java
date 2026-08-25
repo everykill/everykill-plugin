@@ -333,4 +333,53 @@ public class XpAttributorTest
 		Assert.assertEquals("after a reset the first update is a baseline again", 0L, attributed);
 		Assert.assertTrue(!xp.isPrimed());
 	}
+
+	@Test
+	public void theFitIsWhatPicksThePoolNotTheOrderOfSearch()
+	{
+		// same shape as the snakeling case but with the ticks the other way round: the
+		// wrong pool is now LATER, not earlier. if nearness were doing the work this
+		// would still pass by accident, so flipping it proves the fit is deciding.
+		xp.prime(CombatSkill.RANGED, 1_000_000);
+
+		xp.damage(ZULRAH, 19, 100);
+		xp.xpChanged(CombatSkill.RANGED, 1_000_076, 100);
+		xp.damage(SNAKELING, 1, 101);
+		xp.settle(102);
+
+		Assert.assertEquals(76L, xp.xpFor(ZULRAH));
+		Assert.assertEquals(0L, xp.xpFor(SNAKELING));
+	}
+
+	@Test
+	public void twoNpcsHitOnOneTickStillShareTheDrop()
+	{
+		// the fit must not break normal multi-target attribution. 12 + 8 = 20 damage,
+		// 80 xp, and both earned their part of it - this pool fits exactly and the
+		// split runs as it always did.
+		xp.prime(CombatSkill.RANGED, 1_000_000);
+
+		xp.damage(ZULRAH, 12, 100);
+		xp.damage(SNAKELING, 8, 100);
+		xp.xpChanged(CombatSkill.RANGED, 1_000_080, 100);
+		xp.settle(101);
+
+		Assert.assertEquals(48L, xp.xpFor(ZULRAH));
+		Assert.assertEquals(32L, xp.xpFor(SNAKELING));
+	}
+
+	@Test
+	public void anXpAmountThatFitsNoPoolFallsBackToNearness()
+	{
+		// hitpoints pays 1.33 per damage, so damageFor() returns 0 and there is no
+		// exact fit to look for. the old nearest-pool behaviour has to still work, or
+		// every hitpoints drop would strand.
+		xp.prime(CombatSkill.HITPOINTS, 1_000_000);
+
+		xp.damage(ZULRAH, 15, 100);
+		xp.xpChanged(CombatSkill.HITPOINTS, 1_000_019, 100);
+		xp.settle(101);
+
+		Assert.assertEquals(19L, xp.xpFor(ZULRAH));
+	}
 }

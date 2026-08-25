@@ -2202,3 +2202,38 @@ All eight were carried in my own context as "remaining work" across several sess
 **Method note:** the boxes are ticked with the date and the evidence ("verified absent"), not just ticked. A checklist that says done without saying how it was checked is how this drifted in the first place.
 
 **What this means for sequencing:** Step 8 is not gated behind a cleanup pass. The real remaining Hub items are ecosystem ones — stating why this isn't a duplicate of Collection Log Luck / Bossing Info / Dry Rate Tracker, and hosting under the `everykill` org — plus whatever the upload path itself introduces.
+
+---
+
+## 2026-08-24 — the snakeling XP theft is fixed, and the wiki explains why it happens at all
+
+**Status:** fixed, 117 tests green — the first fully green suite since the test was written
+**Sources:** [Hit delay](https://oldschool.runescape.wiki/w/Hit_delay) · [Combat](https://oldschool.runescape.wiki/w/Combat) · project `GAME-MECHANICS.md:60`
+
+### Why the ticks disagree in the first place
+
+I had this logged as "xp lands a tick before its hitsplat" — observed, unexplained. The wiki names the mechanic, under **Processing order delay**:
+
+> *"Attacks will hit on different ticks depending on whether the attacking or defending entity is processed first in a tick. If the entity receiving the hit is processed earlier than the entity dealing the hit, then the hit will be delayed by an additional one tick."*
+>
+> *"**NPCs are processed earlier than players each tick**, so this effect will make all hits on NPCs delayed by an additional one tick."*
+
+So the offset is not a client quirk or a race. It is the engine's turn order, it applies to **every** hit on **every** NPC, and it is therefore permanent. Any attribution built on "the xp and the damage share a tick" was always going to be wrong.
+
+### The fix: search by fit, not by nearness
+
+`allocateAt` walked outward from the xp tick and took the first pool that had any damage in it. In the snakeling case tick 100 held a 1-damage recoil ping, so it won — and banked 76 xp on a monster that took one point of chip damage.
+
+The discriminator was already in our own reference file, `GAME-MECHANICS.md:60`: **4 xp per point of damage for melee and ranged, 2 for magic.** The xp amount *is* a measurement of the damage that earned it. 76 ranged xp means 19 damage. A pool holding 1 damage cannot have produced it, whatever tick it sits on.
+
+So the search now looks for a pool whose total damage **exactly** matches `xp / rate` first, and only falls back to nearness when no pool fits.
+
+### What is deliberately excluded
+
+**Hitpoints and Defence return no expected damage.** Hitpoints pays 1.33 per damage — stored in tenths and rounded, so an exact integer match is not reliable — and Controlled melee pays 1.33 to three skills at once, so a Defence drop has no single rate. Those fall through to the old nearest-pool path, which is tested.
+
+Only an **exact multiple** counts as evidence. A near-match would be a guess, and this is the module where guessing invents xp.
+
+### Method note
+
+Three tests, one of which exists purely to stop this passing by accident: `theFitIsWhatPicksThePoolNotTheOrderOfSearch` runs the same shape with the wrong pool placed *after* the xp instead of before. If nearness were still deciding, it would pass anyway. A test that cannot fail is not evidence.

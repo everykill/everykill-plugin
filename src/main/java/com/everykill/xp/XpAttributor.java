@@ -200,6 +200,34 @@ public class XpAttributor
 	// never hear about it. don't.
 	private boolean allocateAt(CombatSkill skill, long xp, int tick)
 	{
+		// Prefer the pool whose damage ACTUALLY EXPLAINS this xp before falling back to
+		// the nearest one with anything in it.
+		//
+		// The xp amount is a measurement of the damage, not just a number attached to
+		// it: 4 xp per point of damage for melee and ranged, 2 for magic, 1.33 for
+		// hitpoints (GAME-MECHANICS.md, sourced from the Combat and Hitpoints pages).
+		// So a 76 xp ranged drop was earned by 19 damage, and a pool holding 1 damage
+		// cannot have produced it whatever tick it sits on.
+		//
+		// This is what the snakeling case needed. A recoil ping puts 1 damage in tick
+		// 100's pool; our 19 on Zulrah lands in 101 because "NPCs are processed earlier
+		// than players each tick, so this effect will make all hits on NPCs delayed by
+		// an additional one tick" (Hit delay, Processing order delay). Searching by
+		// nearness finds the snakeling first and hands it 76 xp for one point of chip
+		// damage. Searching by fit skips it, because 1 damage explains 4 xp, not 76.
+		final int expected = damageFor(skill, xp);
+		if (expected > 0)
+		{
+			for (int t = tick - SETTLE_TICKS; t <= tick + SETTLE_TICKS; t++)
+			{
+				final Map<Integer, Integer> pool = damageByTick.get(t);
+				if (pool != null && sum(pool) == expected && split(skill, xp, t, tick))
+				{
+					return true;
+				}
+			}
+		}
+
 		for (int t = tick; t <= tick + SETTLE_TICKS; t++)
 		{
 			if (split(skill, xp, t, tick))
@@ -217,6 +245,37 @@ public class XpAttributor
 		}
 
 		return false;
+	}
+
+	/**
+	 * The damage that would produce exactly this much xp, or 0 when we cannot say.
+	 *
+	 * <p>Rates from {@code GAME-MECHANICS.md}. Hitpoints is deliberately excluded: at
+	 * 1.33 xp per damage the rate is stored in tenths and rounded, so an exact integer
+	 * match is not reliable and a near-match would be a guess. Defence is excluded for
+	 * the same reason — Controlled pays 1.33 to three skills, so a Defence drop does
+	 * not have one rate.
+	 */
+	private static int damageFor(CombatSkill skill, long xp)
+	{
+		final int rate;
+		switch (skill)
+		{
+			case ATTACK:
+			case STRENGTH:
+			case RANGED:
+				rate = 4;
+				break;
+			case MAGIC:
+				rate = 2;
+				break;
+			default:
+				return 0;
+		}
+
+		// only an exact multiple is evidence. anything else means this skill was paid
+		// at a rate we did not model, and guessing is worse than falling through.
+		return xp % rate == 0 ? (int) (xp / rate) : 0;
 	}
 
 	private boolean split(CombatSkill skill, long xp, int poolTick, int xpTick)
