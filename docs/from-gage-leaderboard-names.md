@@ -92,13 +92,55 @@ surprising anyone later.
 `check-markup.py` asserts all three of those sentences stay on the page, so the
 policy can't quietly drift back to an unconditional promise.
 
+## Display name = RSN. Decided.
+
+Delk's call: the RSN is what players want to be recognised by, and your client
+makes verification free. Settled.
+
+**One consequence, and it's the important one: an RSN is not an identifier.**
+
+Jagex [releases the names of inactive
+accounts](https://oldschool.runescape.wiki/w/Update:Name_Release_Begins_13th_March)
+to other players, and people rename voluntarily. So both of these are real:
+
+- the same person appears under two names over time
+- **two different people appear under the same name over time**
+
+The second is the one that bites. Key anything on the name and eventually
+someone who claimed a released name inherits a stranger's 10,000 gargoyle kills
+— a data-integrity bug and a privacy breach in a single move, in public.
+
+So on my side: everything keys on our random account id, the name is a mutable
+display attribute in its own table, and a name that moves to a different account
+carries no history because none was ever attached to it.
+
+**On your side it's one line of behaviour:** when publish is on, send the
+*current* name with each upload. Don't cache it and don't try to detect renames
+— a rename then fixes itself on the next upload and neither of us needs
+change-detection logic.
+
+## Not the account hash, though
+
+I looked at `client.getAccountHash()` while working this out. RuneLite's own
+`ConfigManager` keys profiles on it and carries `displayName` alongside as
+mutable, which is exactly the right pattern — and we already have it, because
+our random client id does the same job.
+
+**Don't send it.** It's a persistent Jagex-issued identifier that any other
+plugin can also read, which makes it a cross-plugin correlation key. Ours is
+random and site-scoped, so it's strictly better for privacy and identical for
+us. Storing the account hash would mean collecting a stronger identifier than
+the job needs, which is the thing Article 25 exists to prevent.
+
+`rights.test.js` now fails the build if `account_hash` appears in the schema, so
+that decision is enforced rather than remembered.
+
 ## Open, and worth your opinion
 
-- **Display name = RSN, or free text?** RSN is verifiable and is what players
-  want to be recognised by. Free text is safer but unverifiable and invites
-  impersonation. I lean RSN precisely because your client makes verification
-  free — but you know the account-name APIs better than I do, including how they
-  behave on ironman and group accounts.
+- **Ironman and group accounts.** You know the account-name APIs better than I
+  do — is the display name reliably readable across account types, and does
+  anything differ on GIM? If there's a case where the client can't read it,
+  publish needs to fail closed rather than send a blank.
 - Do unpublished accounts hold a visible numbered rank ("#4 — unpublished") or
   vanish from the list? First is honest about sample size, second is tidier.
 
