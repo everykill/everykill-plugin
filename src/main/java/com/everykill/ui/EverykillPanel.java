@@ -1368,14 +1368,22 @@ public class EverykillPanel extends PluginPanel
 	 */
 	private static JComponent dropBox(JPanel list, int rows)
 	{
-		final int height = Math.min(rows, VISIBLE_DROPS) * DROP_ROW_HEIGHT;
+		// measure, don't assume. a row is 36px of sprite plus its border, so five of
+		// them never fitted in 5 * 36 - the last one clipped and there was no
+		// scrollbar to reach it because the list "fitted".
+		final int rowHeight = rows > 0 && list.getComponentCount() > 0
+			? list.getComponent(0).getPreferredSize().height
+			: DROP_ROW_HEIGHT;
 
 		if (rows <= VISIBLE_DROPS)
 		{
+			// it fits, so let it be exactly as tall as it is.
 			list.setAlignmentX(LEFT_ALIGNMENT);
-			list.setMaximumSize(new Dimension(Short.MAX_VALUE, height));
+			list.setMaximumSize(new Dimension(Short.MAX_VALUE, rows * rowHeight));
 			return list;
 		}
+
+		final int height = VISIBLE_DROPS * rowHeight;
 
 		final JScrollPane box = new JScrollPane(list,
 			ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
@@ -1388,7 +1396,7 @@ public class EverykillPanel extends PluginPanel
 		box.setMaximumSize(new Dimension(Short.MAX_VALUE, height));
 
 		final JScrollBar bar = box.getVerticalScrollBar();
-		bar.setUnitIncrement(DROP_ROW_HEIGHT);
+		bar.setUnitIncrement(rowHeight);
 		bar.setPreferredSize(new Dimension(6, 0));
 		bar.setUI(flatScrollBar());
 
@@ -1565,6 +1573,9 @@ public class EverykillPanel extends PluginPanel
 		final JLabel l = new JLabel(windowed ? "DROPS  (ALL TIME)" : "DROPS");
 		l.setFont(FontManager.getRunescapeSmallFont());
 		l.setForeground(SITE_FG_FAINT);
+		l.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createMatteBorder(0, 2, 0, 0, SITE_ACC),
+			BorderFactory.createEmptyBorder(0, 5, 0, 0)));
 
 		// sits directly above the per-item gp, so the column adds up visually.
 		final JLabel t = new JLabel(total > 0 ? gp(total) + " gp" : "");
@@ -1616,8 +1627,9 @@ public class EverykillPanel extends PluginPanel
 		try
 		{
 			final int id = Integer.parseInt(itemId);
-			final int shown = (int) Math.min(Integer.MAX_VALUE, tally.quantity);
-			itemManager.getImage(id, shown, shown > 1).addTo(icon);
+			// quantity 1: the count column already says how many, and the stack
+			// number baked into the sprite printed it a second time on the icon.
+			itemManager.getImage(id, 1, false).addTo(icon);
 		}
 		catch (RuntimeException e)
 		{
