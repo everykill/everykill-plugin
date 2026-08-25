@@ -66,8 +66,8 @@ public class EverykillOverlay extends OverlayPanel
 		{
 			final NpcStat focus = ledger.sessionFocus();
 			panelComponent.getChildren().add(LineComponent.builder()
-				.left(String.valueOf(kills))
-				.right(focus == null ? "" : String.valueOf(focus.total()))
+				.left(focus == null ? "Everykill" : trim(focus.name))
+				.right(focus == null ? String.valueOf(kills) : focus.total() + " / " + lifetime(focus))
 				.build());
 			return super.render(graphics);
 		}
@@ -85,9 +85,13 @@ public class EverykillOverlay extends OverlayPanel
 		final NpcStat focus = ledger.sessionFocus();
 		if (focus != null)
 		{
+			// spec asks for kills this session AND lifetime kc. session-only was
+			// half the line - the lifetime number is the one you're actually
+			// chasing, and sessionFocus() returns the SESSION row, so it has to be
+			// looked up separately rather than read off the same object.
 			panelComponent.getChildren().add(LineComponent.builder()
 				.left(trim(focus.name))
-				.right(String.valueOf(focus.total()))
+				.right(focus.total() + " / " + lifetime(focus))
 				.build());
 		}
 
@@ -124,6 +128,19 @@ public class EverykillOverlay extends OverlayPanel
 		}
 
 		return super.render(graphics);
+	}
+
+	/**
+	 * Lifetime KC for a monster the session row is tracking.
+	 *
+	 * <p>{@code sessionFocus()} hands back the SESSION stat, whose {@code total()} is
+	 * this sitting's kills. The all-time row is a different object with the same npc
+	 * id, so it has to be fetched rather than read off the one we already have.
+	 */
+	private String lifetime(NpcStat focus)
+	{
+		final NpcStat allTime = ledger.get(focus.npcId);
+		return String.valueOf(allTime == null ? focus.total() : allTime.total());
 	}
 
 	private static String trim(String name)

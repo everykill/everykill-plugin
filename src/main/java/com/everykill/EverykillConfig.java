@@ -25,13 +25,15 @@ public interface EverykillConfig extends Config
 	@ConfigItem(
 		keyName = "showOverlay",
 		name = "Show overlay",
-		description = "Session counter on the game canvas.",
+		description = "Session counter on the game canvas. Off by default - the side panel is the primary surface.",
 		position = 1,
 		section = overlaySection
 	)
 	default boolean showOverlay()
 	{
-		return true;
+		// spec-plugin-ux.md: "Off by default. When on, one compact box." an overlay
+		// nobody asked for is clutter on someone else's screen.
+		return false;
 	}
 
 	@ConfigItem(
@@ -49,13 +51,17 @@ public interface EverykillConfig extends Config
 	@ConfigItem(
 		keyName = "showGradeSplit",
 		name = "Show grade split",
-		description = "Exact / inferred / ambiguous breakdown on the overlay.",
+		description = "Uncontested / inferred / ambiguous breakdown. Off by default - it is a diagnostic, not a session stat.",
 		position = 3,
 		section = overlaySection
 	)
 	default boolean showGradeSplit()
 	{
-		return true;
+		// off by default, and NOT in the spec's overlay list. seeing "ambiguous 1"
+		// appear mid-fight tells you someone is on your target - which is exactly the
+		// in-fight signal the hard limits exist to keep out. useful for verifying
+		// grading, so it stays available; just not on by default.
+		return false;
 	}
 
 	// ------------------------------------------------------------------
