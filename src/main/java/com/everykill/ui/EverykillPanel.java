@@ -12,6 +12,7 @@ import com.everykill.xp.XpService;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.event.MouseAdapter;
@@ -31,6 +32,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.border.CompoundBorder;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.components.materialtabs.MaterialTab;
 import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
@@ -49,11 +51,17 @@ import net.runelite.client.ui.PluginPanel;
  */
 public class EverykillPanel extends PluginPanel
 {
-	private static final Color SUBTLE = new Color(0x8e, 0x8e, 0x8e);
+	// core's own supporting-text grey. was a hand-picked 0x8e8e8e, which is the same
+	// idea two shades off - matching ColorScheme is how the panel looks native.
+	private static final Color SUBTLE = ColorScheme.LIGHT_GRAY_COLOR;
 
 	private final LocalLedger ledger;
 	private final MilestoneNotifier notifier;
 	private final XpService xpService;
+
+	// for drop icons. getImage is async - addTo(label) repaints when it lands, so
+	// nothing blocks swing. same call LootTrackerBox makes.
+	private final ItemManager itemManager;
 
 	private final JLabel sessionKills = new JLabel("0");
 	private final JLabel sessionSub = new JLabel("kills");
@@ -94,12 +102,14 @@ public class EverykillPanel extends PluginPanel
 	}
 
 	@Inject
-	EverykillPanel(LocalLedger ledger, MilestoneNotifier notifier, XpService xpService)
+	EverykillPanel(LocalLedger ledger, MilestoneNotifier notifier, XpService xpService,
+		ItemManager itemManager)
 	{
 		super(false);
 		this.ledger = ledger;
 		this.notifier = notifier;
 		this.xpService = xpService;
+		this.itemManager = itemManager;
 
 		setLayout(new BorderLayout());
 		setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
@@ -504,6 +514,59 @@ public class EverykillPanel extends PluginPanel
 			: stat.totalSince(window.days);
 	}
 
+	/**
+	 * The title-strip background. Core uses {@code DARKER_GRAY_COLOR.darker()} on every
+	 * LootTrackerBox header so an entry reads as one object rather than adjacent lines.
+	 */
+	private static final Color TITLE_BG = ColorScheme.DARKER_GRAY_COLOR.darker();
+
+	/**
+	 * Background for expanded detail. Slightly lifted off the row body so nesting is
+	 * visible - an 8px indent alone left skill and drop lines floating with nothing
+	 * tying them to their monster.
+	 */
+	private static final Color NEST_BG = new Color(38, 38, 38);
+
+	/**
+	 * Highlights a whole row on hover.
+	 *
+	 * <p>Recurses into children because a row that lights up in pieces looks broken -
+	 * {@code GrandExchangeItemPanel.matchComponentBackground} does the same. The title
+	 * strip keeps its own darker shade, so it is passed separately rather than being
+	 * flattened to match the body.
+	 */
+	private static void hoverable(JPanel row, JPanel title)
+	{
+		row.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				paint(ColorScheme.DARK_GRAY_HOVER_COLOR, ColorScheme.DARKER_GRAY_HOVER_COLOR);
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				paint(ColorScheme.DARKER_GRAY_COLOR, TITLE_BG);
+			}
+
+			private void paint(Color body, Color header)
+			{
+				row.setBackground(body);
+				for (Component c : row.getComponents())
+				{
+					if (c == title)
+					{
+						continue;
+					}
+					c.setBackground(body);
+				}
+				title.setBackground(header);
+			}
+		});
+	}
+
 	private JPanel row(NpcStat stat)
 	{
 		// the per-skill split is all-time and session only. day buckets keep a total,
@@ -514,17 +577,20 @@ public class EverykillPanel extends PluginPanel
 		final boolean expandable = hasSkills || hasDrops;
 		final boolean open = expanded.contains(stat.npcId);
 
+		// the title strip. core gives every LootTrackerBox entry its own darker header
+		// with real padding, and that's the whole reason their lists read as rows and
+		// ours read as a wall - see the panel research in FINDINGS.
 		final JPanel p = new JPanel(new BorderLayout());
-		p.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		p.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
+		p.setBackground(TITLE_BG);
+		p.setBorder(BorderFactory.createEmptyBorder(5, 7, 5, 7));
 
 		final JLabel name = new JLabel((expandable ? (open ? "▾ " : "▸ ") : "") + label(stat));
 		name.setFont(FontManager.getRunescapeSmallFont());
-		name.setForeground(ColorScheme.TEXT_COLOR);
+		name.setForeground(Color.WHITE);
 
 		final JLabel count = new JLabel(String.valueOf(countFor(stat)));
 		count.setFont(FontManager.getRunescapeSmallFont());
-		count.setForeground(Color.WHITE);
+		count.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 
 		p.add(name, BorderLayout.WEST);
 		p.add(count, BorderLayout.EAST);
@@ -532,8 +598,14 @@ public class EverykillPanel extends PluginPanel
 		final JPanel wrap = new JPanel();
 		wrap.setLayout(new BoxLayout(wrap, BoxLayout.Y_AXIS));
 		wrap.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		wrap.setBorder(BorderFactory.createEmptyBorder(0, 0, 4, 0));
 		wrap.setToolTipText(tooltip(stat));
 		wrap.add(p);
+
+		// hover the whole row, not just the label under the pointer. core recurses into
+		// children for exactly this reason - a row that highlights in pieces looks
+		// broken.
+		hoverable(wrap, p);
 
 		// only draw the bar when the grades actually differ. a solid green line under
 		// every row is decoration; drawing it only for mixed rows makes the ones worth
@@ -625,8 +697,10 @@ public class EverykillPanel extends PluginPanel
 		final int kinds = stat.drops.size();
 		final JLabel l = new JLabel("drops  ·  " + kinds + (kinds == 1 ? " item" : " items"));
 		l.setFont(FontManager.getRunescapeSmallFont());
-		l.setForeground(SUBTLE);
-		l.setBorder(BorderFactory.createEmptyBorder(4, 8, 1, 0));
+		l.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+		l.setOpaque(true);
+		l.setBackground(NEST_BG);
+		l.setBorder(BorderFactory.createEmptyBorder(4, 7, 2, 0));
 		l.setAlignmentX(LEFT_ALIGNMENT);
 		return l;
 	}
@@ -638,12 +712,12 @@ public class EverykillPanel extends PluginPanel
 	 * unlucky needs the item's published rate, and {@code spec-reference-data.md} keeps
 	 * the reference table server-side, so the client states the fact and stops.
 	 */
-	private static JPanel dropLine(NpcStat stat, String itemId, NpcStat.DropTally tally)
+	private JPanel dropLine(NpcStat stat, String itemId, NpcStat.DropTally tally)
 	{
 		final JPanel p = new JPanel(new BorderLayout());
-		p.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		p.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
-		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 14));
+		p.setBackground(NEST_BG);
+		p.setBorder(BorderFactory.createEmptyBorder(1, 7, 1, 7));
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 18));
 		p.setAlignmentX(LEFT_ALIGNMENT);
 
 		// an id is not a name, but it beats showing nothing when the composition
@@ -652,7 +726,23 @@ public class EverykillPanel extends PluginPanel
 
 		final JLabel left = new JLabel(label);
 		left.setFont(FontManager.getRunescapeSmallFont());
-		left.setForeground(ColorScheme.TEXT_COLOR);
+		left.setForeground(Color.WHITE);
+
+		// the icon, with the stack count drawn into it when there's more than one -
+		// that's what the quantity argument buys. async, so it appears when ready
+		// rather than holding up the repaint.
+		final JLabel icon = new JLabel();
+		icon.setPreferredSize(new Dimension(20, 16));
+		try
+		{
+			final int id = Integer.parseInt(itemId);
+			final int shown = (int) Math.min(Integer.MAX_VALUE, tally.quantity);
+			itemManager.getImage(id, shown, shown > 1).addTo(icon);
+		}
+		catch (RuntimeException e)
+		{
+			// no icon is survivable; a missing row is not.
+		}
 
 		final StringBuilder right = new StringBuilder();
 		right.append(tally.quantity);
@@ -665,7 +755,7 @@ public class EverykillPanel extends PluginPanel
 
 		final JLabel count = new JLabel(right.toString());
 		count.setFont(FontManager.getRunescapeSmallFont());
-		count.setForeground(SUBTLE);
+		count.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 
 		final int since = stat.killsSince(Integer.parseInt(itemId));
 		if (since > 0)
@@ -673,7 +763,8 @@ public class EverykillPanel extends PluginPanel
 			p.setToolTipText(since + " kills since the last one");
 		}
 
-		p.add(left, BorderLayout.WEST);
+		p.add(icon, BorderLayout.WEST);
+		p.add(left, BorderLayout.CENTER);
 		p.add(count, BorderLayout.EAST);
 		return p;
 	}
@@ -681,6 +772,8 @@ public class EverykillPanel extends PluginPanel
 	private static JLabel skillLine(String skill, long xp)
 	{
 		final JLabel l = new JLabel(pretty(skill) + "  " + shortXp(xp));
+		l.setOpaque(true);
+		l.setBackground(NEST_BG);
 		l.setFont(FontManager.getRunescapeSmallFont());
 		l.setForeground(SUBTLE);
 		l.setBorder(BorderFactory.createEmptyBorder(0, 10, 1, 0));
