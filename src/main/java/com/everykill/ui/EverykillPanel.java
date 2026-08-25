@@ -154,6 +154,8 @@ public class EverykillPanel extends PluginPanel
 		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
 		body.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
+		body.add(buildBrandBar());
+		body.add(javax.swing.Box.createVerticalStrut(6));
 		body.add(buildSessionBox());
 		body.add(javax.swing.Box.createVerticalStrut(6));
 		body.add(buildMonsterBox());
@@ -234,6 +236,75 @@ public class EverykillPanel extends PluginPanel
 		top.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 6));
 
 		add(scroll, BorderLayout.CENTER);
+	}
+
+	/**
+	 * The name, a wiki-style link out to the site, and the config button.
+	 *
+	 * <p>Mirrors the site's nav: a rust square with the initials, the product name,
+	 * links on the right. Same brand mark, so the plugin and the site read as one
+	 * thing rather than two projects that happen to share a name.
+	 */
+	private JPanel buildBrandBar()
+	{
+		final JPanel bar = new JPanel(new BorderLayout());
+		bar.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		bar.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
+		bar.setMaximumSize(new Dimension(Short.MAX_VALUE, 24));
+		bar.setAlignmentX(LEFT_ALIGNMENT);
+
+		// the site's .brand-mark: --acc square, white mono initials.
+		final JLabel mark = new JLabel("EK", SwingConstants.CENTER);
+		mark.setOpaque(true);
+		mark.setBackground(SITE_ACC);
+		mark.setForeground(Color.WHITE);
+		mark.setFont(FontManager.getRunescapeSmallFont());
+		mark.setPreferredSize(new Dimension(20, 18));
+
+		final JLabel name = new JLabel(" Everykill");
+		name.setFont(FontManager.getRunescapeBoldFont());
+		name.setForeground(SITE_FG);
+
+		final JPanel left = new JPanel(new BorderLayout());
+		left.setOpaque(false);
+		left.add(mark, BorderLayout.WEST);
+		left.add(name, BorderLayout.CENTER);
+
+		bar.add(left, BorderLayout.WEST);
+		bar.add(linkLabel("site ↗", "Open everykill.gg",
+			() -> LinkBrowser.browse("https://everykill.gg")), BorderLayout.EAST);
+		return bar;
+	}
+
+	/** A clickable bit of text that lights up on hover. */
+	private static JLabel linkLabel(String text, String tooltip, Runnable action)
+	{
+		final JLabel l = new JLabel(text);
+		l.setFont(FontManager.getRunescapeSmallFont());
+		l.setForeground(SITE_FG_FAINT);
+		l.setToolTipText(tooltip);
+		l.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		l.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseClicked(MouseEvent e)
+			{
+				action.run();
+			}
+
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				l.setForeground(SITE_ACC);
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				l.setForeground(SITE_FG_FAINT);
+			}
+		});
+		return l;
 	}
 
 	private JPanel buildSessionBox()
@@ -348,7 +419,7 @@ public class EverykillPanel extends PluginPanel
 		final JPanel p = new JPanel();
 		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
 		p.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		p.setBorder(BorderFactory.createEmptyBorder(7, 5, 7, 5));
+		p.setBorder(BorderFactory.createEmptyBorder(7, 3, 7, 4));
 		return p;
 	}
 
@@ -960,7 +1031,7 @@ public class EverykillPanel extends PluginPanel
 				detail.setBackground(NEST_BG);
 				detail.setBorder(BorderFactory.createCompoundBorder(
 					BorderFactory.createMatteBorder(1, 0, 0, 0, SITE_LINE),
-					BorderFactory.createEmptyBorder(8, 5, 8, 5)));
+					BorderFactory.createEmptyBorder(8, 2, 8, 4)));
 				detail.setAlignmentX(LEFT_ALIGNMENT);
 
 				// the headline numbers as centred blocks - big value, small caption
@@ -1071,7 +1142,7 @@ public class EverykillPanel extends PluginPanel
 		// that's what the quantity argument buys. async, so it appears when ready
 		// rather than holding up the repaint.
 		final JLabel icon = new JLabel();
-		icon.setPreferredSize(new Dimension(20, 16));
+		icon.setPreferredSize(new Dimension(18, 16));
 		try
 		{
 			final int id = Integer.parseInt(itemId);
@@ -1090,8 +1161,8 @@ public class EverykillPanel extends PluginPanel
 		count.setFont(FontManager.getRunescapeSmallFont());
 		count.setForeground(SITE_FG_DIM);
 		count.setHorizontalAlignment(SwingConstants.RIGHT);
-		count.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
-		count.setPreferredSize(new Dimension(24, count.getPreferredSize().height));
+		count.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 2));
+		count.setPreferredSize(new Dimension(16, count.getPreferredSize().height));
 
 		final long value = valueOf(itemId, tally);
 		final JLabel worth = new JLabel(value > 0 ? gp(value) : "");
