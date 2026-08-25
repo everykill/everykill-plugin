@@ -37,6 +37,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.CompoundBorder;
 import net.runelite.client.util.LinkBrowser;
 import okhttp3.HttpUrl;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.components.materialtabs.MaterialTab;
@@ -85,6 +86,17 @@ public class EverykillPanel extends PluginPanel
 	// nothing blocks swing. same call LootTrackerBox makes.
 	private final ItemManager itemManager;
 
+	private final ClientThread clientThread;
+
+	/**
+	 * item id -> price, refreshed on the client thread.
+	 *
+	 * <p>{@code ItemManager.itemPrices} starts as an empty map and is filled by an
+	 * async HTTP fetch, so the price read at drop time is often 0 - and storing that
+	 * made it permanently 0. Reading it here means it fixes itself once prices land.
+	 */
+	private final Map<Integer, Integer> priceCache = new HashMap<>();
+
 	private final JLabel sessionKills = new JLabel("0");
 	private final JLabel sessionSub = new JLabel("kills");
 	private final JLabel sessionGrades = new JLabel(" ");
@@ -125,13 +137,14 @@ public class EverykillPanel extends PluginPanel
 
 	@Inject
 	EverykillPanel(LocalLedger ledger, MilestoneNotifier notifier, XpService xpService,
-		ItemManager itemManager)
+		ItemManager itemManager, ClientThread clientThread)
 	{
 		super(false);
 		this.ledger = ledger;
 		this.notifier = notifier;
 		this.xpService = xpService;
 		this.itemManager = itemManager;
+		this.clientThread = clientThread;
 
 		setLayout(new BorderLayout());
 		setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 2));
@@ -353,6 +366,72 @@ public class EverykillPanel extends PluginPanel
 		SwingUtilities.invokeLater(this::rebuild);
 	}
 
+	/**
+	 * Fills {@link #priceCache} for anything we haven't priced yet.
+	 *
+	 * <p>Hops to the client thread because {@code getItemPrice} asserts it, then comes
+	 * back to Swing to repaint only if something actually changed - otherwise this
+	 * would loop forever against its own rebuild.
+	 */
+	private void refreshPrices(List<NpcStat> rows)
+	{
+		final List<Integer> wanted = new ArrayList<>();
+		for (NpcStat stat : rows)
+		{
+			if (stat.drops == null)
+			{
+				continue;
+			}
+			for (String key : stat.drops.keySet())
+			{
+				try
+				{
+					final int id = Integer.parseInt(key);
+					if (!priceCache.containsKey(id))
+					{
+						wanted.add(id);
+					}
+				}
+				catch (NumberFormatException e)
+				{
+					// not an id, nothing to price.
+				}
+			}
+		}
+
+		if (wanted.isEmpty())
+		{
+			return;
+		}
+
+		clientThread.invokeLater(() ->
+		{
+			boolean changed = false;
+			for (int id : wanted)
+			{
+				try
+				{
+					final int price = itemManager.getItemPrice(id);
+					if (price > 0)
+					{
+						priceCache.put(id, price);
+						changed = true;
+					}
+				}
+				catch (RuntimeException | AssertionError e)
+				{
+					// unknown or untradeable. leave it unpriced rather than caching a
+					// zero we'd never revisit.
+				}
+			}
+
+			if (changed)
+			{
+				SwingUtilities.invokeLater(this::rebuild);
+			}
+		});
+	}
+
 	private void rebuild()
 	{
 		final int kills = ledger.getSessionKills();
@@ -392,6 +471,11 @@ public class EverykillPanel extends PluginPanel
 
 		monsterList.removeAll();
 		final List<NpcStat> rows = statsForWindow();
+
+		// top the price cache up on the client thread, then repaint. getItemPrice
+		// asserts that thread, and its price map is empty until an async fetch lands -
+		// so anything read at drop time may have been 0 and needs a second chance.
+		refreshPrices(rows);
 		monsterHeader.setText(window.tooltip.toUpperCase() + " · " + rows.size());
 
 		// no cap. it used to stop at 12, which quietly hid the 13th row the header was
@@ -628,7 +712,24 @@ public class EverykillPanel extends PluginPanel
 	 * <p>Sorting on value rather than quantity is the difference between a drop list
 	 * that opens on the interesting item and one that opens on four hundred bones.
 	 */
-	private static long valueOf(NpcStat.DropTally tally)
+	private long valueOf(String itemId, NpcStat.DropTally tally)
+	{
+		try
+		{
+			final Integer live = priceCache.get(Integer.parseInt(itemId));
+			if (live != null && live > 0)
+			{
+				return (long) live * tally.quantity;
+			}
+		}
+		catch (NumberFormatException e)
+		{
+			// not an id. fall through to the stored price.
+		}
+		return storedValue(tally);
+	}
+
+	private static long storedValue(NpcStat.DropTally tally)
 	{
 		// the stored price, NOT itemManager.getItemPrice. that call asserts it's on the
 		// client thread and throws AssertionError from swing - which took out the whole
@@ -803,7 +904,7 @@ public class EverykillPanel extends PluginPanel
 		// ours read as a wall - see the panel research in FINDINGS.
 		final JPanel p = new JPanel(new BorderLayout());
 		p.setBackground(TITLE_BG);
-		p.setBorder(BorderFactory.createEmptyBorder(7, 8, 7, 6));
+		p.setBorder(BorderFactory.createEmptyBorder(7, 4, 7, 4));
 
 		final JLabel name = new JLabel((expandable ? (open ? "▾ " : "▸ ") : "") + label(stat));
 		name.setFont(FontManager.getRunescapeSmallFont());
@@ -855,7 +956,7 @@ public class EverykillPanel extends PluginPanel
 				detail.setBackground(NEST_BG);
 				detail.setBorder(BorderFactory.createCompoundBorder(
 					BorderFactory.createMatteBorder(1, 0, 0, 0, SITE_LINE),
-					BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+					BorderFactory.createEmptyBorder(8, 4, 8, 4)));
 				detail.setAlignmentX(LEFT_ALIGNMENT);
 
 				// the headline numbers as centred blocks - big value, small caption
@@ -893,8 +994,8 @@ public class EverykillPanel extends PluginPanel
 					// by total value, not quantity. nobody opens a drop list to find
 					// out how many bones they have.
 					stat.drops.entrySet().stream()
-						.sorted((a, b) -> Long.compare(valueOf(b.getValue()),
-							valueOf(a.getValue())))
+						.sorted((a, b) -> Long.compare(valueOf(b.getKey(), b.getValue()),
+							valueOf(a.getKey(), a.getValue())))
 						.forEach(e -> detail.add(dropLine(stat, e.getKey(), e.getValue())));
 				}
 
@@ -906,12 +1007,12 @@ public class EverykillPanel extends PluginPanel
 	}
 
 	/** DROPS heading with the pile's total value aligned over the gp column. */
-	private static JPanel dropHeader(NpcStat stat)
+	private JPanel dropHeader(NpcStat stat)
 	{
 		long total = 0L;
 		for (Map.Entry<String, NpcStat.DropTally> e : stat.drops.entrySet())
 		{
-			total += valueOf(e.getValue());
+			total += valueOf(e.getKey(), e.getValue());
 		}
 
 		final JPanel p = new JPanel(new BorderLayout());
@@ -987,7 +1088,7 @@ public class EverykillPanel extends PluginPanel
 		count.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
 		count.setPreferredSize(new Dimension(24, count.getPreferredSize().height));
 
-		final long value = valueOf(tally);
+		final long value = valueOf(itemId, tally);
 		final JLabel worth = new JLabel(value > 0 ? gp(value) : "");
 		worth.setFont(FontManager.getRunescapeSmallFont());
 		worth.setForeground(SITE_FG_DIM);
