@@ -1128,6 +1128,10 @@ public class EverykillPanel extends PluginPanel
 		l.setBackground(NEST_BG);
 		l.setBorder(BorderFactory.createEmptyBorder(0, 0, 3, 0));
 		l.setAlignmentX(LEFT_ALIGNMENT);
+
+		// without this the label is laid out at its text width and BoxLayout centres
+		// it. alignmentX positions a child, it does not stretch one.
+		l.setMaximumSize(new Dimension(Short.MAX_VALUE, l.getPreferredSize().height));
 		return l;
 	}
 
@@ -1151,6 +1155,11 @@ public class EverykillPanel extends PluginPanel
 		final JPanel p = new JPanel(new BorderLayout());
 		p.setBackground(TITLE_BG);
 		p.setBorder(BorderFactory.createEmptyBorder(7, 4, 7, 4));
+
+		// same BoxLayout trap as the section labels: no maximum size means the strip is
+		// laid out at its content width and centred, which insets the whole row.
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 26));
+		p.setAlignmentX(LEFT_ALIGNMENT);
 
 		final JLabel name = new JLabel((expandable ? (open ? "▾ " : "▸ ") : "") + label(stat));
 		name.setFont(FontManager.getRunescapeSmallFont());
@@ -1204,6 +1213,7 @@ public class EverykillPanel extends PluginPanel
 					BorderFactory.createMatteBorder(1, 0, 0, 0, SITE_LINE),
 					BorderFactory.createEmptyBorder(8, 2, 8, 4)));
 				detail.setAlignmentX(LEFT_ALIGNMENT);
+				detail.setMaximumSize(new Dimension(Short.MAX_VALUE, Short.MAX_VALUE));
 
 				// the headline numbers as centred blocks - big value, small caption
 				// under it. a stack of left-label/right-number rows all at one weight
