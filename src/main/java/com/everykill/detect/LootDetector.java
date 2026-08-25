@@ -110,6 +110,7 @@ public class LootDetector
 
 		/** item id -> name, filled in on the client thread. */
 		private final Map<Integer, String> names = new HashMap<>();
+		private final Map<Integer, Integer> prices = new HashMap<>();
 
 		/** What the server said this kill dropped. */
 		public List<ItemStack> getItems()
@@ -123,12 +124,19 @@ public class LootDetector
 		 * <p>ItemManager reads through to the client, and the panel that displays these
 		 * paints on Swing. Capturing the name here is the only place both are true.
 		 */
-		public void resolveNames(IntFunction<String> lookup)
+		public void resolveNames(IntFunction<String> nameLookup, IntFunction<Integer> priceLookup)
 		{
 			for (ItemStack item : mutableItems)
 			{
-				names.computeIfAbsent(item.getId(), lookup::apply);
+				names.computeIfAbsent(item.getId(), nameLookup::apply);
+				prices.computeIfAbsent(item.getId(), priceLookup::apply);
 			}
+		}
+
+		/** The resolved price per item, or 0 when it wasn't available. */
+		public int priceOf(int itemId)
+		{
+			return prices.getOrDefault(itemId, 0);
 		}
 
 		/** The resolved name, or null when it wasn't available. */

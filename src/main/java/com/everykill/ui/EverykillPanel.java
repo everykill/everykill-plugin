@@ -573,16 +573,13 @@ public class EverykillPanel extends PluginPanel
 	 * <p>Sorting on value rather than quantity is the difference between a drop list
 	 * that opens on the interesting item and one that opens on four hundred bones.
 	 */
-	private long valueOf(String itemId, NpcStat.DropTally tally)
+	private static long valueOf(NpcStat.DropTally tally)
 	{
-		try
-		{
-			return (long) itemManager.getItemPrice(Integer.parseInt(itemId)) * tally.quantity;
-		}
-		catch (RuntimeException e)
-		{
-			return 0L;
-		}
+		// the stored price, NOT itemManager.getItemPrice. that call asserts it's on the
+		// client thread and throws AssertionError from swing - which took out the whole
+		// repaint mid-loop, so the list rendered three rows and stopped. the header
+		// still said 13 because it counts before drawing.
+		return (long) tally.price * tally.quantity;
 	}
 
 	/** Opens the wiki page for an npc or item id. */
@@ -794,8 +791,8 @@ public class EverykillPanel extends PluginPanel
 					// how many bones they have - the 400 bones would sit on top of the
 					// visitor's item forever.
 					stat.drops.entrySet().stream()
-						.sorted((a, b) -> Long.compare(valueOf(b.getKey(), b.getValue()),
-							valueOf(a.getKey(), a.getValue())))
+						.sorted((a, b) -> Long.compare(valueOf(b.getValue()),
+							valueOf(a.getValue())))
 						.forEach(e -> wrap.add(dropLine(stat, e.getKey(), e.getValue())));
 				}
 			}
@@ -805,14 +802,14 @@ public class EverykillPanel extends PluginPanel
 	}
 
 	/** Separator above the drop list, so it doesn't read as more skill lines. */
-	private JLabel dropHeader(NpcStat stat)
+	private static JLabel dropHeader(NpcStat stat)
 	{
 		final int kinds = stat.drops.size();
 
 		long total = 0L;
 		for (Map.Entry<String, NpcStat.DropTally> e : stat.drops.entrySet())
 		{
-			total += valueOf(e.getKey(), e.getValue());
+			total += valueOf(e.getValue());
 		}
 
 		final JLabel l = new JLabel("drops  ·  " + kinds + (kinds == 1 ? " item" : " items")
@@ -881,7 +878,7 @@ public class EverykillPanel extends PluginPanel
 		// gp and dry streak in the tooltip. both are worth knowing and neither is worth
 		// a permanent column in a 225px panel.
 		final StringBuilder tip = new StringBuilder("<html>");
-		final long value = valueOf(itemId, tally);
+		final long value = valueOf(tally);
 		if (value > 0)
 		{
 			tip.append(gp(value)).append(" gp total");

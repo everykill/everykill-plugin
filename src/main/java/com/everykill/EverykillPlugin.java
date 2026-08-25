@@ -338,7 +338,7 @@ public class EverykillPlugin extends Plugin
 
 		for (LootDetector.ServerLoot loot : reported)
 		{
-			loot.resolveNames(this::itemName);
+			loot.resolveNames(this::itemName, this::itemPrice);
 		}
 
 		onKill(attachLoot(kill, reported, accountType()));
@@ -413,7 +413,8 @@ public class EverykillPlugin extends Plugin
 	{
 		for (ItemStack item : loot.getItems())
 		{
-			into.add(new Drop(item.getId(), item.getQuantity(), loot.nameOf(item.getId())));
+			into.add(new Drop(item.getId(), item.getQuantity(),
+				loot.nameOf(item.getId()), loot.priceOf(item.getId())));
 		}
 	}
 
@@ -424,6 +425,19 @@ public class EverykillPlugin extends Plugin
 	 * name is captured at drop time and stored. Core's loot tracker resolves names in
 	 * the plugin for the same reason.
 	 */
+	/** Price per item, read here because getItemPrice asserts the client thread. */
+	private int itemPrice(int itemId)
+	{
+		try
+		{
+			return itemManager.getItemPrice(itemId);
+		}
+		catch (RuntimeException | AssertionError e)
+		{
+			return 0;
+		}
+	}
+
 	private String itemName(int itemId)
 	{
 		try

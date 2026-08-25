@@ -21,15 +21,25 @@ public class Drop
 	// time is the wrong side of that line. null when the composition wasn't loaded.
 	public final String name;
 
+	// price per item, read on the client thread with the name. getItemPrice asserts
+	// it's on that thread, so a panel that asks at paint time takes down the repaint.
+	public final int price;
+
 	public Drop(int itemId, int quantity)
 	{
-		this(itemId, quantity, null);
+		this(itemId, quantity, null, 0);
 	}
 
 	public Drop(int itemId, int quantity, String name)
 	{
+		this(itemId, quantity, name, 0);
+	}
+
+	public Drop(int itemId, int quantity, String name, int price)
+	{
 		this.itemId = itemId;
 		this.quantity = quantity;
 		this.name = name;
+		this.price = price;
 	}
 }

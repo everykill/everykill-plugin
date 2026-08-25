@@ -167,6 +167,16 @@ public class NpcStat
 		 */
 		public String name;
 
+		/**
+		 * Price per item when the drop landed.
+		 *
+		 * <p>Stored for the same reason as the name: {@code ItemManager.getItemPrice}
+		 * reads through to the client and throws {@code AssertionError: must be called
+		 * on client thread} from Swing. A price that's a few hours stale is fine for
+		 * sorting a drop list.
+		 */
+		public int price;
+
 		/** how many, summed. 99 coins once and 1 coin 99 times both read 99. */
 		public long quantity;
 
