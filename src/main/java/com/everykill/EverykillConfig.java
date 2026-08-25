@@ -18,7 +18,7 @@ public interface EverykillConfig extends Config
 	@ConfigSection(
 		name = "Panel & overlay",
 		description = "What is drawn, and where",
-		position = 0
+		position = 10
 	)
 	String overlaySection = "overlaySection";
 
@@ -26,7 +26,7 @@ public interface EverykillConfig extends Config
 		keyName = "showOverlay",
 		name = "Show overlay",
 		description = "Session counter on the game canvas. Off by default - the side panel is the primary surface.",
-		position = 1,
+		position = 11,
 		section = overlaySection
 	)
 	default boolean showOverlay()
@@ -40,7 +40,7 @@ public interface EverykillConfig extends Config
 		keyName = "compactOverlay",
 		name = "Compact overlay",
 		description = "One line instead of three.",
-		position = 2,
+		position = 12,
 		section = overlaySection
 	)
 	default boolean compactOverlay()
@@ -52,7 +52,7 @@ public interface EverykillConfig extends Config
 		keyName = "showGradeSplit",
 		name = "Show grade split",
 		description = "Uncontested / inferred / ambiguous breakdown. Off by default - it is a diagnostic, not a session stat.",
-		position = 3,
+		position = 13,
 		section = overlaySection
 	)
 	default boolean showGradeSplit()
@@ -68,7 +68,7 @@ public interface EverykillConfig extends Config
 	@ConfigSection(
 		name = "Notices",
 		description = "How much it interrupts you",
-		position = 10
+		position = 20
 	)
 	String noticeSection = "noticeSection";
 
@@ -76,7 +76,7 @@ public interface EverykillConfig extends Config
 		keyName = "noticeLevel",
 		name = "Notice level",
 		description = "Everything is noisy. Silent still records everything.",
-		position = 11,
+		position = 21,
 		section = noticeSection
 	)
 	default NoticeLevel noticeLevel()
@@ -88,7 +88,7 @@ public interface EverykillConfig extends Config
 		keyName = "chatNotices",
 		name = "Chat messages",
 		description = "Posts notices to your chatbox as a client message.",
-		position = 12,
+		position = 22,
 		section = noticeSection
 	)
 	default boolean chatNotices()
@@ -100,7 +100,7 @@ public interface EverykillConfig extends Config
 		keyName = "milestones",
 		name = "KC milestones",
 		description = "100 / 250 / 500 / 1k / 2.5k / 5k / 10k. Counted at uncontested grade only.",
-		position = 13,
+		position = 23,
 		section = noticeSection
 	)
 	default boolean milestones()
@@ -112,7 +112,7 @@ public interface EverykillConfig extends Config
 	@ConfigSection(
 		name = "Recording",
 		description = "What the plugin records",
-		position = 20
+		position = 0
 	)
 	String recordingSection = "recordingSection";
 
@@ -120,7 +120,7 @@ public interface EverykillConfig extends Config
 		keyName = "recordKills",
 		name = "Record kills",
 		description = "The plugin does nothing at all with this off.",
-		position = 21,
+		position = 1,
 		section = recordingSection
 	)
 	default boolean recordKills()

@@ -88,8 +88,6 @@ public class EverykillPanel extends PluginPanel
 
 	// core's own supporting-text grey. was a hand-picked 0x8e8e8e, which is the same
 	// idea two shades off - matching ColorScheme is how the panel looks native.
-	private static final Color SUBTLE = SITE_FG_DIM;
-
 	private final LocalLedger ledger;
 	private final MilestoneNotifier notifier;
 	private final XpService xpService;
@@ -454,10 +452,10 @@ public class EverykillPanel extends PluginPanel
 		sessionKills.setForeground(SITE_ACC);
 
 		sessionSub.setFont(FontManager.getRunescapeSmallFont());
-		sessionSub.setForeground(SUBTLE);
+		sessionSub.setForeground(SITE_FG_DIM);
 
 		sessionGrades.setFont(FontManager.getRunescapeSmallFont());
-		sessionGrades.setForeground(SUBTLE);
+		sessionGrades.setForeground(SITE_FG_DIM);
 
 		// xp that went missing WHILE we were fighting something. teleports and alching
 		// are deliberately excluded - they're magic xp with no monster attached and
@@ -485,14 +483,14 @@ public class EverykillPanel extends PluginPanel
 		final JPanel box = box();
 
 		monsterHeader.setFont(FontManager.getRunescapeSmallFont());
-		monsterHeader.setForeground(SUBTLE);
+		monsterHeader.setForeground(SITE_FG_DIM);
 		monsterHeader.setAlignmentX(LEFT_ALIGNMENT);
 
 		monsterList.setLayout(new BoxLayout(monsterList, BoxLayout.Y_AXIS));
-		monsterList.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		monsterList.setBackground(SITE_PANEL);
 
 		noticeLabel.setFont(FontManager.getRunescapeSmallFont());
-		noticeLabel.setForeground(SUBTLE);
+		noticeLabel.setForeground(SITE_FG_DIM);
 
 		// MaterialTabGroup rather than a JComboBox. A stock combo box renders with a
 		// white popup and black text in the middle of a dark panel and looks exactly as
@@ -569,7 +567,7 @@ public class EverykillPanel extends PluginPanel
 	{
 		final JLabel l = new JLabel(text);
 		l.setFont(FontManager.getRunescapeSmallFont());
-		l.setForeground(SUBTLE);
+		l.setForeground(SITE_FG_DIM);
 		return l;
 	}
 
@@ -784,17 +782,10 @@ public class EverykillPanel extends PluginPanel
 		final long elapsed = System.currentTimeMillis() - ledger.getSessionStartMillis();
 		final double hours = elapsed / 3_600_000.0;
 
-		final JPanel totals = new JPanel(new java.awt.GridLayout(1, 0, 2, 0));
-		totals.setBackground(SITE_PANEL);
-		totals.setBorder(BorderFactory.createCompoundBorder(
-			BorderFactory.createLineBorder(SITE_LINE, 1),
-			BorderFactory.createEmptyBorder(8, 4, 8, 4)));
-		totals.setAlignmentX(LEFT_ALIGNMENT);
-		totals.setMaximumSize(new Dimension(Short.MAX_VALUE, 46));
-		totals.add(statBlock(String.valueOf(kills), "kills"));
-		totals.add(statBlock(shortXp(xp), "xp"));
-		totals.add(statBlock(elapsedShort(elapsed), "elapsed"));
-		monsterList.add(totals);
+		monsterList.add(statRow(
+			statBlock(String.valueOf(kills), "kills"),
+			statBlock(shortXp(xp), "xp"),
+			statBlock(elapsedShort(elapsed), "elapsed")));
 		monsterList.add(javax.swing.Box.createVerticalStrut(4));
 
 		// rates need enough time to mean anything. a 90-second sample extrapolated to
@@ -802,16 +793,9 @@ public class EverykillPanel extends PluginPanel
 		// stays hidden rather than showing something that looks measured.
 		if (hours >= RATE_MIN_HOURS && kills > 0)
 		{
-			final JPanel rates = new JPanel(new java.awt.GridLayout(1, 0, 2, 0));
-			rates.setBackground(SITE_PANEL);
-			rates.setBorder(BorderFactory.createCompoundBorder(
-				BorderFactory.createLineBorder(SITE_LINE, 1),
-				BorderFactory.createEmptyBorder(8, 4, 8, 4)));
-			rates.setAlignmentX(LEFT_ALIGNMENT);
-			rates.setMaximumSize(new Dimension(Short.MAX_VALUE, 46));
-			rates.add(statBlock(String.valueOf(Math.round(kills / hours)), "kills/hr"));
-			rates.add(statBlock(shortXp(Math.round(xp / hours)), "xp/hr"));
-			monsterList.add(rates);
+			monsterList.add(statRow(
+				statBlock(String.valueOf(Math.round(kills / hours)), "kills/hr"),
+				statBlock(shortXp(Math.round(xp / hours)), "xp/hr")));
 			monsterList.add(javax.swing.Box.createVerticalStrut(4));
 		}
 		else if (kills > 0)
@@ -957,17 +941,10 @@ public class EverykillPanel extends PluginPanel
 			}
 		}
 
-		final JPanel totals = new JPanel(new java.awt.GridLayout(1, 0, 2, 0));
-		totals.setBackground(SITE_PANEL);
-		totals.setBorder(BorderFactory.createCompoundBorder(
-			BorderFactory.createLineBorder(SITE_LINE, 1),
-			BorderFactory.createEmptyBorder(8, 4, 8, 4)));
-		totals.setAlignmentX(LEFT_ALIGNMENT);
-		totals.setMaximumSize(new Dimension(Short.MAX_VALUE, 46));
-		totals.add(statBlock(String.valueOf(totalKills), "kills"));
-		totals.add(statBlock(shortXp(totalXp), "xp"));
-		totals.add(statBlock(totalGp > 0 ? gp(totalGp) : "-", "gp"));
-		monsterList.add(totals);
+		monsterList.add(statRow(
+			statBlock(String.valueOf(totalKills), "kills"),
+			statBlock(shortXp(totalXp), "xp"),
+			statBlock(totalGp > 0 ? gp(totalGp) : "-", "gp")));
 
 		monsterList.add(javax.swing.Box.createVerticalStrut(6));
 
@@ -1664,6 +1641,30 @@ public class EverykillPanel extends PluginPanel
 	 * left-label/right-number rows read as a spreadsheet, which is what the expanded
 	 * row looked like before.
 	 */
+	/**
+	 * A card of centred stat blocks. Two or three, the layout splits evenly.
+	 *
+	 * <p>Existed three times identically before this — session totals, session rates
+	 * and the records header. Three copies of a card is three places a border tweak
+	 * gets forgotten.
+	 */
+	private static JPanel statRow(JPanel... blocks)
+	{
+		final JPanel row = new JPanel(new java.awt.GridLayout(1, 0, 2, 0));
+		row.setBackground(SITE_PANEL);
+		row.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(SITE_LINE, 1),
+			BorderFactory.createEmptyBorder(8, 4, 8, 4)));
+		row.setAlignmentX(LEFT_ALIGNMENT);
+		row.setMaximumSize(new Dimension(Short.MAX_VALUE, 46));
+
+		for (JPanel b : blocks)
+		{
+			row.add(b);
+		}
+		return row;
+	}
+
 	private static JPanel statBlock(String value, String caption)
 	{
 		final JPanel p = new JPanel();

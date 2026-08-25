@@ -9,6 +9,7 @@ import com.everykill.EverykillPlugin;
 import com.everykill.ledger.LocalLedger;
 import com.everykill.model.Confidence;
 import com.everykill.model.NpcStat;
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import javax.inject.Inject;
@@ -32,6 +33,9 @@ public class EverykillOverlay extends OverlayPanel
 {
 	public static final String RESET_OPTION = "Reset";
 	public static final String MENU_TARGET = "Everykill session";
+
+	/** everykill-site --acc. Same rust as the panel and the hub icon. */
+	private static final Color BRAND = new Color(0xd9, 0x4f, 0x2b);
 
 	private final EverykillConfig config;
 	private final LocalLedger ledger;
@@ -74,7 +78,10 @@ public class EverykillOverlay extends OverlayPanel
 
 		panelComponent.getChildren().add(TitleComponent.builder()
 			.text("Everykill")
-			.color(Confidence.INFERRED.getColor())
+			// the site's --acc. it used to borrow Confidence.INFERRED's colour purely
+			// because it looked right, which quietly taught people that the title
+			// meant "inferred" - grade colours have to mean grades everywhere.
+			.color(BRAND)
 			.build());
 
 		panelComponent.getChildren().add(LineComponent.builder()
