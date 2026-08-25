@@ -32,6 +32,11 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.border.CompoundBorder;
+import javax.swing.JComponent;
+import javax.swing.JMenuItem;
+import javax.swing.JPopupMenu;
+import net.runelite.client.util.LinkBrowser;
+import okhttp3.HttpUrl;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.components.materialtabs.MaterialTab;
@@ -567,6 +572,105 @@ public class EverykillPanel extends PluginPanel
 		});
 	}
 
+	/**
+	 * What this pile is worth, for sorting. Zero when the price is unknown.
+	 *
+	 * <p>Sorting on value rather than quantity is the difference between a drop list
+	 * that opens on the interesting item and one that opens on four hundred bones.
+	 */
+	private long valueOf(String itemId, NpcStat.DropTally tally)
+	{
+		try
+		{
+			return (long) itemManager.getItemPrice(Integer.parseInt(itemId)) * tally.quantity;
+		}
+		catch (RuntimeException e)
+		{
+			return 0L;
+		}
+	}
+
+	/** Opens the wiki page for an npc or item id. */
+	private static void wiki(String type, int id, String name)
+	{
+		// Special:Lookup resolves by ID, which matters here - "Lesser demon" is eight
+		// npc ids and a name search would land on whichever the wiki prefers. core's
+		// WikiPlugin builds the same url.
+		final HttpUrl url = HttpUrl.get("https://oldschool.runescape.wiki").newBuilder()
+			.addPathSegments("w/Special:Lookup")
+			.addQueryParameter("type", type)
+			.addQueryParameter("id", String.valueOf(id))
+			.addQueryParameter("name", name == null ? "" : name)
+			.addQueryParameter("utm_source", "runelite")
+			.build();
+
+		LinkBrowser.browse(url.toString());
+	}
+
+	/** Right-click menu with a wiki link, so a left click still expands the row. */
+	private static void wikiMenu(JComponent on, String type, int id, String name)
+	{
+		final JPopupMenu menu = new JPopupMenu();
+		menu.setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
+
+		final JMenuItem open = new JMenuItem("Wiki");
+		open.addActionListener(e -> wiki(type, id, name));
+		menu.add(open);
+
+		on.setComponentPopupMenu(menu);
+	}
+
+	/** 1.2m, 340k, 900. Long numbers in a 225px panel are unreadable. */
+	private static String gp(long amount)
+	{
+		if (amount >= 1_000_000L)
+		{
+			return (amount / 100_000L) / 10.0 + "m";
+		}
+		if (amount >= 1_000L)
+		{
+			return (amount / 100L) / 10.0 + "k";
+		}
+		return String.valueOf(amount);
+	}
+
+	/** A label/value pair inside an expanded row. */
+	private static JPanel detailLine(String label, String value)
+	{
+		final JPanel p = new JPanel(new BorderLayout());
+		p.setBackground(NEST_BG);
+		p.setBorder(BorderFactory.createEmptyBorder(1, 7, 1, 7));
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 14));
+		p.setAlignmentX(LEFT_ALIGNMENT);
+
+		final JLabel l = new JLabel(label);
+		l.setFont(FontManager.getRunescapeSmallFont());
+		l.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+
+		final JLabel v = new JLabel(value);
+		v.setFont(FontManager.getRunescapeSmallFont());
+		v.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+
+		p.add(l, BorderLayout.WEST);
+		p.add(v, BorderLayout.EAST);
+		return p;
+	}
+
+	/** "3d ago", "2h ago". Absolute timestamps mean nothing at a glance. */
+	private static String ago(long millis)
+	{
+		final long mins = (System.currentTimeMillis() - millis) / 60_000L;
+		if (mins < 60)
+		{
+			return Math.max(mins, 0) + "m ago";
+		}
+		if (mins < 1440)
+		{
+			return (mins / 60) + "h ago";
+		}
+		return (mins / 1440) + "d ago";
+	}
+
 	private JPanel row(NpcStat stat)
 	{
 		// the per-skill split is all-time and session only. day buckets keep a total,
@@ -607,48 +711,12 @@ public class EverykillPanel extends PluginPanel
 		// broken.
 		hoverable(wrap, p);
 
-		// only draw the bar when the grades actually differ. a solid green line under
-		// every row is decoration; drawing it only for mixed rows makes the ones worth
-		// looking at jump out instead of hiding in a wall of identical bars.
-		// second line: when you fought it on the left, what it paid on the right. both
-		// come from data we were already storing and never showing.
-		final int[] daily = stat.dailyCounts(NpcStat.RETAINED_DAYS);
-		final long perKill = stat.total() > 0 ? stat.xp / stat.total() : 0L;
+		// right-click rather than left, so the left click still expands the row.
+		wikiMenu(wrap, "npc", stat.npcId, stat.name);
 
-		if (perKill > 0 || hasAny(daily))
-		{
-			final JPanel detail = new JPanel(new BorderLayout());
-			detail.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-			detail.setMaximumSize(new Dimension(Short.MAX_VALUE, 9));
-
-			if (hasAny(daily))
-			{
-				final Sparkline spark = new Sparkline();
-				spark.set(daily);
-				spark.setPreferredSize(new Dimension(70, 9));
-				detail.add(spark, BorderLayout.WEST);
-			}
-
-			if (perKill > 0)
-			{
-				final JLabel rate = new JLabel(shortXp(perKill) + " xp/kill");
-				rate.setFont(FontManager.getRunescapeSmallFont());
-				rate.setForeground(SUBTLE);
-				detail.add(rate, BorderLayout.EAST);
-			}
-
-			wrap.add(detail);
-		}
-
-		if (isMixed(stat))
-		{
-			final GradeBar bar = new GradeBar();
-			bar.set(stat.uncontested, stat.inferred, stat.ambiguous);
-			bar.setPreferredSize(new Dimension(200, 3));
-			bar.setMaximumSize(new Dimension(Short.MAX_VALUE, 3));
-			wrap.add(bar);
-		}
-
+		// no sparkline, no grade bar under every row. a 35-day sparkline on a monster
+		// you killed today is one tick in an empty box, and a coloured bar under each
+		// row is the wall the box layout just fixed. both facts live in the tooltip.
 		if (expandable)
 		{
 			p.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -667,6 +735,22 @@ public class EverykillPanel extends PluginPanel
 
 			if (open)
 			{
+				// the facts that used to be a sparkline and a coloured bar. as text
+				// they say what they mean, and they only cost space when opened.
+				wrap.add(detailLine("xp per kill",
+					shortXp(stat.total() > 0 ? stat.xp / stat.total() : 0L)));
+
+				if (stat.total() > 0 && stat.uncontested < stat.total())
+				{
+					wrap.add(detailLine("clean kills",
+						stat.uncontested + " of " + stat.total()));
+				}
+
+				if (stat.lastKillMillis > 0)
+				{
+					wrap.add(detailLine("last killed", ago(stat.lastKillMillis)));
+				}
+
 				// biggest first. nobody scans an alphabetical list looking for where
 				// their xp went.
 				if (hasSkills)
@@ -680,9 +764,12 @@ public class EverykillPanel extends PluginPanel
 				{
 					wrap.add(dropHeader(stat));
 
-					// most-received first, same reasoning as the skills above.
+					// by total value, not quantity. nobody opens a drop list to find out
+					// how many bones they have - the 400 bones would sit on top of the
+					// visitor's item forever.
 					stat.drops.entrySet().stream()
-						.sorted((a, b) -> Long.compare(b.getValue().quantity, a.getValue().quantity))
+						.sorted((a, b) -> Long.compare(valueOf(b.getKey(), b.getValue()),
+							valueOf(a.getKey(), a.getValue())))
 						.forEach(e -> wrap.add(dropLine(stat, e.getKey(), e.getValue())));
 				}
 			}
@@ -692,10 +779,18 @@ public class EverykillPanel extends PluginPanel
 	}
 
 	/** Separator above the drop list, so it doesn't read as more skill lines. */
-	private static JLabel dropHeader(NpcStat stat)
+	private JLabel dropHeader(NpcStat stat)
 	{
 		final int kinds = stat.drops.size();
-		final JLabel l = new JLabel("drops  ·  " + kinds + (kinds == 1 ? " item" : " items"));
+
+		long total = 0L;
+		for (Map.Entry<String, NpcStat.DropTally> e : stat.drops.entrySet())
+		{
+			total += valueOf(e.getKey(), e.getValue());
+		}
+
+		final JLabel l = new JLabel("drops  ·  " + kinds + (kinds == 1 ? " item" : " items")
+			+ (total > 0 ? "  ·  " + gp(total) + " gp" : ""));
 		l.setFont(FontManager.getRunescapeSmallFont());
 		l.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
 		l.setOpaque(true);
@@ -757,10 +852,41 @@ public class EverykillPanel extends PluginPanel
 		count.setFont(FontManager.getRunescapeSmallFont());
 		count.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 
+		// gp and dry streak in the tooltip. both are worth knowing and neither is worth
+		// a permanent column in a 225px panel.
+		final StringBuilder tip = new StringBuilder("<html>");
+		final long value = valueOf(itemId, tally);
+		if (value > 0)
+		{
+			tip.append(gp(value)).append(" gp total");
+			if (tally.quantity > 1)
+			{
+				tip.append("  ·  ").append(gp(value / tally.quantity)).append(" ea");
+			}
+		}
+
 		final int since = stat.killsSince(Integer.parseInt(itemId));
 		if (since > 0)
 		{
-			p.setToolTipText(since + " kills since the last one");
+			if (tip.length() > 6)
+			{
+				tip.append("<br>");
+			}
+			tip.append(since).append(" kills since the last one");
+		}
+
+		if (tip.length() > 6)
+		{
+			p.setToolTipText(tip.append("</html>").toString());
+		}
+
+		try
+		{
+			wikiMenu(p, "item", Integer.parseInt(itemId), tally.name);
+		}
+		catch (NumberFormatException e)
+		{
+			// a key that isn't an id can't be looked up. no menu, row still draws.
 		}
 
 		p.add(icon, BorderLayout.WEST);
@@ -799,35 +925,7 @@ public class EverykillPanel extends PluginPanel
 			.atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString();
 	}
 
-	private static boolean hasAny(int[] counts)
-	{
-		for (int c : counts)
-		{
-			if (c > 0)
-			{
-				return true;
-			}
-		}
-		return false;
-	}
 
-	private static boolean isMixed(NpcStat stat)
-	{
-		int grades = 0;
-		if (stat.uncontested > 0)
-		{
-			grades++;
-		}
-		if (stat.inferred > 0)
-		{
-			grades++;
-		}
-		if (stat.ambiguous > 0)
-		{
-			grades++;
-		}
-		return grades > 1;
-	}
 
 	/** Raw npc_id lives here rather than in the row. Available, not in the way. */
 	private static String tooltip(NpcStat stat)
@@ -889,60 +987,6 @@ public class EverykillPanel extends PluginPanel
 			c.getRed(), c.getGreen(), c.getBlue(), text);
 	}
 
-	/**
-	 * 35 days of kills as a tiny bar chart. We were already keeping the buckets and
-	 * only using them to filter a list; drawn, the same data says when you actually
-	 * fought the thing, which a number can't.
-	 */
-	private static final class Sparkline extends JPanel
-	{
-		private int[] counts = new int[0];
-
-		private Sparkline()
-		{
-			setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		}
-
-		private void set(int[] counts)
-		{
-			this.counts = counts;
-			repaint();
-		}
-
-		@Override
-		protected void paintComponent(Graphics g)
-		{
-			super.paintComponent(g);
-
-			int max = 0;
-			for (int c : counts)
-			{
-				max = Math.max(max, c);
-			}
-			if (max <= 0)
-			{
-				return;
-			}
-
-			final int h = getHeight();
-			final int w = getWidth();
-			final float step = w / (float) counts.length;
-
-			for (int i = 0; i < counts.length; i++)
-			{
-				if (counts[i] <= 0)
-				{
-					continue;
-				}
-
-				// always at least a pixel. a day you killed one thing should still be
-				// visible next to a day you killed two hundred.
-				final int bar = Math.max(1, Math.round(h * (counts[i] / (float) max)));
-				g.setColor(i == counts.length - 1 ? Color.WHITE : Confidence.UNCONTESTED.getColor());
-				g.fillRect(Math.round(i * step), h - bar, Math.max(1, Math.round(step) - 1), bar);
-			}
-		}
-	}
 
 	/** The 3px grade split — foundation, not storefront. The count is the headline. */
 	private static final class GradeBar extends JPanel
