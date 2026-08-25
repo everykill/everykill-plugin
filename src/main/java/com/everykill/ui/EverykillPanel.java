@@ -415,6 +415,30 @@ public class EverykillPanel extends PluginPanel
 			from.xpBySkill.forEach((skill, xp) -> into.xpBySkill.merge(skill, xp, Long::sum));
 		}
 
+		if (from.drops != null)
+		{
+			if (into.drops == null)
+			{
+				into.drops = new HashMap<>();
+			}
+			from.drops.forEach((item, tally) ->
+			{
+				final NpcStat.DropTally target =
+					into.drops.computeIfAbsent(item, k -> new NpcStat.DropTally());
+				target.quantity += tally.quantity;
+				target.drops += tally.drops;
+
+				// the most recent sighting across the merged ids wins. a dry streak on
+				// a rolled-up row is "since ANY of these dropped it", which is what a
+				// player killing lesser demons of four ids actually wants to know.
+				if (tally.lastMillis > target.lastMillis)
+				{
+					target.lastMillis = tally.lastMillis;
+					target.killCountAtLast = tally.killCountAtLast;
+				}
+			});
+		}
+
 		if (from.days != null)
 		{
 			if (into.days == null)
@@ -478,13 +502,15 @@ public class EverykillPanel extends PluginPanel
 		// not a breakdown, so a windowed row has nothing honest to expand into.
 		final boolean windowed = window != Window.ALL && window != Window.SESSION;
 		final boolean hasSkills = !windowed && stat.xpBySkill != null && !stat.xpBySkill.isEmpty();
+		final boolean hasDrops = !windowed && stat.drops != null && !stat.drops.isEmpty();
+		final boolean expandable = hasSkills || hasDrops;
 		final boolean open = expanded.contains(stat.npcId);
 
 		final JPanel p = new JPanel(new BorderLayout());
 		p.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		p.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
 
-		final JLabel name = new JLabel((hasSkills ? (open ? "▾ " : "▸ ") : "") + label(stat));
+		final JLabel name = new JLabel((expandable ? (open ? "▾ " : "▸ ") : "") + label(stat));
 		name.setFont(FontManager.getRunescapeSmallFont());
 		name.setForeground(ColorScheme.TEXT_COLOR);
 
@@ -543,7 +569,7 @@ public class EverykillPanel extends PluginPanel
 			wrap.add(bar);
 		}
 
-		if (hasSkills)
+		if (expandable)
 		{
 			p.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 			p.addMouseListener(new MouseAdapter()
@@ -563,13 +589,85 @@ public class EverykillPanel extends PluginPanel
 			{
 				// biggest first. nobody scans an alphabetical list looking for where
 				// their xp went.
-				stat.xpBySkill.entrySet().stream()
-					.sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-					.forEach(e -> wrap.add(skillLine(e.getKey(), e.getValue())));
+				if (hasSkills)
+				{
+					stat.xpBySkill.entrySet().stream()
+						.sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+						.forEach(e -> wrap.add(skillLine(e.getKey(), e.getValue())));
+				}
+
+				if (hasDrops)
+				{
+					wrap.add(dropHeader(stat));
+
+					// most-received first, same reasoning as the skills above.
+					stat.drops.entrySet().stream()
+						.sorted((a, b) -> Long.compare(b.getValue().quantity, a.getValue().quantity))
+						.forEach(e -> wrap.add(dropLine(stat, e.getKey(), e.getValue())));
+				}
 			}
 		}
 
 		return wrap;
+	}
+
+	/** Separator above the drop list, so it doesn't read as more skill lines. */
+	private static JLabel dropHeader(NpcStat stat)
+	{
+		final int kinds = stat.drops.size();
+		final JLabel l = new JLabel("drops  ·  " + kinds + (kinds == 1 ? " item" : " items"));
+		l.setFont(FontManager.getRunescapeSmallFont());
+		l.setForeground(SUBTLE);
+		l.setBorder(BorderFactory.createEmptyBorder(4, 8, 1, 0));
+		l.setAlignmentX(LEFT_ALIGNMENT);
+		return l;
+	}
+
+	/**
+	 * One item: what it is, how many, and how long since the last one.
+	 *
+	 * <p>The dry number is deliberately plain — "312 since". Saying whether that is
+	 * unlucky needs the item's published rate, and {@code spec-reference-data.md} keeps
+	 * the reference table server-side, so the client states the fact and stops.
+	 */
+	private static JPanel dropLine(NpcStat stat, String itemId, NpcStat.DropTally tally)
+	{
+		final JPanel p = new JPanel(new BorderLayout());
+		p.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		p.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 0));
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 14));
+		p.setAlignmentX(LEFT_ALIGNMENT);
+
+		// an id is not a name, but it beats showing nothing when the composition
+		// wasn't loaded at the time - and it stays diagnosable.
+		final String label = tally.name != null ? tally.name : "item " + itemId;
+
+		final JLabel left = new JLabel(label);
+		left.setFont(FontManager.getRunescapeSmallFont());
+		left.setForeground(ColorScheme.TEXT_COLOR);
+
+		final StringBuilder right = new StringBuilder();
+		right.append(tally.quantity);
+		if (tally.drops > 1 && tally.quantity != tally.drops)
+		{
+			// 400 bones over 400 drops says nothing extra. 3960 coins over 40 drops
+			// does, so only show the split when the two differ.
+			right.append("  (").append(tally.drops).append(')');
+		}
+
+		final JLabel count = new JLabel(right.toString());
+		count.setFont(FontManager.getRunescapeSmallFont());
+		count.setForeground(SUBTLE);
+
+		final int since = stat.killsSince(Integer.parseInt(itemId));
+		if (since > 0)
+		{
+			p.setToolTipText(since + " kills since the last one");
+		}
+
+		p.add(left, BorderLayout.WEST);
+		p.add(count, BorderLayout.EAST);
+		return p;
 	}
 
 	private static JLabel skillLine(String skill, long xp)

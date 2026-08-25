@@ -7,6 +7,7 @@ package com.everykill.ledger;
 import com.everykill.EverykillConfig;
 import com.everykill.model.Confidence;
 import com.everykill.model.KillRecord;
+import com.everykill.model.LootConfidence;
 import com.everykill.model.NpcStat;
 import com.everykill.xp.CombatSkill;
 import com.google.gson.Gson;
@@ -192,6 +193,16 @@ public class LocalLedger
 			stat.combatLevel = kill.combatLevel;
 		}
 		stat.record(kill.grade, kill.timestampMillis, kill.myDamage, kill.othersDamage);
+
+		// after record(), so total() already counts this kill - a drop on kill 500
+		// should read "0 kills dry", not 1. only CONFIRMED and PROBABLE loot is filed:
+		// UNKNOWN means we couldn't say which of two identical monsters earned it, and
+		// filing it anyway would put a guess in the drop history permanently.
+		if (kill.lootConfidence == LootConfidence.CONFIRMED
+			|| kill.lootConfidence == LootConfidence.PROBABLE)
+		{
+			stat.recordDrops(kill.drops, kill.timestampMillis);
+		}
 
 		final NpcStat sessionStat = session.computeIfAbsent(kill.npcId,
 			k -> new NpcStat(kill.npcId, kill.npcName));

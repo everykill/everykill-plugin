@@ -13,6 +13,7 @@ import net.runelite.api.gameval.VarbitID;
 import com.everykill.model.Confidence;
 import com.everykill.model.Drop;
 import com.everykill.model.LootConfidence;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStack;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -92,6 +93,9 @@ public class EverykillPlugin extends Plugin
 
 	@Inject
 	private KillDetector detector;
+
+	@Inject
+	private ItemManager itemManager;
 
 	@Inject
 	private LootDetector lootDetector;
@@ -332,6 +336,11 @@ public class EverykillPlugin extends Plugin
 		final List<LootDetector.ServerLoot> reported =
 			lootDetector.drainFor(kill.npcId, client.getTickCount());
 
+		for (LootDetector.ServerLoot loot : reported)
+		{
+			loot.resolveNames(this::itemName);
+		}
+
 		onKill(attachLoot(kill, reported, accountType()));
 	}
 
@@ -404,7 +413,29 @@ public class EverykillPlugin extends Plugin
 	{
 		for (ItemStack item : loot.getItems())
 		{
-			into.add(new Drop(item.getId(), item.getQuantity()));
+			into.add(new Drop(item.getId(), item.getQuantity(), loot.nameOf(item.getId())));
+		}
+	}
+
+	/**
+	 * The item's name, resolved here because we're on the client thread.
+	 *
+	 * <p>ItemManager reads through to the client and the panel paints on Swing, so the
+	 * name is captured at drop time and stored. Core's loot tracker resolves names in
+	 * the plugin for the same reason.
+	 */
+	private String itemName(int itemId)
+	{
+		try
+		{
+			final String name = itemManager.getItemComposition(itemId).getName();
+			return name == null || name.isEmpty() || "null".equals(name) ? null : name;
+		}
+		catch (RuntimeException e)
+		{
+			// an unknown id is not worth losing the drop over. the panel falls back to
+			// showing the raw id, which stays diagnosable.
+			return null;
 		}
 	}
 

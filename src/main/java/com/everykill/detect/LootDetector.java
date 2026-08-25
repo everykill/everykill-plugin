@@ -6,6 +6,9 @@ package com.everykill.detect;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.IntFunction;
 import java.util.List;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -105,10 +108,33 @@ public class LootDetector
 			this.tick = tick;
 		}
 
+		/** item id -> name, filled in on the client thread. */
+		private final Map<Integer, String> names = new HashMap<>();
+
 		/** What the server said this kill dropped. */
 		public List<ItemStack> getItems()
 		{
 			return Collections.unmodifiableList(mutableItems);
+		}
+
+		/**
+		 * Resolves item names while we're still on the client thread.
+		 *
+		 * <p>ItemManager reads through to the client, and the panel that displays these
+		 * paints on Swing. Capturing the name here is the only place both are true.
+		 */
+		public void resolveNames(IntFunction<String> lookup)
+		{
+			for (ItemStack item : mutableItems)
+			{
+				names.computeIfAbsent(item.getId(), lookup::apply);
+			}
+		}
+
+		/** The resolved name, or null when it wasn't available. */
+		public String nameOf(int itemId)
+		{
+			return names.get(itemId);
 		}
 	}
 

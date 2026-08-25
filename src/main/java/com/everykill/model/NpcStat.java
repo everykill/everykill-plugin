@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Map;
 import java.util.function.ToIntFunction;
 
@@ -69,12 +71,114 @@ public class NpcStat
 	/** kills that contributed to the damage totals above. the denominator. */
 	public int killsWithDamage;
 
+	// what this monster has dropped, keyed by item id. a tally, not a log - storing
+	// every drop event grows without bound on something you kill thousands of times,
+	// and the panel wants "how many bones have i had", not when each one landed.
+	// null until the first drop, so lootless monsters cost nothing in the saved json.
+	public Map<String, DropTally> drops;
+
 	// yyyy-mm-dd -> that day's tally, local time, because "today" means the player's
 	// today. only exists for days you actually killed the thing, and pruned past
 	// RETAINED_DAYS - enough for today/week/month and nothing beyond it.
 	public Map<String, DayTally> days;
 
 	public static final int RETAINED_DAYS = 35;
+
+	/**
+	 * Files a kill's drops against this monster.
+	 *
+	 * <p><b>Call this after {@code record}</b>, so {@code total()} already includes the
+	 * kill that produced the loot. A drop landing on kill 500 should read as "0 kills
+	 * dry", not 1.
+	 *
+	 * <p>Several of the same item in one kill count as <b>one</b> drop with a summed
+	 * quantity — a monster dropping bones twice in one death is still one roll, and
+	 * counting it twice would inflate the numerator of every rate built on this.
+	 */
+	public void recordDrops(List<Drop> kill, long whenMillis)
+	{
+		if (kill == null || kill.isEmpty())
+		{
+			return;
+		}
+
+		if (drops == null)
+		{
+			drops = new HashMap<>();
+		}
+
+		final Set<String> seenThisKill = new HashSet<>();
+
+		for (Drop drop : kill)
+		{
+			final String key = String.valueOf(drop.itemId);
+			final DropTally tally = drops.computeIfAbsent(key, k -> new DropTally());
+
+			if (drop.name != null)
+			{
+				tally.name = drop.name;
+			}
+			tally.quantity += drop.quantity;
+			tally.killCountAtLast = total();
+			tally.lastMillis = whenMillis;
+
+			if (seenThisKill.add(key))
+			{
+				tally.drops++;
+			}
+		}
+	}
+
+	/**
+	 * Kills since this item last dropped, or -1 if it never has.
+	 *
+	 * <p>The honest half of a dry streak. Whether that number is <i>unlucky</i> needs
+	 * the item's published rate, which {@code spec-reference-data.md} keeps server-side
+	 * — so the client can say "312 kills since" and must not say "you are 2.4x dry".
+	 */
+	public int killsSince(int itemId)
+	{
+		if (drops == null)
+		{
+			return -1;
+		}
+
+		final DropTally tally = drops.get(String.valueOf(itemId));
+		return tally == null ? -1 : total() - tally.killCountAtLast;
+	}
+
+	/**
+	 * One item's history against this monster.
+	 *
+	 * <p>{@code killCountAtLast} is what makes a dry streak possible: current kill count
+	 * minus that number is how many kills since it last dropped. Storing the count at
+	 * the time rather than a running "dry" counter means the answer stays right no
+	 * matter what happens in between, and survives the file being reloaded.
+	 */
+	public static final class DropTally
+	{
+		/**
+		 * The item's name, resolved when the drop was recorded.
+		 *
+		 * <p>Stored rather than looked up at paint time because {@code ItemManager}
+		 * reads through to the client, and the panel paints on the Swing thread. Core
+		 * resolves names in the plugin for the same reason. It also means the ledger
+		 * stays readable on its own.
+		 */
+		public String name;
+
+		/** how many, summed. 99 coins once and 1 coin 99 times both read 99. */
+		public long quantity;
+
+		/** how many separate kills produced it. this is the drop-rate numerator. */
+		public int drops;
+
+		/** total kills on this monster when it last dropped. */
+		public int killCountAtLast;
+
+		/** when it last dropped. */
+		public long lastMillis;
+	}
 
 	public static final class DayTally
 	{
