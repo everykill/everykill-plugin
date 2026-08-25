@@ -2145,3 +2145,35 @@ Expanded content in `LootTrackerBox` is a separate container with its own backgr
 4. **Put expanded content on its own background** rather than indenting it.
 
 **What not to do:** invent a new palette or font sizes. Every colour above already exists in `ColorScheme`, and a plugin that looks like RuneLite is the point — `spec-plugin-ux.md` §Design principles says the panel should feel native, and matching core's construction is how that is achieved rather than asserted.
+
+---
+
+## 2026-08-24 — icons: items yes, monsters no, and the reason is the same one that moved always_drops server-side
+
+**Status:** research, answering "could we have pngs for mobs and drops?"
+
+### Drops: yes, and core hands it to us
+
+`ItemManager.getImage(itemId, quantity, stackable)` returns an `AsyncBufferedImage`. `LootTrackerBox:292` is the exact pattern:
+
+```java
+AsyncBufferedImage itemImage = itemManager.getImage(item.getId(), item.getQuantity(), item.getQuantity() > 1);
+itemImage.addTo(imageLabel);
+```
+
+`addTo` is the important part — the image loads asynchronously and repaints the label when ready, so nothing blocks the Swing thread. Passing the quantity also gets the **stack number rendered into the icon** for free, which is how core shows "99" on a coin pile.
+
+Cost to us: one `@Inject ItemManager` in the panel and a label per drop row. **This is worth doing.**
+
+### Monsters: there is no API for it
+
+`NPCComposition` exposes `getModels()` and `getChatheadModels()` — **3D model ids, not images**. Nothing in `rlsrc` calls `getChatheadModels` at all, and core's Slayer panel shows no monster icons either. There is no `getNpcImage` anywhere in `net.runelite.client.game`.
+
+So a monster icon has to come from outside the client, and both routes are already closed by decisions this project has made:
+
+1. **Bundle PNGs in the jar.** Thousands of monsters, and the images would come from the OSRS Wiki — `LICENSING.md:54` puts wiki content at **CC BY-NC-SA 3.0**, non-commercial with share-alike, against a BSD plugin. Same conflict that keeps `always_drops.tsv` off the client.
+2. **Fetch at runtime.** A network call in the first Hub submission, which `PRODUCT-DIRECTION.md`'s local-only decision explicitly removed. Identical reasoning to the `always_drops` entry earlier today.
+
+**Recommendation: item icons yes, monster icons no.** Not "not yet" — the licensing half doesn't improve with time. If monster imagery is ever wanted it belongs on the site, where wiki attribution is a page footer rather than a jar full of redistributed assets, and that is Gage's lane.
+
+**A cheaper substitute exists if the rows need visual anchoring:** the combat level is already on every row, and grade colour is already established. Neither needs an asset pipeline.
