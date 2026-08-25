@@ -77,6 +77,10 @@ public class EverykillPanel extends PluginPanel
 	private static final Color SITE_FG_FAINT = new Color(0x63, 0x69, 0x6f);
 	private static final Color SITE_ACC = new Color(0xd9, 0x4f, 0x2b);
 
+	// --good from the site, used there for status dots and 'done' tags. gp is the one
+	// number that means something good happened, so it gets it.
+	private static final Color SITE_GOLD = new Color(0x4f, 0x9d, 0x5d);
+
 	// core's own supporting-text grey. was a hand-picked 0x8e8e8e, which is the same
 	// idea two shades off - matching ColorScheme is how the panel looks native.
 	private static final Color SUBTLE = SITE_FG_DIM;
@@ -422,7 +426,7 @@ public class EverykillPanel extends PluginPanel
 		// RuneLite's three RuneScape faces are all fixed-size — "small" is a different
 		// TTF, not a smaller point size — so bold is the only emphasis available.
 		sessionKills.setFont(FontManager.getRunescapeBoldFont());
-		sessionKills.setForeground(Color.WHITE);
+		sessionKills.setForeground(SITE_ACC);
 
 		sessionSub.setFont(FontManager.getRunescapeSmallFont());
 		sessionSub.setForeground(SUBTLE);
@@ -530,8 +534,14 @@ public class EverykillPanel extends PluginPanel
 	{
 		final JPanel p = new JPanel();
 		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
-		p.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		p.setBorder(BorderFactory.createEmptyBorder(7, 3, 7, 4));
+
+		// --panel, not runelite grey. this backs the session header and the monster
+		// list, so it was the largest flat area on screen and the reason the panel
+		// read as black rather than dark.
+		p.setBackground(SITE_PANEL);
+		p.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createMatteBorder(0, 0, 0, 0, SITE_LINE),
+			BorderFactory.createEmptyBorder(7, 4, 7, 4)));
 		return p;
 	}
 
@@ -1153,7 +1163,7 @@ public class EverykillPanel extends PluginPanel
 	/** drop rows visible before the list starts scrolling. */
 	private static final int VISIBLE_DROPS = 5;
 
-	private static final int DROP_ROW_HEIGHT = 30;
+	private static final int DROP_ROW_HEIGHT = 36;
 
 	/**
 	 * What this pile is worth, for sorting. Zero when the price is unknown.
@@ -1312,7 +1322,7 @@ public class EverykillPanel extends PluginPanel
 
 		final JLabel v = new JLabel(value, SwingConstants.CENTER);
 		v.setFont(FontManager.getRunescapeBoldFont());
-		v.setForeground(SITE_FG);
+		v.setForeground(SITE_ACC);
 		v.setAlignmentX(CENTER_ALIGNMENT);
 
 		final JLabel c = new JLabel(caption, SwingConstants.CENTER);
@@ -1333,7 +1343,9 @@ public class EverykillPanel extends PluginPanel
 		l.setForeground(SITE_FG_FAINT);
 		l.setOpaque(true);
 		l.setBackground(NEST_BG);
-		l.setBorder(BorderFactory.createEmptyBorder(0, 0, 3, 0));
+		l.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createMatteBorder(0, 2, 0, 0, SITE_ACC),
+			BorderFactory.createEmptyBorder(0, 5, 3, 0)));
 		l.setAlignmentX(LEFT_ALIGNMENT);
 
 		// without this the label is laid out at its text width and BoxLayout centres
@@ -1579,7 +1591,7 @@ public class EverykillPanel extends PluginPanel
 		p.setBorder(BorderFactory.createCompoundBorder(
 			BorderFactory.createMatteBorder(0, 0, 1, 0, NEST_BG),
 			BorderFactory.createEmptyBorder(3, 4, 3, 6)));
-		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 30));
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 36));
 		p.setAlignmentX(LEFT_ALIGNMENT);
 
 		// an id is not a name, but it beats showing nothing when the composition
@@ -1599,7 +1611,7 @@ public class EverykillPanel extends PluginPanel
 		// that's what the quantity argument buys. async, so it appears when ready
 		// rather than holding up the repaint.
 		final JLabel icon = new JLabel();
-		icon.setPreferredSize(new Dimension(34, 24));
+		icon.setPreferredSize(new Dimension(36, 32));
 		icon.setHorizontalAlignment(SwingConstants.CENTER);
 		try
 		{
@@ -1625,7 +1637,7 @@ public class EverykillPanel extends PluginPanel
 		final long value = valueOf(itemId, tally);
 		final JLabel worth = new JLabel(value > 0 ? gp(value) : "");
 		worth.setFont(FontManager.getRunescapeSmallFont());
-		worth.setForeground(SITE_FG_DIM);
+		worth.setForeground(value > 0 ? SITE_GOLD : SITE_FG_FAINT);
 
 		// gp and dry streak in the tooltip. both are worth knowing and neither is worth
 		// a permanent column in a 225px panel.
