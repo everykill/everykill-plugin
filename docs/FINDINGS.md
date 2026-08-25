@@ -2093,3 +2093,55 @@ The one thing the overlay currently gets right and should keep: hiding `inferred
 2. **Drops in the panel** — the data now exists; per-npc persistence does not. Needs a `drops` field on `NpcStat` first.
 3. **Overlay default** back to the spec's contents; grade split moves to a Session tab.
 4. **Dry streaks** — needs drop history per npc plus rarity, and rarity is server-side by `spec-reference-data.md`. Client can show *"kills since last X"*; the *"you are 2.4x dry"* framing is a site feature.
+
+---
+
+## 2026-08-24 — why the side panel looks unfinished, from reading core's own panels
+
+**Status:** research, no code changed yet
+**Method:** read `LootTrackerBox`, `GrandExchangeItemPanel` and `ColorScheme` in `rlsrc` (RuneLite 1.12.36) rather than guessing at taste.
+
+Our panel and core's panels use the same widgets and the same colours. The difference is structural, and it comes down to four things core does that we don't.
+
+### 1. Rows are boxes, not lines
+
+`LootTrackerBox` gives every entry a **title strip on its own background** — `DARKER_GRAY_COLOR.darker()` — sitting above the content, with `EmptyBorder(7,7,7,7)` inside it and `EmptyBorder(5,0,0,0)` separating one box from the next.
+
+Ours draws every row on the same flat `DARKER_GRAY_COLOR` with 2px of vertical padding and nothing between them. That is why the screenshot reads as a wall: **there is no visual unit**. A monster, its xp/kill line, its grade bar and its drops are four unrelated lines that happen to be adjacent.
+
+Core's actual values, for reference:
+
+| | core | ours |
+|---|---|---|
+| Row separation | `EmptyBorder(5, 0, 0, 0)` | none |
+| Title inner padding | `EmptyBorder(7, 7, 7, 7)` | `EmptyBorder(2, 0, 2, 0)` |
+| Title background | `DARKER_GRAY_COLOR.darker()` | same as body |
+
+### 2. Hover feedback
+
+`GrandExchangeItemPanel` attaches a `MouseAdapter` that swaps the whole panel's background to `DARK_GRAY_HOVER_COLOR` (35,35,35) on enter and back on exit, recursing into children so the row highlights as one thing. `LootTrackerBox` uses `DARKER_GRAY_HOVER_COLOR` (60,60,60) the same way.
+
+We set a hand cursor on expandable rows and nothing else. **The screenshot shows a cursor mid-row with no indication of what it is over.**
+
+### 3. A three-level type hierarchy, by colour not size
+
+Core never changes font size in these panels — everything is `FontManager.getRunescapeSmallFont()`. Emphasis comes from colour alone:
+
+- `Color.WHITE` — the thing itself (item name, monster name)
+- `LIGHT_GRAY_COLOR` (165,165,165) — supporting numbers (price, subtitle)
+- `MEDIUM_GRAY_COLOR` (77,77,77) — inactive/absent
+
+Ours uses `TEXT_COLOR` for names and one custom `SUBTLE` for everything secondary, so xp/kill, drop counts and the drops header all sit at the same weight. Three kinds of information, one voice.
+
+### 4. Indentation carries meaning
+
+Expanded content in `LootTrackerBox` is a separate container with its own background, so nesting is obvious. Our expanded skill and drop lines are indented 8px on the same background — visible in the screenshot as `Strength 3.9k` floating under `Cyclops (56)` with no tie to it.
+
+### What this suggests, in order of effect per line changed
+
+1. **Give each monster row a container** with `EmptyBorder(5,0,0,0)` outside and a title strip at `DARKER_GRAY_COLOR.darker()`. Biggest single change; makes the list read as rows.
+2. **Add hover highlight** on the whole row via `MouseAdapter`, matching `GrandExchangeItemPanel.matchComponentBackground`.
+3. **Adopt core's three-colour hierarchy** — white for names, `LIGHT_GRAY_COLOR` for numbers, `MEDIUM_GRAY_COLOR` for absent.
+4. **Put expanded content on its own background** rather than indenting it.
+
+**What not to do:** invent a new palette or font sizes. Every colour above already exists in `ColorScheme`, and a plugin that looks like RuneLite is the point — `spec-plugin-ux.md` §Design principles says the panel should feel native, and matching core's construction is how that is achieved rather than asserted.
