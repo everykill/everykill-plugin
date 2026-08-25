@@ -66,6 +66,7 @@ public class EverykillPanel extends PluginPanel
 	//   --fg-dim    #9aa0a8   supporting numbers
 	//   --fg-faint  #63696f   headings, absent values
 	//   --acc       #d94f2b   "rs-adjacent rust, not jagex gold"
+	private static final Color SITE_BG = new Color(0x0b, 0x0c, 0x0e);
 	private static final Color SITE_PANEL = new Color(0x16, 0x18, 0x1d);
 	private static final Color SITE_BG_ALT = new Color(0x10, 0x12, 0x16);
 	private static final Color SITE_LINE = new Color(0x23, 0x26, 0x2d);
@@ -96,6 +97,9 @@ public class EverykillPanel extends PluginPanel
 	 * made it permanently 0. Reading it here means it fixes itself once prices land.
 	 */
 	private final Map<Integer, Integer> priceCache = new HashMap<>();
+
+	/** records view instead of the kill log. */
+	private boolean showRecords;
 
 	private final JLabel sessionKills = new JLabel("0");
 	private final JLabel sessionSub = new JLabel("kills");
@@ -148,11 +152,11 @@ public class EverykillPanel extends PluginPanel
 
 		setLayout(new BorderLayout());
 		setBorder(BorderFactory.createEmptyBorder(8, 0, 8, 0));
-		setBackground(ColorScheme.DARK_GRAY_COLOR);
+		setBackground(SITE_BG);
 
 		final JPanel body = new JPanel();
 		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
-		body.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		body.setBackground(SITE_BG);
 
 		body.add(buildBrandBar());
 		body.add(javax.swing.Box.createVerticalStrut(6));
@@ -178,15 +182,15 @@ public class EverykillPanel extends PluginPanel
 				return vp == null ? d : new Dimension(vp.getWidth(), d.height);
 			}
 		};
-		top.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		top.setBackground(SITE_BG);
 		top.add(body, BorderLayout.NORTH);
 
 		final JScrollPane scroll = new JScrollPane(top,
 			ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
 			ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 		scroll.setBorder(BorderFactory.createEmptyBorder());
-		scroll.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		scroll.getViewport().setBackground(ColorScheme.DARK_GRAY_COLOR);
+		scroll.setBackground(SITE_BG);
+		scroll.getViewport().setBackground(SITE_BG);
 
 		// the default is 1px per notch, which makes a long list feel broken.
 		scroll.getVerticalScrollBar().setUnitIncrement(16);
@@ -248,7 +252,7 @@ public class EverykillPanel extends PluginPanel
 	private JPanel buildBrandBar()
 	{
 		final JPanel bar = new JPanel(new BorderLayout());
-		bar.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		bar.setBackground(SITE_BG);
 		bar.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
 		bar.setMaximumSize(new Dimension(Short.MAX_VALUE, 24));
 		bar.setAlignmentX(LEFT_ALIGNMENT);
@@ -270,9 +274,20 @@ public class EverykillPanel extends PluginPanel
 		left.add(mark, BorderLayout.WEST);
 		left.add(name, BorderLayout.CENTER);
 
-		bar.add(left, BorderLayout.WEST);
-		bar.add(linkLabel("site ↗", "Open everykill.gg",
+		final JPanel right = new JPanel(new BorderLayout(8, 0));
+		right.setOpaque(false);
+		right.add(linkLabel(showRecords ? "kills" : "records",
+			showRecords ? "Back to the kill log" : "Personal records",
+			() ->
+			{
+				showRecords = !showRecords;
+				rebuild();
+			}), BorderLayout.WEST);
+		right.add(linkLabel("site ↗", "Open everykill.gg",
 			() -> LinkBrowser.browse("https://everykill.gg")), BorderLayout.EAST);
+
+		bar.add(left, BorderLayout.WEST);
+		bar.add(right, BorderLayout.EAST);
 		return bar;
 	}
 
@@ -444,6 +459,156 @@ public class EverykillPanel extends PluginPanel
 	 * back to Swing to repaint only if something actually changed - otherwise this
 	 * would loop forever against its own rebuild.
 	 */
+	/**
+	 * Personal records, from data we already store.
+	 *
+	 * <p>{@code spec-plugin-ux.md} also lists fastest kill and best xp/hour. Neither is
+	 * built because no per-kill duration is recorded anywhere - inventing one from
+	 * kill timestamps would measure how fast you walked between monsters. The tab says
+	 * so rather than quietly omitting them.
+	 */
+	private void buildRecords(java.util.Collection<NpcStat> all)
+	{
+		monsterHeader.setText("RECORDS");
+
+		int totalKills = 0;
+		long totalXp = 0L;
+		long totalGp = 0L;
+		NpcStat mostKilled = null;
+		long firstEver = Long.MAX_VALUE;
+
+		String bestItem = null;
+		long bestValue = 0L;
+		String bestFrom = null;
+
+		String driestItem = null;
+		int driestKills = 0;
+		String driestFrom = null;
+
+		for (NpcStat stat : all)
+		{
+			totalKills += stat.total();
+			totalXp += stat.xp;
+
+			if (mostKilled == null || stat.total() > mostKilled.total())
+			{
+				mostKilled = stat;
+			}
+			if (stat.firstKillMillis > 0 && stat.firstKillMillis < firstEver)
+			{
+				firstEver = stat.firstKillMillis;
+			}
+			if (stat.drops == null)
+			{
+				continue;
+			}
+
+			for (Map.Entry<String, NpcStat.DropTally> e : stat.drops.entrySet())
+			{
+				final NpcStat.DropTally tally = e.getValue();
+				totalGp += valueOf(e.getKey(), tally);
+
+				// per-drop value, not the pile - 400 bones isn't a lucky drop.
+				final long each = tally.drops > 0
+					? valueOf(e.getKey(), tally) / tally.drops : 0L;
+				if (each > bestValue)
+				{
+					bestValue = each;
+					bestItem = tally.name == null ? "item " + e.getKey() : tally.name;
+					bestFrom = stat.name;
+				}
+
+				try
+				{
+					final int since = stat.killsSince(Integer.parseInt(e.getKey()));
+					if (since > driestKills)
+					{
+						driestKills = since;
+						driestItem = tally.name == null ? "item " + e.getKey() : tally.name;
+						driestFrom = stat.name;
+					}
+				}
+				catch (NumberFormatException ex)
+				{
+					// not an id, no streak to read.
+				}
+			}
+		}
+
+		final JPanel totals = new JPanel(new java.awt.GridLayout(1, 0, 2, 0));
+		totals.setBackground(SITE_PANEL);
+		totals.setBorder(BorderFactory.createEmptyBorder(8, 2, 8, 4));
+		totals.setAlignmentX(LEFT_ALIGNMENT);
+		totals.setMaximumSize(new Dimension(Short.MAX_VALUE, 40));
+		totals.add(statBlock(String.valueOf(totalKills), "kills"));
+		totals.add(statBlock(shortXp(totalXp), "xp"));
+		totals.add(statBlock(totalGp > 0 ? gp(totalGp) : "-", "gp"));
+		monsterList.add(totals);
+
+		monsterList.add(javax.swing.Box.createVerticalStrut(6));
+
+		if (bestItem != null)
+		{
+			monsterList.add(recordCard("MOST VALUABLE DROP", bestItem,
+				gp(bestValue) + " gp  ·  " + bestFrom));
+		}
+
+		if (driestItem != null && driestKills > 0)
+		{
+			monsterList.add(recordCard("LONGEST DRY STREAK", driestItem,
+				driestKills + " kills since  ·  " + driestFrom));
+		}
+
+		if (mostKilled != null && mostKilled.total() > 0)
+		{
+			monsterList.add(recordCard("MOST KILLED", mostKilled.name,
+				mostKilled.total() + " kills"));
+		}
+
+		if (firstEver != Long.MAX_VALUE)
+		{
+			monsterList.add(recordCard("TRACKING SINCE",
+				new java.text.SimpleDateFormat("d MMM yyyy").format(new java.util.Date(firstEver)),
+				ago(firstEver)));
+		}
+
+		if (totalKills == 0)
+		{
+			monsterList.add(caption("Nothing counted yet."));
+		}
+	}
+
+	/** One record: a small caps heading, the answer, and what backs it. */
+	private static JPanel recordCard(String heading, String value, String detail)
+	{
+		final JPanel p = new JPanel();
+		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+		p.setBackground(SITE_PANEL);
+		p.setBorder(BorderFactory.createEmptyBorder(6, 5, 6, 5));
+		p.setAlignmentX(LEFT_ALIGNMENT);
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 48));
+
+		final JLabel h = new JLabel(heading);
+		h.setFont(FontManager.getRunescapeSmallFont());
+		h.setForeground(SITE_FG_FAINT);
+		h.setAlignmentX(LEFT_ALIGNMENT);
+
+		final JLabel v = new JLabel(value);
+		v.setFont(FontManager.getRunescapeBoldFont());
+		v.setForeground(SITE_FG);
+		v.setAlignmentX(LEFT_ALIGNMENT);
+
+		final JLabel d = new JLabel(detail);
+		d.setFont(FontManager.getRunescapeSmallFont());
+		d.setForeground(SITE_FG_DIM);
+		d.setAlignmentX(LEFT_ALIGNMENT);
+
+		p.add(h);
+		p.add(v);
+		p.add(d);
+		return p;
+	}
+
 	private void refreshPrices(List<NpcStat> rows)
 	{
 		final List<Integer> wanted = new ArrayList<>();
@@ -548,6 +713,12 @@ public class EverykillPanel extends PluginPanel
 		// so anything read at drop time may have been 0 and needs a second chance.
 		refreshPrices(rows);
 		monsterHeader.setText(window.tooltip.toUpperCase() + " · " + rows.size());
+
+		if (showRecords)
+		{
+			buildRecords(ledger.allTimeSorted());
+			return;
+		}
 
 		// no cap. it used to stop at 12, which quietly hid the 13th row the header was
 		// already counting - and expanding a row pushed others off the end, so the list
@@ -775,7 +946,7 @@ public class EverykillPanel extends PluginPanel
 	 * visible - an 8px indent alone left skill and drop lines floating with nothing
 	 * tying them to their monster.
 	 */
-	private static final Color NEST_BG = SITE_PANEL;
+	private static final Color NEST_BG = SITE_BG_ALT;
 
 	/**
 	 * What this pile is worth, for sorting. Zero when the price is unknown.
