@@ -149,7 +149,20 @@ public class EverykillPanel extends PluginPanel
 		// height, so expanding a monster with a long drop list grew the panel until it
 		// stretched the whole client window. CENTER plus a scroll pane means the panel
 		// keeps its size and the content moves instead.
-		final JPanel top = new JPanel(new BorderLayout());
+		// the view has to take the VIEWPORT's width, not its own natural one. a scroll
+		// pane hands its view the width the content asks for, so one long drop name
+		// widened everything and pushed the right-hand numbers off the edge - with
+		// HORIZONTAL_SCROLLBAR_NEVER they were just clipped, not reachable.
+		final JPanel top = new JPanel(new BorderLayout())
+		{
+			@Override
+			public Dimension getPreferredSize()
+			{
+				final Dimension d = super.getPreferredSize();
+				final java.awt.Container vp = getParent();
+				return vp == null ? d : new Dimension(vp.getWidth(), d.height);
+			}
+		};
 		top.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		top.add(body, BorderLayout.NORTH);
 
@@ -835,6 +848,7 @@ public class EverykillPanel extends PluginPanel
 		final JLabel name = new JLabel((expandable ? (open ? "▾ " : "▸ ") : "") + label(stat));
 		name.setFont(FontManager.getRunescapeSmallFont());
 		name.setForeground(SITE_FG);
+		name.setMinimumSize(new Dimension(1, name.getPreferredSize().height));
 
 		final JLabel count = new JLabel(String.valueOf(countFor(stat)));
 		count.setFont(FontManager.getRunescapeSmallFont());
@@ -892,7 +906,7 @@ public class EverykillPanel extends PluginPanel
 				// the headline numbers as centred blocks - big value, small caption
 				// under it. a stack of left-label/right-number rows all at one weight
 				// is what made this look like a spreadsheet.
-				final JPanel stats = new JPanel(new java.awt.GridLayout(1, 0, 6, 0));
+				final JPanel stats = new JPanel(new java.awt.GridLayout(1, 0, 2, 0));
 				stats.setBackground(NEST_BG);
 				stats.setAlignmentX(LEFT_ALIGNMENT);
 				stats.setMaximumSize(new Dimension(Short.MAX_VALUE, 34));
@@ -983,6 +997,10 @@ public class EverykillPanel extends PluginPanel
 		final JLabel left = new JLabel(label);
 		left.setFont(FontManager.getRunescapeSmallFont());
 		left.setForeground(SITE_FG);
+
+		// a long item name must not widen the row - core sets the same 1px minimum in
+		// LootTrackerBox with the comment "make BoxLayout truncate the name".
+		left.setMinimumSize(new Dimension(1, left.getPreferredSize().height));
 
 		// the icon, with the stack count drawn into it when there's more than one -
 		// that's what the quantity argument buys. async, so it appears when ready
