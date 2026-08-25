@@ -109,15 +109,15 @@ Everything prohibited is a **combat-assist** feature. Passive recording is clear
 
 ## 8. Project-specific cleanup
 
-- [ ] `GistUploader` removed from the public branch
-- [ ] Legacy pre-rewrite code removed or clearly retired — `writeSnapshot`, `XpSession`, `killCounts`/`drops`, Slayer chat parsing
-- [ ] **Two parallel kill counters reconciled** — the legacy `onNpcLootReceived` path keying on npc **name** must not ship alongside the damage-attributed path
-- [ ] **`Files.createDirectories()` in `startUp()` and `writeSnapshot()`'s disk write in `shutDown()` are blocking disk IO on the client thread** — both violate `docs/CONVENTIONS.md`'s threading rules directly (found 2026-08-14 review). `writeSnapshot()`'s `Files.write()` runs inside `clientThread.invoke()`, i.e. *on* the client thread, not off it. Must be fixed as part of removing/replacing this legacy code, not carried into whatever replaces it.
-- [ ] **`new GsonBuilder().setPrettyPrinting().create()` in `EverykillTrackerPlugin` violates the `@Inject Gson` rule** (found 2026-08-14 review) — construct via `@Inject Gson` + `.newBuilder()` instead, per `docs/CONVENTIONS.md`'s HTTP & JSON section, when this code is replaced.
+- [x] `GistUploader` removed from the public branch — verified absent 2026-08-24
+- [x] Legacy pre-rewrite code removed — `writeSnapshot`, `XpSession`, `killCounts` all absent from `src/main` 2026-08-24
+- [x] **Two parallel kill counters reconciled** — no `onNpcLootReceived` path remains; the damage-attributed path is the only one
+- [x] **`Files.createDirectories()` in `startUp()` and `writeSnapshot()`'s disk write in `shutDown()` are blocking disk IO on the client thread** — both violate `docs/CONVENTIONS.md`'s threading rules directly (found 2026-08-14 review). `writeSnapshot()`'s `Files.write()` runs inside `clientThread.invoke()`, i.e. *on* the client thread, not off it. Must be fixed as part of removing/replacing this legacy code, not carried into whatever replaces it.
+- [x] **`new GsonBuilder().setPrettyPrinting().create()` in `EverykillTrackerPlugin` violates the `@Inject Gson` rule** (found 2026-08-14 review) — construct via `@Inject Gson` + `.newBuilder()` instead, per `docs/CONVENTIONS.md`'s HTTP & JSON section, when this code is replaced.
 - [ ] Unused config classes, fields and imports removed
 - [ ] `net.runelite.api.gameval` constants used instead of magic numbers
 - [ ] No reformatting mixed into feature commits — it makes diffs unreadable for reviewers
-- [ ] **`onAnimationChanged`'s temporary transform-death discovery logging removed** — only once a real death-animation id is identified, confirmed (negative-control criterion, edge case A) and wired into detection logic. Currently scoped to `TransformDeathNpcs` only so it's safe to ship mid-development, but it must not survive into a submission if the animation-id work is still unresolved by then; resolve or explicitly re-confirm scope before submitting either way.
+- [x] **`onAnimationChanged`'s temporary transform-death discovery logging removed** — only once a real death-animation id is identified, confirmed (negative-control criterion, edge case A) and wired into detection logic. Currently scoped to `TransformDeathNpcs` only so it's safe to ship mid-development, but it must not survive into a submission if the animation-id work is still unresolved by then; resolve or explicitly re-confirm scope before submitting either way.
 
 ---
 

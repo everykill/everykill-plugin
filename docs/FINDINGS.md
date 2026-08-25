@@ -2177,3 +2177,28 @@ So a monster icon has to come from outside the client, and both routes are alrea
 **Recommendation: item icons yes, monster icons no.** Not "not yet" — the licensing half doesn't improve with time. If monster imagery is ever wanted it belongs on the site, where wiki attribution is a page footer rather than a jar full of redistributed assets, and that is Gage's lane.
 
 **A cheaper substitute exists if the rows need visual anchoring:** the combat level is already on every row, and grade colour is already established. Neither needs an asset pipeline.
+
+---
+
+## 2026-08-24 — the Hub blocker list was stale: every item on it is already gone
+
+**Status:** verified by grep against `src/main`, not by reading the doc
+
+Asked what was next, I went to `SUBMISSION-CHECKLIST.md` §8 expecting a session of cleanup. Checked each item against the code first:
+
+| Blocker | Reality |
+|---|---|
+| `GistUploader` | file does not exist |
+| `EverykillTrackerPlugin` | does not exist |
+| `XpSession`, `writeSnapshot`, `killCounts` | zero references in `src/main` |
+| `onNpcLootReceived` name-keyed counter | zero references |
+| `Files.createDirectories` / `Files.write` on client thread | zero references |
+| `new GsonBuilder()` | zero references |
+| `getWorldArea()` null check | no call sites at all |
+| `onAnimationChanged` temp logging | no such handler |
+
+All eight were carried in my own context as "remaining work" across several sessions. They were removed during the rewrite and the checklist was never reconciled.
+
+**Method note:** the boxes are ticked with the date and the evidence ("verified absent"), not just ticked. A checklist that says done without saying how it was checked is how this drifted in the first place.
+
+**What this means for sequencing:** Step 8 is not gated behind a cleanup pass. The real remaining Hub items are ecosystem ones — stating why this isn't a duplicate of Collection Log Luck / Bossing Info / Dry Rate Tracker, and hosting under the `everykill` org — plus whatever the upload path itself introduces.
