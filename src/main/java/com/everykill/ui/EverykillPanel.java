@@ -140,7 +140,6 @@ public class EverykillPanel extends PluginPanel
 	/** How far back the list looks. SESSION is the live one; the rest read day buckets. */
 	private enum Window
 	{
-		SESSION("Now", "This session", 0),
 		TODAY("Day", "Today", 1),
 		WEEK("Wk", "This week", 7),
 		MONTH("Mth", "This month", 30),
@@ -483,10 +482,10 @@ public class EverykillPanel extends PluginPanel
 		// MaterialTabGroup rather than a JComboBox. A stock combo box renders with a
 		// white popup and black text in the middle of a dark panel and looks exactly as
 		// bad as that sounds. This is what core's own panels use.
-		// MaterialTab hardcodes a 10px empty border each side. Five of those in 225px
-		// leaves ~24px for text, and "Now" needs 31 - measured, not guessed - so it
-		// rendered as "N...". Narrowing the gaps doesn't help: the padding is the
-		// problem, so the border gets replaced below.
+		// MaterialTab hardcodes a 10px empty border each side. That cost a fifth tab
+		// its label back when "Now" lived here; with four, a 54px cell leaves 34px of
+		// text room and the longest label is 21px - measured, not guessed - so core's
+		// own border is left alone.
 		tabs.setLayout(new java.awt.GridLayout(1, Window.values().length, 1, 0));
 		tabs.setMaximumSize(new Dimension(Short.MAX_VALUE, 22));
 
@@ -507,10 +506,6 @@ public class EverykillPanel extends PluginPanel
 				window = w;
 				rebuild();
 
-				// core sets its own border AFTER this returns - select() calls the
-				// event first, then setBorder(SELECTED_BORDER) - so narrowing it here
-				// would be overwritten. queue it behind that.
-				SwingUtilities.invokeLater(() -> narrow(tab, true));
 				return true;
 			});
 			tabs.addTab(tab);
@@ -521,7 +516,6 @@ public class EverykillPanel extends PluginPanel
 			}
 
 			// unselected tabs get it straight away; the selected one is queued above.
-			narrow(tab, w == window);
 		}
 
 		viewTabs.setLayout(new BorderLayout());
@@ -1074,24 +1068,6 @@ public class EverykillPanel extends PluginPanel
 		repaint();
 	}
 
-	/**
-	 * Rebuilds a tab's border with 2px sides instead of core's 10.
-	 *
-	 * <p>{@code MaterialTab} pads 10px each side. Five tabs in a 225px panel leaves
-	 * about 24px of text room and "Now" needs 31, so the first tab rendered as "N...".
-	 * Gap tuning cannot fix that — the padding is the whole budget.
-	 *
-	 * <p>The selected form keeps core's orange underline, because that stripe is the
-	 * only thing showing which window you're looking at.
-	 */
-	private static void narrow(MaterialTab tab, boolean selected)
-	{
-		tab.setBorder(selected
-			? new CompoundBorder(
-				BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.BRAND_ORANGE),
-				BorderFactory.createEmptyBorder(5, 2, 4, 2))
-			: BorderFactory.createEmptyBorder(5, 2, 5, 2));
-	}
 
 	/**
 	 * Folds rows that are the same monster wearing different ids.
@@ -1221,13 +1197,6 @@ public class EverykillPanel extends PluginPanel
 	/** Rows for whatever window is picked, biggest first, empties dropped. */
 	private List<NpcStat> statsForWindow()
 	{
-		if (window == Window.SESSION)
-		{
-			final List<NpcStat> out = rollUp(new ArrayList<>(ledger.getSession().values()));
-			out.sort(Comparator.comparingInt(NpcStat::total).reversed());
-			return out;
-		}
-
 		if (window == Window.ALL)
 		{
 			final List<NpcStat> out = rollUp(ledger.allTimeSorted());
@@ -1249,7 +1218,7 @@ public class EverykillPanel extends PluginPanel
 
 	private int countFor(NpcStat stat)
 	{
-		return window == Window.SESSION || window == Window.ALL
+		return window == Window.ALL
 			? stat.total()
 			: stat.totalSince(window.days);
 	}
@@ -1537,7 +1506,7 @@ public class EverykillPanel extends PluginPanel
 		// split and the drop list are ALL-TIME numbers, not that period's. they used to
 		// be suppressed entirely, which left Day/Wk/Mth rows with no dropdown at all.
 		// showing them labelled beats hiding them; spec says degrade, don't guess.
-		final boolean windowed = window != Window.ALL && window != Window.SESSION;
+		final boolean windowed = window != Window.ALL;
 		final boolean hasSkills = stat.xpBySkill != null && !stat.xpBySkill.isEmpty();
 		final boolean hasDrops = stat.drops != null && !stat.drops.isEmpty();
 		final boolean expandable = hasSkills || hasDrops;
