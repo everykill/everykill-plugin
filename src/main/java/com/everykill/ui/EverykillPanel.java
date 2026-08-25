@@ -31,6 +31,7 @@ import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.SwingConstants;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 import javax.swing.border.CompoundBorder;
@@ -166,10 +167,45 @@ public class EverykillPanel extends PluginPanel
 		// to belong to the bar - its own comment says "prevent scrollbar overlapping
 		// over contents". our scroll pane didn't reserve it, so the bar sat on top of
 		// the counts. give the bar its width and pad the content off it.
-		scroll.getVerticalScrollBar().setPreferredSize(new Dimension(9, 0));
-		scroll.getVerticalScrollBar().setBorder(
-			BorderFactory.createEmptyBorder(0, 2, 0, 2));
-		top.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 4));
+		final javax.swing.JScrollBar bar = scroll.getVerticalScrollBar();
+		bar.setPreferredSize(new Dimension(10, 0));
+		bar.setBackground(SITE_BG_ALT);
+		bar.setBorder(BorderFactory.createEmptyBorder());
+
+		// flat thumb in the site's line colour. the default metal bar brings arrow
+		// buttons at both ends, which is what squashed it into itself in a 10px lane.
+		bar.setUI(new javax.swing.plaf.basic.BasicScrollBarUI()
+		{
+			@Override
+			protected void configureScrollBarColors()
+			{
+				thumbColor = SITE_LINE;
+				trackColor = SITE_BG_ALT;
+			}
+
+			@Override
+			protected javax.swing.JButton createIncreaseButton(int orientation)
+			{
+				return zeroButton();
+			}
+
+			@Override
+			protected javax.swing.JButton createDecreaseButton(int orientation)
+			{
+				return zeroButton();
+			}
+
+			private javax.swing.JButton zeroButton()
+			{
+				final javax.swing.JButton b = new javax.swing.JButton();
+				b.setPreferredSize(new Dimension(0, 0));
+				b.setMinimumSize(new Dimension(0, 0));
+				b.setMaximumSize(new Dimension(0, 0));
+				return b;
+			}
+		});
+
+		top.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 6));
 
 		add(scroll, BorderLayout.CENTER);
 	}
@@ -706,7 +742,7 @@ public class EverykillPanel extends PluginPanel
 	{
 		final JPanel p = new JPanel(new BorderLayout());
 		p.setBackground(NEST_BG);
-		p.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 8));
+		p.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
 		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 17));
 		p.setAlignmentX(LEFT_ALIGNMENT);
 
@@ -738,17 +774,32 @@ public class EverykillPanel extends PluginPanel
 		return (mins / 1440) + "d ago";
 	}
 
-	/** The one-line facts row under a monster's name. */
-	private static JLabel summaryLine(String text)
+	/**
+	 * One headline number with its caption under it, centred.
+	 *
+	 * <p>Three of these side by side read at a glance. The same three facts as
+	 * left-label/right-number rows read as a spreadsheet, which is what the expanded
+	 * row looked like before.
+	 */
+	private static JPanel statBlock(String value, String caption)
 	{
-		final JLabel l = new JLabel(text);
-		l.setFont(FontManager.getRunescapeSmallFont());
-		l.setForeground(SITE_FG_DIM);
-		l.setOpaque(true);
-		l.setBackground(NEST_BG);
-		l.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 8));
-		l.setAlignmentX(LEFT_ALIGNMENT);
-		return l;
+		final JPanel p = new JPanel();
+		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+		p.setBackground(NEST_BG);
+
+		final JLabel v = new JLabel(value, SwingConstants.CENTER);
+		v.setFont(FontManager.getRunescapeBoldFont());
+		v.setForeground(SITE_FG);
+		v.setAlignmentX(CENTER_ALIGNMENT);
+
+		final JLabel c = new JLabel(caption, SwingConstants.CENTER);
+		c.setFont(FontManager.getRunescapeSmallFont());
+		c.setForeground(SITE_FG_FAINT);
+		c.setAlignmentX(CENTER_ALIGNMENT);
+
+		p.add(v);
+		p.add(c);
+		return p;
 	}
 
 	/** A small caps heading inside an expanded row, with a rule above it. */
@@ -759,9 +810,7 @@ public class EverykillPanel extends PluginPanel
 		l.setForeground(SITE_FG_FAINT);
 		l.setOpaque(true);
 		l.setBackground(NEST_BG);
-		l.setBorder(BorderFactory.createCompoundBorder(
-			BorderFactory.createMatteBorder(1, 0, 0, 0, SITE_LINE),
-			BorderFactory.createEmptyBorder(5, 10, 2, 0)));
+		l.setBorder(BorderFactory.createEmptyBorder(0, 0, 3, 0));
 		l.setAlignmentX(LEFT_ALIGNMENT);
 		return l;
 	}
@@ -832,54 +881,55 @@ public class EverykillPanel extends PluginPanel
 
 			if (open)
 			{
-				// one summary line, not four stacked label/value rows. these are facts
-				// you glance at - a table of them was the ugliest part of the panel.
-				final StringBuilder facts = new StringBuilder();
+				final JPanel detail = new JPanel();
+				detail.setLayout(new BoxLayout(detail, BoxLayout.Y_AXIS));
+				detail.setBackground(NEST_BG);
+				detail.setBorder(BorderFactory.createCompoundBorder(
+					BorderFactory.createMatteBorder(1, 0, 0, 0, SITE_LINE),
+					BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+				detail.setAlignmentX(LEFT_ALIGNMENT);
+
+				// the headline numbers as centred blocks - big value, small caption
+				// under it. a stack of left-label/right-number rows all at one weight
+				// is what made this look like a spreadsheet.
+				final JPanel stats = new JPanel(new java.awt.GridLayout(1, 0, 6, 0));
+				stats.setBackground(NEST_BG);
+				stats.setAlignmentX(LEFT_ALIGNMENT);
+				stats.setMaximumSize(new Dimension(Short.MAX_VALUE, 34));
+
 				final long perKill = stat.total() > 0 ? stat.xp / stat.total() : 0L;
-				if (perKill > 0)
-				{
-					facts.append(shortXp(perKill)).append(" xp/kill");
-				}
+				stats.add(statBlock(shortXp(perKill), "xp/kill"));
+				stats.add(statBlock(stat.uncontested + "/" + stat.total(), "clean"));
 				if (stat.lastKillMillis > 0)
 				{
-					if (facts.length() > 0)
-					{
-						facts.append("   ");
-					}
-					facts.append(ago(stat.lastKillMillis));
+					stats.add(statBlock(ago(stat.lastKillMillis).replace(" ago", ""), "ago"));
 				}
-				if (stat.total() > 0 && stat.uncontested < stat.total())
-				{
-					if (facts.length() > 0)
-					{
-						facts.append("   ");
-					}
-					facts.append(stat.uncontested).append('/').append(stat.total()).append(" clean");
-				}
-				if (facts.length() > 0)
-				{
-					wrap.add(summaryLine(facts.toString()));
-				}
+
+				detail.add(stats);
 
 				if (hasSkills)
 				{
-					wrap.add(sectionLine("XP"));
+					detail.add(javax.swing.Box.createVerticalStrut(10));
+					detail.add(sectionLine("XP"));
 					stat.xpBySkill.entrySet().stream()
 						.sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-						.forEach(e -> wrap.add(skillLine(e.getKey(), e.getValue())));
+						.forEach(e -> detail.add(skillLine(e.getKey(), e.getValue())));
 				}
 
 				if (hasDrops)
 				{
-					wrap.add(dropHeader(stat));
+					detail.add(javax.swing.Box.createVerticalStrut(10));
+					detail.add(dropHeader(stat));
 
 					// by total value, not quantity. nobody opens a drop list to find
 					// out how many bones they have.
 					stat.drops.entrySet().stream()
 						.sorted((a, b) -> Long.compare(valueOf(b.getValue()),
 							valueOf(a.getValue())))
-						.forEach(e -> wrap.add(dropLine(stat, e.getKey(), e.getValue())));
+						.forEach(e -> detail.add(dropLine(stat, e.getKey(), e.getValue())));
 				}
+
+				wrap.add(detail);
 			}
 		}
 
@@ -922,7 +972,7 @@ public class EverykillPanel extends PluginPanel
 	{
 		final JPanel p = new JPanel(new BorderLayout());
 		p.setBackground(NEST_BG);
-		p.setBorder(BorderFactory.createEmptyBorder(2, 10, 2, 8));
+		p.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
 		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 20));
 		p.setAlignmentX(LEFT_ALIGNMENT);
 
