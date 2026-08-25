@@ -32,6 +32,8 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingConstants;
+import javax.swing.JComponent;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 import javax.swing.border.CompoundBorder;
@@ -208,36 +210,7 @@ public class EverykillPanel extends PluginPanel
 
 		// flat thumb in the site's line colour. the default metal bar brings arrow
 		// buttons at both ends, which is what squashed it into itself in a 10px lane.
-		bar.setUI(new javax.swing.plaf.basic.BasicScrollBarUI()
-		{
-			@Override
-			protected void configureScrollBarColors()
-			{
-				thumbColor = SITE_LINE;
-				trackColor = SITE_BG_ALT;
-			}
-
-			@Override
-			protected javax.swing.JButton createIncreaseButton(int orientation)
-			{
-				return zeroButton();
-			}
-
-			@Override
-			protected javax.swing.JButton createDecreaseButton(int orientation)
-			{
-				return zeroButton();
-			}
-
-			private javax.swing.JButton zeroButton()
-			{
-				final javax.swing.JButton b = new javax.swing.JButton();
-				b.setPreferredSize(new Dimension(0, 0));
-				b.setMinimumSize(new Dimension(0, 0));
-				b.setMaximumSize(new Dimension(0, 0));
-				return b;
-			}
-		});
+		bar.setUI(flatScrollBar());
 
 		top.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 6));
 
@@ -312,6 +285,47 @@ public class EverykillPanel extends PluginPanel
 			}
 		});
 		return l;
+	}
+
+	/**
+	 * Flat thumb, no arrow buttons.
+	 *
+	 * <p>The default metal bar puts a button at each end, which in a narrow lane
+	 * leaves almost no thumb — that is what made the first scrollbar look squashed
+	 * into itself. One factory so both bars can never drift apart.
+	 */
+	private static javax.swing.plaf.basic.BasicScrollBarUI flatScrollBar()
+	{
+		return new javax.swing.plaf.basic.BasicScrollBarUI()
+		{
+			@Override
+			protected void configureScrollBarColors()
+			{
+				thumbColor = SITE_LINE;
+				trackColor = SITE_BG_ALT;
+			}
+
+			@Override
+			protected javax.swing.JButton createIncreaseButton(int orientation)
+			{
+				return zeroButton();
+			}
+
+			@Override
+			protected javax.swing.JButton createDecreaseButton(int orientation)
+			{
+				return zeroButton();
+			}
+
+			private javax.swing.JButton zeroButton()
+			{
+				final javax.swing.JButton b = new javax.swing.JButton();
+				b.setPreferredSize(new Dimension(0, 0));
+				b.setMinimumSize(new Dimension(0, 0));
+				b.setMaximumSize(new Dimension(0, 0));
+				return b;
+			}
+		};
 	}
 
 	private JPanel buildBrandBar()
@@ -1136,6 +1150,11 @@ public class EverykillPanel extends PluginPanel
 	 */
 	private static final Color NEST_BG = SITE_BG_ALT;
 
+	/** drop rows visible before the list starts scrolling. */
+	private static final int VISIBLE_DROPS = 5;
+
+	private static final int DROP_ROW_HEIGHT = 30;
+
 	/**
 	 * What this pile is worth, for sorting. Zero when the price is unknown.
 	 *
@@ -1323,6 +1342,63 @@ public class EverykillPanel extends PluginPanel
 		return l;
 	}
 
+	/**
+	 * The drop list, capped in height and scrolling past that.
+	 *
+	 * <p>Five rows fit; a longer list scrolls rather than shoving everything below it
+	 * down the panel. Short lists get no scrollbar at all — a box that scrolls when it
+	 * doesn't need to looks broken.
+	 *
+	 * <p>The wheel is forwarded to the outer scroll pane once this box hits its end,
+	 * so scrolling past the last drop keeps moving the panel instead of dead-stopping
+	 * under the cursor. That is the usual complaint about nested scroll panes and it
+	 * is worth the twenty lines to avoid.
+	 */
+	private static JComponent dropBox(JPanel list, int rows)
+	{
+		final int height = Math.min(rows, VISIBLE_DROPS) * DROP_ROW_HEIGHT;
+
+		if (rows <= VISIBLE_DROPS)
+		{
+			list.setAlignmentX(LEFT_ALIGNMENT);
+			list.setMaximumSize(new Dimension(Short.MAX_VALUE, height));
+			return list;
+		}
+
+		final JScrollPane box = new JScrollPane(list,
+			ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,
+			ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+		box.setBorder(BorderFactory.createEmptyBorder());
+		box.setBackground(SITE_PANEL);
+		box.getViewport().setBackground(SITE_PANEL);
+		box.setAlignmentX(LEFT_ALIGNMENT);
+		box.setPreferredSize(new Dimension(0, height));
+		box.setMaximumSize(new Dimension(Short.MAX_VALUE, height));
+
+		final JScrollBar bar = box.getVerticalScrollBar();
+		bar.setUnitIncrement(DROP_ROW_HEIGHT);
+		bar.setPreferredSize(new Dimension(6, 0));
+		bar.setUI(flatScrollBar());
+
+		box.addMouseWheelListener(e ->
+		{
+			final JScrollBar own = box.getVerticalScrollBar();
+			final boolean atTop = own.getValue() <= own.getMinimum();
+			final boolean atEnd = own.getValue() + own.getVisibleAmount() >= own.getMaximum();
+			final boolean scrollingPastTheEnd =
+				(e.getWheelRotation() < 0 && atTop) || (e.getWheelRotation() > 0 && atEnd);
+
+			if (scrollingPastTheEnd)
+			{
+				// hand it upward rather than swallowing it.
+				box.getParent().dispatchEvent(
+					SwingUtilities.convertMouseEvent(box, e, box.getParent()));
+			}
+		});
+
+		return box;
+	}
+
 	private JPanel row(NpcStat stat)
 	{
 		// the per-skill split is all-time and session only. day buckets keep a total,
@@ -1438,10 +1514,18 @@ public class EverykillPanel extends PluginPanel
 
 					// by total value, not quantity. nobody opens a drop list to find
 					// out how many bones they have.
+					// a monster with thirty drop types would push every row below it off
+					// the panel, so the list gets its own capped, scrolling box.
+					final JPanel list = new JPanel();
+					list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
+					list.setBackground(SITE_PANEL);
+
 					stat.drops.entrySet().stream()
 						.sorted((a, b) -> Long.compare(valueOf(b.getKey(), b.getValue()),
 							valueOf(a.getKey(), a.getValue())))
-						.forEach(e -> detail.add(dropLine(stat, e.getKey(), e.getValue())));
+						.forEach(e -> list.add(dropLine(stat, e.getKey(), e.getValue())));
+
+					detail.add(dropBox(list, stat.drops.size()));
 				}
 
 				wrap.add(detail);
@@ -1491,8 +1575,11 @@ public class EverykillPanel extends PluginPanel
 	{
 		final JPanel p = new JPanel(new BorderLayout());
 		p.setBackground(NEST_BG);
-		p.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
-		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 20));
+		p.setBackground(SITE_PANEL);
+		p.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createMatteBorder(0, 0, 1, 0, NEST_BG),
+			BorderFactory.createEmptyBorder(3, 4, 3, 6)));
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 30));
 		p.setAlignmentX(LEFT_ALIGNMENT);
 
 		// an id is not a name, but it beats showing nothing when the composition
@@ -1502,6 +1589,7 @@ public class EverykillPanel extends PluginPanel
 		final JLabel left = new JLabel(label);
 		left.setFont(FontManager.getRunescapeSmallFont());
 		left.setForeground(SITE_FG);
+		left.setBorder(BorderFactory.createEmptyBorder(0, 6, 0, 4));
 
 		// a long item name must not widen the row - core sets the same 1px minimum in
 		// LootTrackerBox with the comment "make BoxLayout truncate the name".
@@ -1511,7 +1599,8 @@ public class EverykillPanel extends PluginPanel
 		// that's what the quantity argument buys. async, so it appears when ready
 		// rather than holding up the repaint.
 		final JLabel icon = new JLabel();
-		icon.setPreferredSize(new Dimension(18, 16));
+		icon.setPreferredSize(new Dimension(34, 24));
+		icon.setHorizontalAlignment(SwingConstants.CENTER);
 		try
 		{
 			final int id = Integer.parseInt(itemId);
@@ -1530,8 +1619,8 @@ public class EverykillPanel extends PluginPanel
 		count.setFont(FontManager.getRunescapeSmallFont());
 		count.setForeground(SITE_FG_DIM);
 		count.setHorizontalAlignment(SwingConstants.RIGHT);
-		count.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 2));
-		count.setPreferredSize(new Dimension(16, count.getPreferredSize().height));
+		count.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 3));
+		count.setPreferredSize(new Dimension(18, count.getPreferredSize().height));
 
 		final long value = valueOf(itemId, tally);
 		final JLabel worth = new JLabel(value > 0 ? gp(value) : "");
