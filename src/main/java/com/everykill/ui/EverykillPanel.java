@@ -640,9 +640,9 @@ public class EverykillPanel extends PluginPanel
 		value.setForeground(SITE_FG);
 		value.setAlignmentX(LEFT_ALIGNMENT);
 
-		final JLabel why = new JLabel("<html>Shown once. Your account name is never sent,"
-			+ " so this code and the id on this computer are the only way back to your"
-			+ " history.</html>");
+		final JLabel why = new JLabel("<html>Shown once. Your account is identified by a"
+			+ " random id, not your RuneScape name, so this code and the id on this"
+			+ " computer are the only way back to your history.</html>");
 		why.setFont(FontManager.getRunescapeSmallFont());
 		why.setForeground(SITE_FG_DIM);
 		why.setAlignmentX(LEFT_ALIGNMENT);
@@ -744,6 +744,25 @@ public class EverykillPanel extends PluginPanel
 			warn.setBorder(BorderFactory.createEmptyBorder(2, 0, 4, 0));
 			monsterList.add(warn);
 		}
+
+		monsterList.add(javax.swing.Box.createVerticalStrut(8));
+		monsterList.add(sectionLine("LEADERBOARD"));
+
+		// the name itself is never held anywhere - not on the record, not in the
+		// identity file, not cached here for display. showing the STATE says what the
+		// user needs without this panel becoming the field that gets populated.
+		monsterList.add(detailLine("name",
+			uploadService.isPublishing() ? "published" : "not shown"));
+
+		final JLabel note = new JLabel(uploadService.isPublishing()
+			? "<html>Your display name is on public leaderboards.</html>"
+			: "<html>You are ranked anonymously. Turn on “Publish my name”"
+				+ " in settings to appear by name.</html>");
+		note.setFont(FontManager.getRunescapeSmallFont());
+		note.setForeground(SITE_FG_DIM);
+		note.setAlignmentX(LEFT_ALIGNMENT);
+		note.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
+		monsterList.add(note);
 
 		monsterList.add(javax.swing.Box.createVerticalStrut(8));
 		monsterList.add(sectionLine("YOUR DATA"));

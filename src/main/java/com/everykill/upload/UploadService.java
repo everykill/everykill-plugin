@@ -411,6 +411,19 @@ public class UploadService
 			onError);
 	}
 
+	/**
+	 * Whether the display name is currently on public leaderboards.
+	 *
+	 * <p>Reads the config rather than {@code publishedState}, because the toggle is
+	 * what the user chose and the server sync may be a flush behind. Answering "no"
+	 * while a name is live would be the dangerous direction to be wrong in; this way
+	 * round the panel is honest the instant the toggle moves.
+	 */
+	public boolean isPublishing()
+	{
+		return config.publishName() && identity.isRegistered();
+	}
+
 	/** Non-null when uploading has stopped because of a client fault. */
 	public String getHalted()
 	{
