@@ -41,6 +41,7 @@ taskkill /PID <pid> /F
 | `GET` | `/v1/health` | totals + reference-table coverage. No auth. |
 | `POST` | `/v1/register` | client id → token. No auth. |
 | `POST` | `/v1/kills` | the batch. Bearer token. |
+| `POST` | `/v1/publish` | publish or withdraw a display name. Bearer token. |
 | `GET` | `/v1/me` | export everything (GDPR 15/20). Bearer token. |
 | `DELETE` | `/v1/me` | erase everything (GDPR 17). Bearer token. |
 
@@ -166,7 +167,72 @@ instead of surfacing it in one request.
 `429` with `retryAfter` in seconds. Retry only on `429`, `5xx` and transport
 errors — everything else is a per-record verdict inside a `200`.
 
-## 7. What I need from you
+## 7. `POST /v1/publish` — built, matches your client exactly
+
+Your toggle now sends into something real. I wrote it against
+`UploadClient.publish` rather than a description of it, so the payloads are
+yours unchanged.
+
+**Publish or rename** — `{"publish": true, "displayName": "Zezima"}`:
+
+```json
+{ "stored": true, "published": true, "displayName": "Zezima",
+  "note": "Published. This name is a label on your account, not an identifier — renaming replaces it and your history stays put." }
+```
+
+**Withdraw** — `{"publish": false}`:
+
+```json
+{ "stored": true, "published": false, "removed": true,
+  "note": "Name deleted from our database, not hidden. Your kills still count toward everyone's ranks as an unnamed entry." }
+```
+
+`removed: false` means nothing was published — a `200`, not an error, so a
+toggle that gets flipped off twice doesn't produce a scary log line.
+
+### What the server does with it
+
+- **Its own table.** `published_name`, one row per account, keyed on account id.
+  Not a column on `account`, so withdrawing is one `DELETE` that provably
+  removes the row rather than nulling a field somebody forgets to clear.
+- **Renaming is an upsert.** The history stays on the account. Verified live:
+  published as `Zezima`, renamed to `Lynx Titan`, one row.
+- **Withdraw is a real delete.** Confirmed by reading the table directly in a
+  test, not by trusting the API's own 401 afterwards.
+- **`DELETE /v1/me` takes the name with it.** An erasure that leaves an RSN
+  behind isn't an erasure.
+- **The pruner takes it too.** Retention applies to the name as much as the kills.
+- **The export shows it.** `GET /v1/me` now returns
+  `account.publishedName`, null when nothing is published. Article 15 is
+  "everything we hold" and this is the most identifying thing in there.
+
+### Validation, because this string lands on a public page
+
+`400` with a specific reason for: longer than 12 characters, empty or
+whitespace-only, anything outside `[A-Za-z0-9 _-]`, or a non-string
+`displayName`. Names are trimmed before storing. `Lynx Titan`, `B0aty` and
+`a-b_c` all pass.
+
+**`publish: false` ignores any `displayName` sent alongside it.** A client
+holding a stale name can't republish it by accident while trying to withdraw.
+
+### Two accounts may hold the same name, on purpose
+
+Not a unique constraint. Jagex releases inactive players' names, so two accounts
+can legitimately hold the same string — and rejecting the second would hand the
+first a permanent claim on a name it no longer owns.
+
+### The guard that had to change
+
+`rights.test.js` banned `display_name` from the schema outright. Adding this
+table failed the build, which is exactly what the note in that test predicted
+would happen. I rescoped it rather than relaxing it: it now parses the schema
+into tables and allows a name **only** in `published_name`. Add `display_name`
+to `kill` and the build still fails, by name. Verified by doing it.
+
+21 new tests, 160 total.
+
+## 8. What I still need from you
 
 ### a. Export and delete buttons
 
@@ -210,7 +276,7 @@ three of your rules.
 I've added `email` to the schema guard: `rights.test.js` fails the build if a
 column with that name appears. Your side is the half I can't enforce.
 
-## 8. Answers to your two questions
+## 9. Answers to your two questions
 
 **Unpublished accounts hold a visible numbered rank — agreed, and your reasoning
 beat mine.** I was weighing tidiness; you pointed out that hiding them makes every
@@ -234,16 +300,16 @@ it's Jagex-issued and readable by every other plugin, which makes it a
 cross-plugin correlation key. Our random client id does the same job without that
 property. `rights.test.js` fails the build if `account_hash` appears in the schema.
 
-## 9. Status
+## 10. Status
 
 **Mine, done:** validation, dryness resolution, storage, dedupe, tokens, rate
 limiting, GDPR export/erasure, three-year retention enforced by a scheduled
-pruner. 139 tests. Site and privacy policy live.
+pruner, and `POST /v1/publish`. 160 tests. Site and privacy policy live.
 
 **Mine, not done:** not deployed to `api.everykill.com`. Blocked on hosting, not
 code — an endpoint that answers `accepted` and drops the data is worse than no
 endpoint, because the client stops queueing.
 
-**Yours:** the three items in section 7.
+**Yours:** the items in section 8.
 
 — Gage
