@@ -630,7 +630,7 @@ public class EverykillPanel extends PluginPanel
 			BorderFactory.createEmptyBorder(8, 8, 8, 8)));
 		p.setAlignmentX(LEFT_ALIGNMENT);
 
-		final JLabel head = new JLabel("SAVE THIS CODE");
+		final JLabel head = new JLabel("RECOVERY CODE");
 		head.setFont(FontManager.getRunescapeSmallFont());
 		head.setForeground(SITE_ACC);
 		head.setAlignmentX(LEFT_ALIGNMENT);
@@ -640,9 +640,10 @@ public class EverykillPanel extends PluginPanel
 		value.setForeground(SITE_FG);
 		value.setAlignmentX(LEFT_ALIGNMENT);
 
-		final JLabel why = new JLabel("<html>Shown once. Your account is identified by a"
-			+ " random id, not your RuneScape name, so this code and the id on this"
-			+ " computer are the only way back to your history.</html>");
+		final JLabel why = new JLabel("<html>Your account is identified by a random id,"
+			+ " not your RuneScape name. That id is saved with your RuneLite settings,"
+			+ " so a reinstall usually restores it on its own. Keep this code somewhere"
+			+ " in case it doesn’t.</html>");
 		why.setFont(FontManager.getRunescapeSmallFont());
 		why.setForeground(SITE_FG_DIM);
 		why.setAlignmentX(LEFT_ALIGNMENT);

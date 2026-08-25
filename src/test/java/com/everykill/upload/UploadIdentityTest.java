@@ -177,4 +177,91 @@ public class UploadIdentityTest
 		Assert.assertEquals("P309-51P3-0BY7-LQPS", id.getRecoveryCode());
 		Assert.assertEquals("token-2", id.getToken());
 	}
+
+	@Test
+	public void aReinstallRecoversTheClientIdFromSyncedConfig()
+	{
+		// the whole point. a fresh machine has no identity.properties, but RuneLite
+		// has already synced the id back with the rest of the rs profile config - so
+		// register lands in the SAME account instead of minting an orphan.
+		final java.util.Map<String, String> synced = new java.util.HashMap<>();
+		synced.put("uploadClientId", "0123456789abcdef0123456789abcdef");
+
+		final UploadIdentity fresh = new UploadIdentity(
+			folder.getRoot().toPath().resolve("gone.properties"), fakeConfig(synced));
+		fresh.load();
+
+		Assert.assertEquals("0123456789abcdef0123456789abcdef", fresh.getClientId());
+		Assert.assertFalse("no token yet - register issues a fresh one", fresh.isRegistered());
+	}
+
+	@Test
+	public void aFirstRunMirrorsTheNewIdIntoSyncedConfig()
+	{
+		final java.util.Map<String, String> synced = new java.util.HashMap<>();
+
+		final UploadIdentity id = new UploadIdentity(
+			folder.getRoot().toPath().resolve("id.properties"), fakeConfig(synced));
+		id.load();
+
+		Assert.assertEquals(id.getClientId(), synced.get("uploadClientId"));
+	}
+
+	@Test
+	public void theTokenIsNeverMirrored()
+	{
+		// the id names an account; the token authenticates as it. syncing a live
+		// bearer token buys nothing and puts a credential in someone else's storage.
+		final java.util.Map<String, String> synced = new java.util.HashMap<>();
+
+		final UploadIdentity id = new UploadIdentity(
+			folder.getRoot().toPath().resolve("id.properties"), fakeConfig(synced));
+		id.load();
+		id.save("ek_secret_token");
+
+		Assert.assertFalse(synced.containsValue("ek_secret_token"));
+		Assert.assertEquals(1, synced.size());
+	}
+
+	@Test
+	public void forgettingClearsTheSyncedCopyToo()
+	{
+		// otherwise the next login resurrects a deleted account.
+		final java.util.Map<String, String> synced = new java.util.HashMap<>();
+
+		final UploadIdentity id = new UploadIdentity(
+			folder.getRoot().toPath().resolve("id.properties"), fakeConfig(synced));
+		id.load();
+		id.save("tok");
+		Assert.assertFalse(synced.isEmpty());
+
+		id.forget();
+
+		Assert.assertTrue("a deleted account must not come back", synced.isEmpty());
+	}
+
+	/** A SyncedStore backed by a map. */
+	private static SyncedStore fakeConfig(java.util.Map<String, String> store)
+	{
+		return new SyncedStore()
+		{
+			@Override
+			public String get(String key)
+			{
+				return store.get(key);
+			}
+
+			@Override
+			public void put(String key, String value)
+			{
+				store.put(key, value);
+			}
+
+			@Override
+			public void remove(String key)
+			{
+				store.remove(key);
+			}
+		};
+	}
 }

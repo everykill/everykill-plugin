@@ -12,6 +12,9 @@ import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.Properties;
 import lombok.extern.slf4j.Slf4j;
+import com.everykill.EverykillConfig;
+import javax.inject.Inject;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.RuneLite;
 
 /**
@@ -44,20 +47,64 @@ public class UploadIdentity
 	// the only way back into their history - forever, with no rsn on file.
 	private static final String KEY_RECOVERY = "recoveryCode";
 
+	/** Synced by RuneLite with the rest of the RS profile config. */
+	private static final String CONFIG_KEY = "uploadClientId";
+
 	private final Path path;
+
+	/**
+	 * RuneLite's own config, which syncs to the user's RuneLite account.
+	 *
+	 * <p>The client id is mirrored here so a reinstall recovers silently. Nobody reads
+	 * a recovery code they were shown once and did not need yet, and losing the local
+	 * file is the common case — new computer, fresh install, wiped .runelite. The
+	 * ledger already rides this sync; the identity did not, which meant your kills
+	 * came back and your account did not.
+	 *
+	 * <p>Null when RuneLite has no profile yet (before login), which is why the local
+	 * file remains the source of truth and this is a mirror rather than a move.
+	 */
+	private final SyncedStore synced;
 
 	private String clientId;
 	private String token;
 	private String recoveryCode;
 
-	public UploadIdentity()
+	@Inject
+	public UploadIdentity(ConfigManager configManager)
 	{
-		this(RuneLite.RUNELITE_DIR.toPath().resolve(DIR).resolve(FILE));
+		this(RuneLite.RUNELITE_DIR.toPath().resolve(DIR).resolve(FILE),
+			new SyncedStore()
+			{
+				@Override
+				public String get(String key)
+				{
+					return configManager.getRSProfileConfiguration(EverykillConfig.GROUP, key);
+				}
+
+				@Override
+				public void put(String key, String value)
+				{
+					configManager.setRSProfileConfiguration(EverykillConfig.GROUP, key, value);
+				}
+
+				@Override
+				public void remove(String key)
+				{
+					configManager.unsetRSProfileConfiguration(EverykillConfig.GROUP, key);
+				}
+			});
 	}
 
 	UploadIdentity(Path path)
 	{
+		this(path, null);
+	}
+
+	UploadIdentity(Path path, SyncedStore synced)
+	{
 		this.path = path;
+		this.synced = synced;
 	}
 
 	/**
@@ -89,8 +136,55 @@ public class UploadIdentity
 
 		if (clientId == null || clientId.length() != 32)
 		{
-			clientId = newClientId();
-			token = null;
+			// nothing local. before minting a new id - which orphans any history the
+			// server holds - ask RuneLite's synced config, because a reinstall is the
+			// exact case this exists for.
+			final String synced = syncedClientId();
+			if (synced != null)
+			{
+				clientId = synced;
+				token = null;
+				log.debug("everykill: recovered client id from RuneLite config sync");
+			}
+			else
+			{
+				clientId = newClientId();
+				token = null;
+			}
+		}
+
+		mirrorToConfig();
+	}
+
+	private String syncedClientId()
+	{
+		if (synced == null)
+		{
+			return null;
+		}
+
+		final String value = synced.get(CONFIG_KEY);
+		return value != null && value.length() == 32 ? value : null;
+	}
+
+	/**
+	 * Writes the id into synced config. The TOKEN is deliberately not mirrored.
+	 *
+	 * <p>The id identifies an account; the token authenticates as it. Syncing the id
+	 * lets a reinstall re-register into the same history — register is idempotent, so
+	 * it just issues a fresh token. Syncing the credential as well would put a live
+	 * bearer token in someone else's storage for no gain.
+	 */
+	private void mirrorToConfig()
+	{
+		if (synced == null || clientId == null)
+		{
+			return;
+		}
+
+		if (!clientId.equals(syncedClientId()))
+		{
+			synced.put(CONFIG_KEY, clientId);
 		}
 	}
 
@@ -151,6 +245,8 @@ public class UploadIdentity
 			props.setProperty(KEY_RECOVERY, recoveryCode);
 		}
 
+		mirrorToConfig();
+
 		try
 		{
 			Files.createDirectories(path.getParent());
@@ -200,6 +296,13 @@ public class UploadIdentity
 	 */
 	public synchronized void forget()
 	{
+		// the synced copy goes too. leaving it would resurrect a deleted account on
+		// the next login, which is not what "delete my data" means.
+		if (synced != null)
+		{
+			synced.remove(CONFIG_KEY);
+		}
+
 		clientId = null;
 		token = null;
 		recoveryCode = null;
