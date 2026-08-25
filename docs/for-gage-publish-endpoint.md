@@ -25,7 +25,7 @@ named."*
 `POST /v1/publish`, bearer token, not implemented on your side yet.
 
 ```json
-{ "publish": true, "displayName": "Zelnork" }
+{ "publish": true, "displayName": "SomePlayer" }
 ```
 
 Withdrawing sends `{"publish": false}` with **no** `displayName` — because the name
