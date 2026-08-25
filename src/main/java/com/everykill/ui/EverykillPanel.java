@@ -104,8 +104,21 @@ public class EverykillPanel extends PluginPanel
 	 */
 	private final Map<Integer, Integer> priceCache = new HashMap<>();
 
-	/** records view instead of the kill log. */
-	private boolean showRecords;
+	private enum View
+	{
+		KILLS("Kill log"),
+		SESSION("Session"),
+		RECORDS("Records");
+
+		private final String label;
+
+		View(String label)
+		{
+			this.label = label;
+		}
+	}
+
+	private View view = View.KILLS;
 
 	private final JLabel sessionKills = new JLabel("0");
 	private final JLabel sessionSub = new JLabel("kills");
@@ -235,21 +248,19 @@ public class EverykillPanel extends PluginPanel
 	 */
 	private JPanel buildViewTabs()
 	{
-		final JPanel row = new JPanel(new java.awt.GridLayout(1, 2, 1, 0));
+		final JPanel row = new JPanel(new java.awt.GridLayout(1, View.values().length, 1, 0));
 		row.setBackground(SITE_BG);
 		row.setMaximumSize(new Dimension(Short.MAX_VALUE, 20));
 		row.setAlignmentX(LEFT_ALIGNMENT);
 
-		row.add(viewTab("Kill log", !showRecords, () ->
+		for (View v : View.values())
 		{
-			showRecords = false;
-			rebuild();
-		}));
-		row.add(viewTab("Records", showRecords, () ->
-		{
-			showRecords = true;
-			rebuild();
-		}));
+			row.add(viewTab(v.label, view == v, () ->
+			{
+				view = v;
+				rebuild();
+			}));
+		}
 		return row;
 	}
 
@@ -574,6 +585,94 @@ public class EverykillPanel extends PluginPanel
 	 * kill timestamps would measure how fast you walked between monsters. The tab says
 	 * so rather than quietly omitting them.
 	 */
+	/**
+	 * Live view of this session.
+	 *
+	 * <p>{@code spec-plugin-ux.md} §1b also lists supplies consumed, damage taken,
+	 * deaths, and the current slayer task. None of those are built: nothing tracks
+	 * inventory changes, our own hitpoints, or the slayer varbits, and a panel that
+	 * showed 0 for all four would read as "you took no damage" rather than "we are
+	 * not watching". They arrive when something measures them.
+	 *
+	 * <p>The session boundary is the spec's other open item. Ours is "since the
+	 * counters were last zeroed" — login or a manual reset — not the fixed 10-minute
+	 * idle rule, so the elapsed figure is labelled plainly rather than dressed up as
+	 * a standard everyone shares.
+	 */
+	private void buildSession()
+	{
+		monsterHeader.setText("THIS SESSION");
+
+		final int kills = ledger.getSessionKills();
+		final long xp = ledger.sessionXp();
+		final long elapsed = System.currentTimeMillis() - ledger.getSessionStartMillis();
+		final double hours = elapsed / 3_600_000.0;
+
+		final JPanel totals = new JPanel(new java.awt.GridLayout(1, 0, 2, 0));
+		totals.setBackground(SITE_PANEL);
+		totals.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(SITE_LINE, 1),
+			BorderFactory.createEmptyBorder(8, 4, 8, 4)));
+		totals.setAlignmentX(LEFT_ALIGNMENT);
+		totals.setMaximumSize(new Dimension(Short.MAX_VALUE, 46));
+		totals.add(statBlock(String.valueOf(kills), "kills"));
+		totals.add(statBlock(shortXp(xp), "xp"));
+		totals.add(statBlock(elapsedShort(elapsed), "elapsed"));
+		monsterList.add(totals);
+		monsterList.add(javax.swing.Box.createVerticalStrut(4));
+
+		// rates need enough time to mean anything. a 90-second sample extrapolated to
+		// an hour is a number that moves every tick and tells you nothing - so it
+		// stays hidden rather than showing something that looks measured.
+		if (hours >= RATE_MIN_HOURS && kills > 0)
+		{
+			final JPanel rates = new JPanel(new java.awt.GridLayout(1, 0, 2, 0));
+			rates.setBackground(SITE_PANEL);
+			rates.setBorder(BorderFactory.createCompoundBorder(
+				BorderFactory.createLineBorder(SITE_LINE, 1),
+				BorderFactory.createEmptyBorder(8, 4, 8, 4)));
+			rates.setAlignmentX(LEFT_ALIGNMENT);
+			rates.setMaximumSize(new Dimension(Short.MAX_VALUE, 46));
+			rates.add(statBlock(String.valueOf(Math.round(kills / hours)), "kills/hr"));
+			rates.add(statBlock(shortXp(Math.round(xp / hours)), "xp/hr"));
+			monsterList.add(rates);
+			monsterList.add(javax.swing.Box.createVerticalStrut(4));
+		}
+		else if (kills > 0)
+		{
+			monsterList.add(caption("rates after 5 minutes"));
+			monsterList.add(javax.swing.Box.createVerticalStrut(4));
+		}
+
+		final List<NpcStat> rows = rollUp(new ArrayList<>(ledger.getSession().values()));
+		if (rows.isEmpty())
+		{
+			monsterList.add(caption("Nothing killed yet."));
+			return;
+		}
+
+		monsterList.add(sectionLine("BY MONSTER"));
+		for (NpcStat stat : rows)
+		{
+			monsterList.add(row(stat));
+		}
+	}
+
+	/** "2h 14m", "14m", "40s". */
+	private static String elapsedShort(long millis)
+	{
+		final long mins = millis / 60_000L;
+		if (mins < 1)
+		{
+			return (millis / 1000L) + "s";
+		}
+		if (mins < 60)
+		{
+			return mins + "m";
+		}
+		return (mins / 60) + "h " + (mins % 60) + "m";
+	}
+
 	private void buildRecords(java.util.Collection<NpcStat> all)
 	{
 		monsterHeader.setText("RECORDS");
@@ -924,11 +1023,19 @@ public class EverykillPanel extends PluginPanel
 		// the real state rather than whatever the last click set.
 		viewTabs.removeAll();
 		viewTabs.add(buildViewTabs());
-		tabs.setVisible(!showRecords);
+		// the time tabs only mean something for the kill log. a lifetime record and a
+		// live session both ignore them, so they hide rather than sit there inert.
+		tabs.setVisible(view == View.KILLS);
 
-		if (showRecords)
+		if (view == View.RECORDS)
 		{
 			buildRecords(ledger.allTimeSorted());
+			return;
+		}
+
+		if (view == View.SESSION)
+		{
+			buildSession();
 			return;
 		}
 
@@ -1161,6 +1268,9 @@ public class EverykillPanel extends PluginPanel
 	private static final Color NEST_BG = SITE_BG_ALT;
 
 	/** drop rows visible before the list starts scrolling. */
+	/** hours of session before per-hour rates are worth showing. */
+	private static final double RATE_MIN_HOURS = 5.0 / 60.0;
+
 	private static final int VISIBLE_DROPS = 5;
 
 	private static final int DROP_ROW_HEIGHT = 36;

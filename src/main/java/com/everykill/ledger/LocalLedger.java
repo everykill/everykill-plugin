@@ -346,6 +346,18 @@ public class LocalLedger
 	}
 
 	/** Experience measured this session, across every monster. */
+	/**
+	 * When this session started, for elapsed time and per-hour rates.
+	 *
+	 * <p>Reset by {@code startSession()}, so it means "since the counters were last
+	 * zeroed" — not since login. Those differ after a manual reset and the panel
+	 * should say the same thing the counters do.
+	 */
+	public long getSessionStartMillis()
+	{
+		return sessionStartMillis;
+	}
+
 	public long sessionXp()
 	{
 		long total = 0L;
