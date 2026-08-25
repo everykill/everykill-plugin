@@ -2390,3 +2390,50 @@ mean toggling upload on uploads a backlog the user never agreed to send.
 **The whole batch is always acked**, including rejections — confirmed by Gage against my
 actual `PendingKills` code. Holding a rejected record back parks it at the head of the
 queue forever and wedges every future batch behind it.
+
+---
+
+## 2026-08-25 — Step 8 verified: real kills reached the server with nobody driving
+
+**Status:** ✅ verified live. Three kills went detector → ledger → queue → HTTP → SQLite
+with no curl, no pasted JSON, and no hand-holding.
+
+Evidence, read out of `everykill-site/api/everykill.db` rather than from a log line:
+
+```
+event_id                              npc      grade         myDmg  fightTicks  loot
+5d6bbbf0-95d6-4e31-8725-6a10171ddaad  Cyclops  uncontested   76     79          confirmed
+b1c8c90c-4e5b-4bba-a390-cc65e0b7f0a7  Cyclops  uncontested   76     47          confirmed
+9d30d905-db27-4da9-bfc4-2d3c7196cc13  Cyclops  uncontested   76     39          confirmed
+```
+
+**How we know these are real and not another curl test.** My two test records carry
+hand-typed ids (`tyler-fixed-1`, `live-plugin-token-1`) and identical values — 75 damage,
+12 ticks, every time, because I typed them once and reused the string. These three carry
+**client-generated UUIDs**, and their fight lengths differ: 79, 47 and 39 ticks. Nothing
+I could paste produces varying fight lengths, because `fightTicks` is measured from our
+first damage to the kill resolving. The variation *is* the proof.
+
+Drops arrived intact and correctly attributed per kill:
+
+| kill | drops |
+|---|---|
+| 5d6bbbf0 | Big bones ×1, Coins ×47 |
+| b1c8c90c | Big bones ×1, Black longsword ×1 |
+| 9d30d905 | Big bones ×1, Uncut sapphire ×1 |
+
+Every cyclops dropped Big bones plus one rolled item — exactly the pattern measured
+during Step 6 live verification, now surviving the whole pipeline.
+
+Dryness resolved server-side on all three: `counts_as_dry=0`, `in_denominator=1`,
+`reason=confirmed_loot`.
+
+**What this closes.** Every link is now proven end to end: kill detection, damage
+attribution, loot capture, the account-type gate, queue and batching, registration,
+bearer auth, the wire format, and ingest. The chain that was theoretical at midnight is
+measured.
+
+**Method note.** The verification came from querying the server's own database, not from
+reading `"accepted": 1` in a response. A response says the server replied; a row says the
+data is there. Those differ whenever anything between them is lying, which is exactly
+when you need to know.
