@@ -8,6 +8,7 @@ import com.everykill.ledger.LocalLedger;
 import com.google.gson.Gson;
 import com.everykill.model.Confidence;
 import com.everykill.model.NpcStat;
+import com.everykill.upload.UploadService;
 import com.everykill.notice.MilestoneNotifier;
 import com.everykill.xp.XpService;
 import java.awt.BorderLayout;
@@ -15,6 +16,8 @@ import java.awt.Cursor;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 import java.awt.Graphics;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -135,6 +138,8 @@ public class EverykillPanel extends PluginPanel
 
 	private final NpcIcons npcIcons;
 
+	private final UploadService uploadService;
+
 	// npc ids whose skill breakdown is open. panel state, never persisted.
 	private final Set<Integer> expanded = new HashSet<>();
 
@@ -164,7 +169,8 @@ public class EverykillPanel extends PluginPanel
 
 	@Inject
 	EverykillPanel(LocalLedger ledger, MilestoneNotifier notifier, XpService xpService,
-		ItemManager itemManager, ClientThread clientThread, Gson gson)
+		ItemManager itemManager, ClientThread clientThread, Gson gson,
+		UploadService uploadService)
 	{
 		super(false);
 		this.ledger = ledger;
@@ -172,6 +178,7 @@ public class EverykillPanel extends PluginPanel
 		this.xpService = xpService;
 		this.itemManager = itemManager;
 		this.clientThread = clientThread;
+		this.uploadService = uploadService;
 
 		// injected Gson, per CONVENTIONS - never build one. read once at construction
 		// because it's a 238-entry file off the classpath, not per repaint.
@@ -600,9 +607,101 @@ public class EverykillPanel extends PluginPanel
 	 * idle rule, so the elapsed figure is labelled plainly rather than dressed up as
 	 * a standard everyone shares.
 	 */
+	/**
+	 * The recovery code, shown until the user says they have it.
+	 *
+	 * <p>Deliberately loud and deliberately blocking-ish. The server mints this exactly
+	 * once and there is no RSN on file, so it is the only route back into a history
+	 * after a reinstall. A quiet one-time toast would lose people their data, and the
+	 * honest cost of doing identity properly should be stated rather than buried.
+	 */
+	private JPanel recoveryBanner(String code)
+	{
+		final JPanel p = new JPanel();
+		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+		p.setBackground(SITE_PANEL);
+		p.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createMatteBorder(0, 2, 0, 0, SITE_ACC),
+			BorderFactory.createEmptyBorder(8, 8, 8, 8)));
+		p.setAlignmentX(LEFT_ALIGNMENT);
+
+		final JLabel head = new JLabel("SAVE THIS CODE");
+		head.setFont(FontManager.getRunescapeSmallFont());
+		head.setForeground(SITE_ACC);
+		head.setAlignmentX(LEFT_ALIGNMENT);
+
+		final JLabel value = new JLabel(code);
+		value.setFont(FontManager.getRunescapeBoldFont());
+		value.setForeground(SITE_FG);
+		value.setAlignmentX(LEFT_ALIGNMENT);
+
+		final JLabel why = new JLabel("<html>Shown once. Your account name is never sent,"
+			+ " so this is the only way back to your history if you reinstall.</html>");
+		why.setFont(FontManager.getRunescapeSmallFont());
+		why.setForeground(SITE_FG_DIM);
+		why.setAlignmentX(LEFT_ALIGNMENT);
+
+		final JLabel copy = new JLabel("Copy");
+		copy.setFont(FontManager.getRunescapeSmallFont());
+		copy.setForeground(SITE_FG_FAINT);
+		copy.setAlignmentX(LEFT_ALIGNMENT);
+		copy.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		copy.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseClicked(MouseEvent e)
+			{
+				Toolkit.getDefaultToolkit().getSystemClipboard()
+					.setContents(new StringSelection(code), null);
+				copy.setText("Copied");
+				copy.setForeground(SITE_GOLD);
+			}
+		});
+
+		final JLabel done = new JLabel("I've saved it");
+		done.setFont(FontManager.getRunescapeSmallFont());
+		done.setForeground(SITE_FG_FAINT);
+		done.setAlignmentX(LEFT_ALIGNMENT);
+		done.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		done.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseClicked(MouseEvent e)
+			{
+				// only now does it leave disk. clearing on display would mean a
+				// misclick costs someone their history.
+				uploadService.acknowledgeRecoveryCode();
+				rebuild();
+			}
+		});
+
+		final JPanel actions = new JPanel(new java.awt.GridLayout(1, 2, 6, 0));
+		actions.setOpaque(false);
+		actions.setAlignmentX(LEFT_ALIGNMENT);
+		actions.setMaximumSize(new Dimension(Short.MAX_VALUE, 16));
+		actions.add(copy);
+		actions.add(done);
+
+		p.add(head);
+		p.add(value);
+		p.add(javax.swing.Box.createVerticalStrut(4));
+		p.add(why);
+		p.add(javax.swing.Box.createVerticalStrut(6));
+		p.add(actions);
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, p.getPreferredSize().height));
+		return p;
+	}
+
 	private void buildSession()
 	{
 		monsterHeader.setText("THIS SESSION");
+
+		final String recovery = uploadService.getRecoveryCode();
+		if (recovery != null)
+		{
+			monsterList.add(recoveryBanner(recovery));
+			monsterList.add(javax.swing.Box.createVerticalStrut(6));
+		}
 
 		final int kills = ledger.getSessionKills();
 		final long xp = ledger.sessionXp();
@@ -652,6 +751,26 @@ public class EverykillPanel extends PluginPanel
 			return;
 		}
 
+		// spec-plugin-ux 1b: upload state plain and always visible. a queue that is
+		// silently not draining is the failure mode people only notice weeks later.
+		monsterList.add(sectionLine("UPLOAD"));
+		monsterList.add(detailLine("status", uploadService.getStatus()));
+
+		final int queued = uploadService.queued();
+		if (queued > 0)
+		{
+			monsterList.add(detailLine("waiting", String.valueOf(queued)));
+		}
+
+		final int dropped = uploadService.dropped();
+		if (dropped > 0)
+		{
+			// surfaced rather than swallowed. if the queue is shedding records the
+			// user is entitled to know their data is not all arriving.
+			monsterList.add(detailLine("dropped", String.valueOf(dropped)));
+		}
+
+		monsterList.add(javax.swing.Box.createVerticalStrut(6));
 		monsterList.add(sectionLine("BY MONSTER"));
 		for (NpcStat stat : rows)
 		{

@@ -39,10 +39,16 @@ public class UploadIdentity
 	private static final String KEY_CLIENT_ID = "clientId";
 	private static final String KEY_TOKEN = "token";
 
+	// held on disk until the user says they've written it down. it is minted exactly
+	// once by the server, so a client restart before they copy it would otherwise lose
+	// the only way back into their history - forever, with no rsn on file.
+	private static final String KEY_RECOVERY = "recoveryCode";
+
 	private final Path path;
 
 	private String clientId;
 	private String token;
+	private String recoveryCode;
 
 	public UploadIdentity()
 	{
@@ -79,6 +85,7 @@ public class UploadIdentity
 
 		clientId = props.getProperty(KEY_CLIENT_ID);
 		token = props.getProperty(KEY_TOKEN);
+		recoveryCode = props.getProperty(KEY_RECOVERY);
 
 		if (clientId == null || clientId.length() != 32)
 		{
@@ -124,11 +131,25 @@ public class UploadIdentity
 	 */
 	public synchronized void save(String newToken)
 	{
+		save(newToken, recoveryCode);
+	}
+
+	/** Stores the token, and the recovery code when the server just minted one. */
+	public synchronized void save(String newToken, String newRecoveryCode)
+	{
 		token = newToken;
+		if (newRecoveryCode != null)
+		{
+			recoveryCode = newRecoveryCode;
+		}
 
 		final Properties props = new Properties();
 		props.setProperty(KEY_CLIENT_ID, clientId);
 		props.setProperty(KEY_TOKEN, newToken);
+		if (recoveryCode != null)
+		{
+			props.setProperty(KEY_RECOVERY, recoveryCode);
+		}
 
 		try
 		{
@@ -145,6 +166,27 @@ public class UploadIdentity
 			// as the id itself survives, which it does not here. say so loudly.
 			log.warn("everykill: could not save upload identity to {}", path, e);
 			throw new UncheckedIOException(e);
+		}
+	}
+
+	/** The unacknowledged recovery code, or null once the user has confirmed it. */
+	public synchronized String getRecoveryCode()
+	{
+		return recoveryCode;
+	}
+
+	/**
+	 * Called when the user says they have written the code down.
+	 *
+	 * <p>Only then does it leave disk. Clearing it on display would mean a misclick
+	 * costs someone their history.
+	 */
+	public synchronized void acknowledgeRecoveryCode()
+	{
+		recoveryCode = null;
+		if (token != null)
+		{
+			save(token);
 		}
 	}
 

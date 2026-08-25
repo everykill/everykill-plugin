@@ -136,4 +136,45 @@ public class UploadIdentityTest
 		Assert.assertEquals(32, id.getClientId().length());
 		Assert.assertNotEquals("abc123", id.getClientId());
 	}
+
+	@Test
+	public void aRecoveryCodeSurvivesARestartUntilAcknowledged()
+	{
+		// the server mints it ONCE. holding it in memory means a crash, or the user
+		// closing the client to write it down somewhere, loses their history forever.
+		final Path path = folder.getRoot().toPath().resolve("id.properties");
+
+		final UploadIdentity first = identityAt(path);
+		first.load();
+		first.save("token-abc", "P309-51P3-0BY7-LQPS");
+
+		final UploadIdentity afterRestart = identityAt(path);
+		afterRestart.load();
+		Assert.assertEquals("P309-51P3-0BY7-LQPS", afterRestart.getRecoveryCode());
+
+		afterRestart.acknowledgeRecoveryCode();
+
+		final UploadIdentity afterAck = identityAt(path);
+		afterAck.load();
+		Assert.assertNull("acknowledged, so it stops nagging", afterAck.getRecoveryCode());
+		Assert.assertEquals("but the token is untouched", "token-abc", afterAck.getToken());
+	}
+
+	@Test
+	public void aLaterRegistrationDoesNotWipeAnUnacknowledgedCode()
+	{
+		// register is idempotent and returns recoveryCode null every time after the
+		// first. passing that null through must not erase the one we are still
+		// showing - that would be losing the code to a routine token refresh.
+		final Path path = folder.getRoot().toPath().resolve("id.properties");
+
+		final UploadIdentity id = identityAt(path);
+		id.load();
+		id.save("token-1", "P309-51P3-0BY7-LQPS");
+
+		id.save("token-2", null);
+
+		Assert.assertEquals("P309-51P3-0BY7-LQPS", id.getRecoveryCode());
+		Assert.assertEquals("token-2", id.getToken());
+	}
 }

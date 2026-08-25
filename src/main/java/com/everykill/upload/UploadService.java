@@ -49,15 +49,6 @@ public class UploadService
 	@Getter
 	private volatile String status = "Not uploading";
 
-	/**
-	 * Shown once, on the first successful registration, and never re-issued.
-	 *
-	 * <p>Held here so the panel can display it. With no RSN on file this is the only
-	 * way back into a history after a reinstall, and that has to be said plainly.
-	 */
-	@Getter
-	private volatile String recoveryCode;
-
 	@Inject
 	UploadService(EverykillConfig config, UploadClient client, UploadIdentity identity,
 		ScheduledExecutorService executor)
@@ -152,11 +143,10 @@ public class UploadService
 			{
 				try
 				{
-					identity.save(reg.token);
-					if (reg.recoveryCode != null)
-					{
-						recoveryCode = reg.recoveryCode;
-					}
+					// straight to disk, including the recovery code. it is minted
+					// exactly once, so holding it in memory means a restart before
+					// the user copies it loses their history permanently.
+					identity.save(reg.token, reg.recoveryCode);
 					status = "Registered";
 				}
 				catch (RuntimeException e)
@@ -234,6 +224,22 @@ public class UploadService
 				}
 				inFlight.set(false);
 			});
+	}
+
+	/**
+	 * A recovery code the user has not confirmed yet, or null.
+	 *
+	 * <p>Read from disk, so it survives restarts until acknowledged.
+	 */
+	public String getRecoveryCode()
+	{
+		return identity.getRecoveryCode();
+	}
+
+	/** The user says they have written it down. Only now does it leave disk. */
+	public void acknowledgeRecoveryCode()
+	{
+		identity.acknowledgeRecoveryCode();
 	}
 
 	/** Kills queued but not yet sent. */
