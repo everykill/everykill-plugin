@@ -59,14 +59,21 @@ fails the build without having to remember this conversation.
 3. **Any name validation you want done client-side.** Length, characters. I can reject
    before sending, but I'd rather not invent rules that disagree with yours.
 
-## One thing I'd like your view on
+## Retroactive — decided, and it's yes
 
-**Should publishing be retroactive?** If someone uploads 4,000 kills unnamed and then
-opts in, do those kills become theirs publicly, or only kills from that point on?
+Delk called it: *"let them opt-in whenever, its up to them to be on the leaderboard or
+not."*
 
-Retroactive is what people will expect — they earned the rank. But it means a single
-toggle can reveal months of activity at once, and someone who opts in casually may not
-picture that. Not asking you to decide alone; flagging it because it's the kind of thing
-that's obvious in hindsight and awkward to reverse.
+So publishing names **every kill on the account**, including ones uploaded while
+unnamed. It's the honest reading — those ranks were earned, and a board that only
+counted kills after the toggle would under-report someone who has been uploading for
+months.
+
+The consequence I flagged is real but it's the user's to make, so the plugin states it
+rather than hiding it. The config now reads *"including kills you already uploaded"*, so
+the scope is on screen at the moment of choosing rather than discovered afterwards.
+
+Withdrawing is the same in reverse: the name goes, the kills stay as unnamed entries and
+keep counting toward everyone else's percentiles.
 
 — Tyler

@@ -193,7 +193,7 @@ public interface EverykillConfig extends Config
 	@ConfigItem(
 		keyName = "publishName",
 		name = "Publish my name",
-		description = "Shows your display name on public leaderboards. Off means you are still ranked, just not named. Requires uploading. Turning this off later deletes the name from the site.",
+		description = "Shows your display name on public leaderboards, including kills you already uploaded. Off means you are still ranked, just not named. Requires uploading. Turning this off deletes the name from the site; your ranks stay as unnamed entries.",
 		warning = "This feature submits your IP address to a 3rd-party server not controlled or verified by RuneLite developers",
 		position = 33,
 		section = uploadSection
