@@ -111,6 +111,8 @@ public class EverykillPanel extends PluginPanel
 	private final JLabel noticeLabel = new JLabel(" ");
 	private final MaterialTabGroup tabs = new MaterialTabGroup();
 
+	private final JPanel viewTabs = new JPanel();
+
 	// npc ids whose skill breakdown is open. panel state, never persisted.
 	private final Set<Integer> expanded = new HashSet<>();
 
@@ -249,6 +251,69 @@ public class EverykillPanel extends PluginPanel
 	 * links on the right. Same brand mark, so the plugin and the site read as one
 	 * thing rather than two projects that happen to share a name.
 	 */
+	/**
+	 * Kills / Records. The time tabs below only apply to the kill log, so they are
+	 * hidden on Records rather than left visible and inert - which is what stranded
+	 * you there with no way back.
+	 */
+	private JPanel buildViewTabs()
+	{
+		final JPanel row = new JPanel(new java.awt.GridLayout(1, 2, 1, 0));
+		row.setBackground(SITE_BG);
+		row.setMaximumSize(new Dimension(Short.MAX_VALUE, 20));
+		row.setAlignmentX(LEFT_ALIGNMENT);
+
+		row.add(viewTab("Kill log", !showRecords, () ->
+		{
+			showRecords = false;
+			rebuild();
+		}));
+		row.add(viewTab("Records", showRecords, () ->
+		{
+			showRecords = true;
+			rebuild();
+		}));
+		return row;
+	}
+
+	/** One view tab: rust underline when selected, same idiom as the time tabs. */
+	private static JLabel viewTab(String text, boolean selected, Runnable action)
+	{
+		final JLabel l = new JLabel(text, SwingConstants.CENTER);
+		l.setFont(FontManager.getRunescapeSmallFont());
+		l.setForeground(selected ? SITE_FG : SITE_FG_FAINT);
+		l.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		l.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0,
+			selected ? SITE_ACC : SITE_BG));
+		l.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseClicked(MouseEvent e)
+			{
+				action.run();
+			}
+
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				if (!selected)
+				{
+					l.setForeground(SITE_FG_DIM);
+				}
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				if (!selected)
+				{
+					l.setForeground(SITE_FG_FAINT);
+				}
+			}
+		});
+		return l;
+	}
+
 	private JPanel buildBrandBar()
 	{
 		final JPanel bar = new JPanel(new BorderLayout());
@@ -274,20 +339,9 @@ public class EverykillPanel extends PluginPanel
 		left.add(mark, BorderLayout.WEST);
 		left.add(name, BorderLayout.CENTER);
 
-		final JPanel right = new JPanel(new BorderLayout(8, 0));
-		right.setOpaque(false);
-		right.add(linkLabel(showRecords ? "kills" : "records",
-			showRecords ? "Back to the kill log" : "Personal records",
-			() ->
-			{
-				showRecords = !showRecords;
-				rebuild();
-			}), BorderLayout.WEST);
-		right.add(linkLabel("site ↗", "Open everykill.gg",
-			() -> LinkBrowser.browse("https://everykill.gg")), BorderLayout.EAST);
-
 		bar.add(left, BorderLayout.WEST);
-		bar.add(right, BorderLayout.EAST);
+		bar.add(linkLabel("site ↗", "Open everykill.gg",
+			() -> LinkBrowser.browse("https://everykill.gg")), BorderLayout.EAST);
 		return bar;
 	}
 
@@ -418,6 +472,12 @@ public class EverykillPanel extends PluginPanel
 			narrow(tab, w == window);
 		}
 
+		viewTabs.setLayout(new BorderLayout());
+		viewTabs.setBackground(SITE_BG);
+		viewTabs.setMaximumSize(new Dimension(Short.MAX_VALUE, 20));
+		viewTabs.setAlignmentX(LEFT_ALIGNMENT);
+		box.add(viewTabs);
+		box.add(javax.swing.Box.createVerticalStrut(6));
 		box.add(tabs);
 		box.add(javax.swing.Box.createVerticalStrut(6));
 		box.add(monsterHeader);
@@ -537,9 +597,11 @@ public class EverykillPanel extends PluginPanel
 
 		final JPanel totals = new JPanel(new java.awt.GridLayout(1, 0, 2, 0));
 		totals.setBackground(SITE_PANEL);
-		totals.setBorder(BorderFactory.createEmptyBorder(8, 2, 8, 4));
+		totals.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(SITE_LINE, 1),
+			BorderFactory.createEmptyBorder(8, 4, 8, 4)));
 		totals.setAlignmentX(LEFT_ALIGNMENT);
-		totals.setMaximumSize(new Dimension(Short.MAX_VALUE, 40));
+		totals.setMaximumSize(new Dimension(Short.MAX_VALUE, 46));
 		totals.add(statBlock(String.valueOf(totalKills), "kills"));
 		totals.add(statBlock(shortXp(totalXp), "xp"));
 		totals.add(statBlock(totalGp > 0 ? gp(totalGp) : "-", "gp"));
@@ -551,18 +613,21 @@ public class EverykillPanel extends PluginPanel
 		{
 			monsterList.add(recordCard("MOST VALUABLE DROP", bestItem,
 				gp(bestValue) + " gp  ·  " + bestFrom));
+			monsterList.add(javax.swing.Box.createVerticalStrut(4));
 		}
 
 		if (driestItem != null && driestKills > 0)
 		{
 			monsterList.add(recordCard("LONGEST DRY STREAK", driestItem,
 				driestKills + " kills since  ·  " + driestFrom));
+			monsterList.add(javax.swing.Box.createVerticalStrut(4));
 		}
 
 		if (mostKilled != null && mostKilled.total() > 0)
 		{
 			monsterList.add(recordCard("MOST KILLED", mostKilled.name,
 				mostKilled.total() + " kills"));
+			monsterList.add(javax.swing.Box.createVerticalStrut(4));
 		}
 
 		if (firstEver != Long.MAX_VALUE)
@@ -584,9 +649,14 @@ public class EverykillPanel extends PluginPanel
 		final JPanel p = new JPanel();
 		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
 		p.setBackground(SITE_PANEL);
-		p.setBorder(BorderFactory.createEmptyBorder(6, 5, 6, 5));
+
+		// a card: 1px line all round like the site's .card, then padding inside it.
+		// on the page background these read as objects rather than a run of text.
+		p.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(SITE_LINE, 1),
+			BorderFactory.createEmptyBorder(7, 8, 8, 8)));
 		p.setAlignmentX(LEFT_ALIGNMENT);
-		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 48));
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 58));
 
 		final JLabel h = new JLabel(heading);
 		h.setFont(FontManager.getRunescapeSmallFont());
@@ -713,6 +783,12 @@ public class EverykillPanel extends PluginPanel
 		// so anything read at drop time may have been 0 and needs a second chance.
 		refreshPrices(rows);
 		monsterHeader.setText(window.tooltip.toUpperCase() + " · " + rows.size());
+
+		// the view tabs are rebuilt from showRecords each time, so they always reflect
+		// the real state rather than whatever the last click set.
+		viewTabs.removeAll();
+		viewTabs.add(buildViewTabs());
+		tabs.setVisible(!showRecords);
 
 		if (showRecords)
 		{
