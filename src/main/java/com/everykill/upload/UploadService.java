@@ -29,8 +29,15 @@ public class UploadService
 	/** How often we look at the queue. The contract allows 5 requests per 60s. */
 	private static final long FLUSH_SECONDS = 180L;
 
-	/** First flush waits, so a login burst doesn't upload before the panel is up. */
-	private static final long FIRST_FLUSH_SECONDS = 60L;
+	/**
+	 * First flush is quick, because it is usually just registration.
+	 *
+	 * <p>This was 60s and the first live test never reached it — the client was closed
+	 * 34 seconds in, so the plugin never registered and it looked like upload was
+	 * broken. Registration is one small request that needs no game data, so making it
+	 * wait for a batch that may not exist yet buys nothing.
+	 */
+	private static final long FIRST_FLUSH_SECONDS = 10L;
 
 	private final EverykillConfig config;
 	private final UploadClient client;
