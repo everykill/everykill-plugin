@@ -2322,3 +2322,71 @@ singular fallback handles "Giant rats" → "Giant rat".
 
 **Method note:** when a teammate demonstrates something you recorded as impossible, read
 their code before re-arguing the point. The answer was 78 lines and one field name away.
+
+---
+
+## 2026-08-25 — transport landed, and the live server caught a bug review would not have
+
+**Status:** verified against the running reference server, not just compiled. 139 tests green.
+
+**Built:** `UploadIdentity` (client id + token on disk under `.runelite/everykill-plugin/`),
+`UploadClient` (OkHttp, `enqueue()` only), `UploadService` (scheduled flush, registration,
+queue ownership), `UploadGson`, and the `uploadUrl` config item.
+
+### The bug
+
+First real request to `POST /v1/kills` came back:
+
+```
+"status": "rejected", "reason": "grade 'UNCONTESTED' is not a known grade"
+```
+
+Java enum constants serialise as `UNCONTESTED`. `spec-kill-contract.md:35` reads
+`uncontested` — and has since it was written. **Every kill this plugin ever uploaded
+would have been rejected**, silently, because a rejection is a per-record verdict inside
+a `200`. The queue would have drained happily and stored nothing.
+
+Nothing about this is visible in a compile, a unit test written against my own
+assumptions, or a code review. It took one real request.
+
+`UploadGson` derives from the **injected** Gson via `newBuilder()` and lowercases
+`Confidence` and `LootConfidence` — but **not** `DeathSignal`, which the contract prints
+upper case. One blanket rule would have looked tidier and broken the other field.
+
+### Gage's correction to the auth design, adopted
+
+I had specified a salted hash of the account computed client-side. He rejected it
+correctly: the plugin is open source, so the salt ships in a public jar, RSNs are not
+secret and there are few of them — anyone could hash the hiscores and reverse the whole
+database. *"A public salt is not a salt."*
+
+Built his way instead: random 128-bit client id, traded for a bearer token, **the RSN
+never leaves the client.** `thereIsNoPlayerFieldOnTheWire` is a test rather than a
+comment.
+
+The cost is real and the panel must state it: with no RSN on file, losing
+`identity.properties` orphans that history permanently, and the recovery code is minted
+exactly once.
+
+### Verified live, not assumed
+
+- register returns `stored: true` (the real server, not the Worker stub)
+- second register: `returning: true`, `recoveryCode: null` — idempotent, code minted once
+- a correctly-shaped kill: `accepted: 1`, with `dryness.reason: "confirmed_loot"`
+- the same `eventId` resent: `duplicate: 1`, nothing written twice
+
+### Design notes worth keeping
+
+**A first run writes nothing to disk.** The client id is only persisted once a token
+comes back, so a failed registration cannot burn an id and strand a history that never
+existed.
+
+**`clearToken()` keeps the client id.** Register is idempotent on the id, so a dead token
+re-registers into the *same* history. Losing the id instead is unrecoverable.
+
+**`offer()` drops kills when upload is off**, rather than queueing them. Queueing would
+mean toggling upload on uploads a backlog the user never agreed to send.
+
+**The whole batch is always acked**, including rejections — confirmed by Gage against my
+actual `PendingKills` code. Holding a rejected record back parks it at the head of the
+queue forever and wedges every future batch behind it.

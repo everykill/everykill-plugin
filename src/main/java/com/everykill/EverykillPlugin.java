@@ -23,6 +23,7 @@ import com.everykill.model.NpcStat;
 import com.everykill.notice.MilestoneNotifier;
 import com.everykill.ui.EverykillOverlay;
 import com.everykill.ui.EverykillPanel;
+import com.everykill.upload.UploadService;
 import com.everykill.xp.XpService;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
@@ -109,6 +110,9 @@ public class EverykillPlugin extends Plugin
 	@Inject
 	private XpService xpService;
 
+	@Inject
+	private UploadService uploadService;
+
 	private NavigationButton navButton;
 
 	// guards against reloading the ledger on every loading zone
@@ -128,6 +132,7 @@ public class EverykillPlugin extends Plugin
 		// pick up the real counts and then save an empty map over them.
 		ledger.load();
 		ledger.startSession();
+		uploadService.startUp();
 		notifier.startSession();
 		detector.reset();
 		xpService.reset();
@@ -150,6 +155,9 @@ public class EverykillPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		// cancel first: a flush firing mid-teardown would work against a ledger that
+		// is being written out from under it.
+		uploadService.shutDown();
 		ledger.flush();
 		overlayManager.remove(overlay);
 		clientToolbar.removeNavigation(navButton);
@@ -509,6 +517,10 @@ public class EverykillPlugin extends Plugin
 		final boolean firstEver = before == null || before.total() == 0;
 
 		final NpcStat after = ledger.record(kill);
+
+		// queued, not sent. the service decides when, and drops it on the floor
+		// when upload is off - so toggling it on never uploads a backlog.
+		uploadService.offer(kill);
 
 		// what a hand count gets checked against. without it a wrong total is just a
 		// wrong number. needs --debug.

@@ -159,6 +159,26 @@ public interface EverykillConfig extends Config
 		return false;
 	}
 
+	/**
+	 * Where kills go.
+	 *
+	 * <p>Editable because nothing is deployed yet — the reference server runs locally
+	 * and this is how it gets pointed at. It carries the same third-party warning as
+	 * the toggle: a user-supplied address is exactly the case the warning exists for.
+	 */
+	@ConfigItem(
+		keyName = "uploadUrl",
+		name = "Upload address",
+		description = "Base address of the Everykill ingest server, e.g. http://127.0.0.1:8790",
+		warning = "This feature submits your IP address to a 3rd-party server not controlled or verified by RuneLite developers",
+		position = 32,
+		section = uploadSection
+	)
+	default String uploadUrl()
+	{
+		return "";
+	}
+
 	enum NoticeLevel
 	{
 		EVERYTHING("Everything"),
