@@ -1581,7 +1581,6 @@ public class EverykillPanel extends PluginPanel
 
 		// same BoxLayout trap as the section labels: no maximum size means the strip is
 		// laid out at its content width and centred, which insets the whole row.
-		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 26));
 		p.setAlignmentX(LEFT_ALIGNMENT);
 
 		final JLabel name = new JLabel((expandable ? (open ? "▾ " : "▸ ") : "") + label(stat));
@@ -1598,29 +1597,34 @@ public class EverykillPanel extends PluginPanel
 		right.add(count, BorderLayout.CENTER);
 		right.add(wikiButton("npc", stat.npcId, stat.name), BorderLayout.EAST);
 
+		// the icon lane is reserved on EVERY row, drawn or not. two reasons: a row
+		// with an icon is 24px tall and one without is text-height, so mixing them
+		// made the list ragged - and reserving it keeps every name starting in the
+		// same column instead of stepping left when a monster has no icon.
+		final JLabel face = new JLabel();
+		face.setPreferredSize(new Dimension(26, 24));
+		face.setHorizontalAlignment(SwingConstants.CENTER);
+
 		final int iconId = npcIcons.forName(stat.name);
 		if (iconId > 0)
 		{
-			final JLabel face = new JLabel();
-			face.setPreferredSize(new Dimension(26, 24));
-			face.setHorizontalAlignment(SwingConstants.CENTER);
 			// quantity 1: a stack number burnt into a monster's face is nonsense.
 			itemManager.getImage(iconId, 1, false).addTo(face);
-
-			final JPanel lead = new JPanel(new BorderLayout());
-			lead.setOpaque(false);
-			lead.add(face, BorderLayout.WEST);
-			lead.add(name, BorderLayout.CENTER);
-			p.add(lead, BorderLayout.WEST);
-		}
-		else
-		{
-			// most monsters have no icon and that has to look deliberate rather than
-			// broken, so the row just starts at the name.
-			p.add(name, BorderLayout.WEST);
 		}
 
+		final JPanel lead = new JPanel(new BorderLayout());
+		lead.setOpaque(false);
+		lead.add(face, BorderLayout.WEST);
+		lead.add(name, BorderLayout.CENTER);
+
+		p.add(lead, BorderLayout.WEST);
 		p.add(right, BorderLayout.EAST);
+
+		// AFTER the children are in. this was hardcoded to 26, then a 24px icon plus
+		// 14px of padding needed 38 and every row with a face got crushed into the
+		// cap. measuring an empty panel would have been just as wrong - it returns the
+		// border and nothing else.
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, p.getPreferredSize().height));
 
 		final JPanel wrap = new JPanel();
 		wrap.setLayout(new BoxLayout(wrap, BoxLayout.Y_AXIS));
