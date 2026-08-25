@@ -1919,41 +1919,28 @@ public class EverykillPanel extends PluginPanel
 
 
 
-	/** Raw npc_id lives here rather than in the row. Available, not in the way. */
+	/**
+	 * What the row does not already say.
+	 *
+	 * <p>This used to repeat the grade split, xp and dates that expanding the row now
+	 * shows, and led with {@code npc_id} — a debug field on a tooltip that fires every
+	 * time the cursor crosses the panel. What is left is the grade split, because
+	 * that is provenance and appears nowhere else in the UI once the overlay's split
+	 * was turned off.
+	 */
 	private static String tooltip(NpcStat stat)
 	{
 		final StringBuilder sb = new StringBuilder("<html>");
-		sb.append("npc_id ").append(stat.npcId);
-		if (stat.combatLevel > 0)
-		{
-			sb.append(" &middot; level ").append(stat.combatLevel);
-		}
-		sb.append("<br>").append(span(Confidence.UNCONTESTED, stat.uncontested + " uncontested"));
+		sb.append(span(Confidence.UNCONTESTED, stat.uncontested + " uncontested"));
+
 		if (stat.inferred > 0)
 		{
 			sb.append("<br>").append(span(Confidence.INFERRED, stat.inferred + " inferred"));
 		}
+
 		if (stat.ambiguous > 0)
 		{
 			sb.append("<br>").append(span(Confidence.AMBIGUOUS, stat.ambiguous + " ambiguous"));
-		}
-		if (stat.xp > 0)
-		{
-			sb.append("<br>").append(shortXp(stat.xp)).append(" xp");
-		}
-
-		final int best = stat.bestDay();
-		if (best > 1)
-		{
-			sb.append("<br>best day ").append(best);
-		}
-		if (stat.firstKillMillis > 0)
-		{
-			sb.append("<br>first ").append(day(stat.firstKillMillis));
-			if (stat.lastKillMillis > stat.firstKillMillis)
-			{
-				sb.append(" &middot; last ").append(day(stat.lastKillMillis));
-			}
 		}
 
 		return sb.append("</html>").toString();
