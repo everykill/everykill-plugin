@@ -5,6 +5,7 @@
 package com.everykill.ui;
 
 import com.everykill.ledger.LocalLedger;
+import com.google.gson.Gson;
 import com.everykill.model.Confidence;
 import com.everykill.model.NpcStat;
 import com.everykill.notice.MilestoneNotifier;
@@ -132,6 +133,8 @@ public class EverykillPanel extends PluginPanel
 
 	private final JPanel viewTabs = new JPanel();
 
+	private final NpcIcons npcIcons;
+
 	// npc ids whose skill breakdown is open. panel state, never persisted.
 	private final Set<Integer> expanded = new HashSet<>();
 
@@ -161,7 +164,7 @@ public class EverykillPanel extends PluginPanel
 
 	@Inject
 	EverykillPanel(LocalLedger ledger, MilestoneNotifier notifier, XpService xpService,
-		ItemManager itemManager, ClientThread clientThread)
+		ItemManager itemManager, ClientThread clientThread, Gson gson)
 	{
 		super(false);
 		this.ledger = ledger;
@@ -169,6 +172,10 @@ public class EverykillPanel extends PluginPanel
 		this.xpService = xpService;
 		this.itemManager = itemManager;
 		this.clientThread = clientThread;
+
+		// injected Gson, per CONVENTIONS - never build one. read once at construction
+		// because it's a 238-entry file off the classpath, not per repaint.
+		this.npcIcons = NpcIcons.load(gson);
 
 		setLayout(new BorderLayout());
 		setBorder(BorderFactory.createEmptyBorder(8, 0, 8, 0));
@@ -1538,7 +1545,28 @@ public class EverykillPanel extends PluginPanel
 		right.add(count, BorderLayout.CENTER);
 		right.add(wikiButton("npc", stat.npcId, stat.name), BorderLayout.EAST);
 
-		p.add(name, BorderLayout.WEST);
+		final int iconId = npcIcons.forName(stat.name);
+		if (iconId > 0)
+		{
+			final JLabel face = new JLabel();
+			face.setPreferredSize(new Dimension(26, 24));
+			face.setHorizontalAlignment(SwingConstants.CENTER);
+			// quantity 1: a stack number burnt into a monster's face is nonsense.
+			itemManager.getImage(iconId, 1, false).addTo(face);
+
+			final JPanel lead = new JPanel(new BorderLayout());
+			lead.setOpaque(false);
+			lead.add(face, BorderLayout.WEST);
+			lead.add(name, BorderLayout.CENTER);
+			p.add(lead, BorderLayout.WEST);
+		}
+		else
+		{
+			// most monsters have no icon and that has to look deliberate rather than
+			// broken, so the row just starts at the name.
+			p.add(name, BorderLayout.WEST);
+		}
+
 		p.add(right, BorderLayout.EAST);
 
 		final JPanel wrap = new JPanel();

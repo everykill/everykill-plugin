@@ -2288,3 +2288,37 @@ Cron stays fine for scheduled *work*; it is not a message bus.
 **Consequence:** assume Gage has seen none of today's plugin-side corrections. The
 damage-share correction and the Nex threshold correction are repeated in the file for
 that reason, not because they're new.
+
+---
+
+## 2026-08-24 — monster icons are possible after all: draw an ITEM, not the NPC
+
+**Status:** shipped. Corrects my own FINDINGS entry from earlier today.
+
+Earlier today I recorded that monster images were impossible in the plugin, permanently,
+for two reasons: no NPC image API (`NPCComposition.getModels()` returns 3D model ids and
+nothing in core renders one to a panel), and wiki PNGs being CC BY-NC-SA against a BSD
+plugin.
+
+**Both facts are still true. The conclusion was wrong.** Delk shipped monster icons in
+the Slayer Alternatives plugin and showed me the screenshot.
+
+**The trick:** don't render the NPC. Render an **item** that reads as the monster — an
+ensouled head, its unique drop, a slayer item. `ItemManager.getImage(id, 1, false)` is
+the same call already used for drop icons, so it costs nothing new and stays inside the
+licence.
+
+I had framed the question as "can we get a picture of this monster" and answered that
+correctly. The right question was "can we put a recognisable image next to this monster's
+name", which has a completely different answer.
+
+**Carried across:** `icons.json`, 238 hand-mapped names, from `slayer-alternatives` —
+same author, same BSD-2-Clause licence, so reuse is clean. Landed as
+`src/main/resources/com/everykill/npc-icons.json` + `ui/NpcIcons.java`.
+
+Missing entries are the normal case (238 names against thousands of npc ids) and must
+stay cheap: `forName` returns -1, the row draws no icon and starts at the name. A
+singular fallback handles "Giant rats" → "Giant rat".
+
+**Method note:** when a teammate demonstrates something you recorded as impossible, read
+their code before re-arguing the point. The answer was 78 lines and one field name away.
