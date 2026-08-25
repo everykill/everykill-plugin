@@ -2253,3 +2253,38 @@ Three tests, one of which exists purely to stop this passing by accident: `theFi
 **Delivery caveat, recorded rather than assumed:** the three earlier Tyler→Gage cron messages today (`2196ac2284fe`, `946fb39286cf`, `123320ea2d8d`) all show `last_status: error` in the job table. Whether they reached him is unverified. Do not assume Gage has seen the damage-share correction, the Nex threshold correction, or the site briefing until he says so.
 
 **Sequencing consequence:** with the snakeling fixed and the Hub blocker list found to be already clear, there is no longer any local work gating the plugin. Everything remaining either needs Gage (transport) or is a feature rather than a fix (Session tab: kills/hr, xp/hr, supplies, task — spec-plugin-ux 1b).
+
+---
+
+## 2026-08-24 — cron delivery to Gage is 0 for 4; stop using it for agent-to-agent messages
+
+**Status:** verified failure, four times, same day. Method changed.
+
+Every Tyler→Gage message today went out as a one-shot cron to `bot-chat:gage`, and every
+one of them failed:
+
+| Job | Subject | Outcome |
+|---|---|---|
+| `2196ac2284fe` | site direction briefing | `last_status: error` |
+| `946fb39286cf` | correction #1, damage share | `last_status: error` |
+| `123320ea2d8d` | correction #2, Nex threshold | `last_status: error` |
+| `67f3e1c1b5b1` | ingest contract request | dispatch claimed, run never completed, job auto-removed |
+
+The last one is the informative failure: *"dispatch was claimed, but the run never
+completed (`last_run_at` was never written) — the scheduler process was most likely
+killed or restarted mid-execution."* Cron fires inside the RuneLite dev-client sessions
+we keep starting and killing, and a one-shot job whose scheduler dies mid-run is simply
+lost.
+
+**The trap:** the create call returns `success: true` and the job appears in the table.
+Nothing about scheduling a cron tells you the message will arrive. I reported "sent to
+Gage" three times today on that basis. It was never sent.
+
+**New method:** agent-to-agent content goes in a **file in the repo** — here,
+`docs/for-gage-ingest-contract.md` — and the human carries the pointer. A file cannot
+half-deliver, it survives a killed process, and Gage can read it whenever he starts.
+Cron stays fine for scheduled *work*; it is not a message bus.
+
+**Consequence:** assume Gage has seen none of today's plugin-side corrections. The
+damage-share correction and the Nex threshold correction are repeated in the file for
+that reason, not because they're new.
