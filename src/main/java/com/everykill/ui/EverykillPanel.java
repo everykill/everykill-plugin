@@ -432,13 +432,13 @@ public class EverykillPanel extends PluginPanel
 		// the whole lockup is the link, mark included - that's how the site's nav
 		// works and it's a much bigger target than 'site' on its own.
 		left.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		left.setToolTipText("Open everykill.gg");
+		left.setToolTipText("Open everykill.com");
 		left.addMouseListener(new MouseAdapter()
 		{
 			@Override
 			public void mouseClicked(MouseEvent e)
 			{
-				LinkBrowser.browse("https://everykill.gg");
+				LinkBrowser.browse("https://www.everykill.com");
 			}
 
 			@Override
@@ -663,6 +663,37 @@ public class EverykillPanel extends PluginPanel
 	 * after a reinstall. A quiet one-time toast would lose people their data, and the
 	 * honest cost of doing identity properly should be stated rather than buried.
 	 */
+	/**
+	 * A wrapping paragraph that reports the height it actually needs.
+	 *
+	 * <p>An HTML {@link JLabel} derives its preferred height from its preferred
+	 * width. Inside a vertical {@code BoxLayout} nothing tells it how wide it will
+	 * end up, so it assumes one long line, reports a one-line height, and everything
+	 * past that gets clipped — which is exactly what happened to the recovery text.
+	 *
+	 * <p>Setting the view width first and re-measuring is the documented way round
+	 * it: {@code View.setSize} then re-read the preferred size.
+	 */
+	private static JLabel paragraph(String html, Color colour)
+	{
+		final JLabel l = new JLabel("<html>" + html + "</html>");
+		l.setFont(FontManager.getRunescapeSmallFont());
+		l.setForeground(colour);
+		l.setAlignmentX(LEFT_ALIGNMENT);
+
+		// PluginPanel.PANEL_WIDTH minus the scrollbar lane and the card's padding.
+		final int width = PluginPanel.PANEL_WIDTH - 34;
+
+		final javax.swing.text.View view = javax.swing.plaf.basic.BasicHTML.createHTMLView(
+			l, l.getText());
+		view.setSize(width, 0);
+		final int height = (int) Math.ceil(view.getPreferredSpan(javax.swing.text.View.Y_AXIS));
+
+		l.setPreferredSize(new Dimension(width, height));
+		l.setMaximumSize(new Dimension(Short.MAX_VALUE, height));
+		return l;
+	}
+
 	private JPanel recoveryBanner(String code)
 	{
 		// wording note: this used to say the code alone was the way back. it is the
@@ -688,13 +719,10 @@ public class EverykillPanel extends PluginPanel
 		value.setForeground(SITE_FG);
 		value.setAlignmentX(LEFT_ALIGNMENT);
 
-		final JLabel why = new JLabel("<html>Your account is identified by a random id,"
+		final JLabel why = paragraph("Your account is identified by a random id,"
 			+ " not your RuneScape name. That id is saved with your RuneLite settings,"
 			+ " so a reinstall usually restores it on its own. Keep this code somewhere"
-			+ " in case it doesn’t.</html>");
-		why.setFont(FontManager.getRunescapeSmallFont());
-		why.setForeground(SITE_FG_DIM);
-		why.setAlignmentX(LEFT_ALIGNMENT);
+			+ " in case it doesn’t.", SITE_FG_DIM);
 
 		final JLabel copy = new JLabel("Copy");
 		copy.setFont(FontManager.getRunescapeSmallFont());
@@ -785,11 +813,8 @@ public class EverykillPanel extends PluginPanel
 		final String halted = uploadService.getHalted();
 		if (halted != null)
 		{
-			final JLabel warn = new JLabel("<html>" + halted
-				+ "<br>Your kills are safe and still queued.</html>");
-			warn.setFont(FontManager.getRunescapeSmallFont());
-			warn.setForeground(SITE_ACC);
-			warn.setAlignmentX(LEFT_ALIGNMENT);
+			final JLabel warn = paragraph(halted
+				+ "<br>Your kills are safe and still queued.", SITE_ACC);
 			warn.setBorder(BorderFactory.createEmptyBorder(2, 0, 4, 0));
 			monsterList.add(warn);
 		}
@@ -803,13 +828,10 @@ public class EverykillPanel extends PluginPanel
 		monsterList.add(detailLine("name",
 			uploadService.isPublishing() ? "published" : "not shown"));
 
-		final JLabel note = new JLabel(uploadService.isPublishing()
-			? "<html>Your display name is on public leaderboards.</html>"
-			: "<html>You are ranked anonymously. Turn on “Publish my name”"
-				+ " in settings to appear by name.</html>");
-		note.setFont(FontManager.getRunescapeSmallFont());
-		note.setForeground(SITE_FG_DIM);
-		note.setAlignmentX(LEFT_ALIGNMENT);
+		final JLabel note = paragraph(uploadService.isPublishing()
+			? "Your display name is on public leaderboards."
+			: "You are ranked anonymously. Turn on “Publish my name”"
+				+ " in settings to appear by name.", SITE_FG_DIM);
 		note.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
 		monsterList.add(note);
 
