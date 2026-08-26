@@ -43,6 +43,7 @@ public class MilestoneNotifier
 
 	private final ChatMessageManager chatMessageManager;
 	private final EverykillConfig config;
+	private final DinkNotifier dink;
 
 	@Getter
 	private int suppressedThisSession;
@@ -51,10 +52,12 @@ public class MilestoneNotifier
 	private int shownThisSession;
 
 	@Inject
-	public MilestoneNotifier(ChatMessageManager chatMessageManager, EverykillConfig config)
+	public MilestoneNotifier(ChatMessageManager chatMessageManager, EverykillConfig config,
+		DinkNotifier dink)
 	{
 		this.chatMessageManager = chatMessageManager;
 		this.config = config;
+		this.dink = dink;
 	}
 
 	public void startSession()
@@ -87,6 +90,7 @@ public class MilestoneNotifier
 			{
 				raise(new Notice(Notice.Kind.MILESTONE,
 					format(rung) + " " + kill.npcName + " kills", rung));
+				dink.milestone(kill, rung);
 				return;
 			}
 		}

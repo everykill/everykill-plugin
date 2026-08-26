@@ -917,6 +917,14 @@ public class EverykillPanel extends PluginPanel
 		board.add(detailLine("name",
 			uploadService.isPublishing() ? "published" : "not shown"));
 
+		// an ironman deciding whether to hide their mode needs to see what is
+		// currently exposed, not go and read the config to work it out.
+		if (uploadService.isPublishing())
+		{
+			board.add(detailLine("account type",
+				uploadService.isPublishingAccountType() ? "shown" : "hidden"));
+		}
+
 		// the name itself is never held anywhere - not on the record, not in the
 		// identity file, not cached here for display. showing the STATE says what the
 		// user needs without this panel becoming the field that gets populated.

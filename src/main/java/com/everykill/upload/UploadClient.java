@@ -265,7 +265,7 @@ public class UploadClient
 	 * that leaks.
 	 */
 	public void publish(String baseUrl, String token, String displayName,
-		Consumer<String> onDone, Consumer<String> onError)
+		String accountType, Consumer<String> onDone, Consumer<String> onError)
 	{
 		final HttpUrl url = endpoint(baseUrl, "publish");
 		if (url == null)
@@ -279,6 +279,13 @@ public class UploadClient
 		if (displayName != null)
 		{
 			body.addProperty("displayName", displayName);
+		}
+
+		// omitted entirely when withheld, rather than sent as "hidden". a field the
+		// server never receives cannot be logged, leaked or un-hidden later.
+		if (accountType != null)
+		{
+			body.addProperty("accountType", accountType);
 		}
 
 		final Request request = new Request.Builder()

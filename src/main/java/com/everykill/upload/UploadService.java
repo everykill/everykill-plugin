@@ -5,6 +5,7 @@
 package com.everykill.upload;
 
 import com.everykill.EverykillConfig;
+import com.everykill.detect.AccountTypes;
 import com.everykill.model.KillRecord;
 import java.util.List;
 import net.runelite.api.Client;
@@ -54,6 +55,8 @@ public class UploadService
 	private final ScheduledExecutorService executor;
 	private final Client gameClient;
 	private final ClientThread clientThread;
+
+	private final AccountTypes accountTypes;
 	private final PendingKills pending = new PendingKills();
 
 	/** One flush at a time. Two in flight would ack each other's records. */
@@ -80,7 +83,8 @@ public class UploadService
 
 	@Inject
 	UploadService(EverykillConfig config, UploadClient client, UploadIdentity identity,
-		ScheduledExecutorService executor, Client gameClient, ClientThread clientThread)
+		ScheduledExecutorService executor, Client gameClient, ClientThread clientThread,
+		AccountTypes accountTypes)
 	{
 		this.config = config;
 		this.client = client;
@@ -88,6 +92,7 @@ public class UploadService
 		this.executor = executor;
 		this.gameClient = gameClient;
 		this.clientThread = clientThread;
+		this.accountTypes = accountTypes;
 	}
 
 	/** Queues a kill. Cheap and non-blocking — safe from the client thread. */
@@ -316,7 +321,7 @@ public class UploadService
 
 		if (!wanted)
 		{
-			client.publish(config.uploadUrl(), identity.getToken(), null,
+			client.publish(config.uploadUrl(), identity.getToken(), null, null,
 				msg ->
 				{
 					publishedState = false;
@@ -338,7 +343,12 @@ public class UploadService
 				return;
 			}
 
-			client.publish(config.uploadUrl(), identity.getToken(), name,
+			// read here on the client thread with the name, and only if the player
+			// asked for it. an ironman who would rather not advertise the mode gets
+			// the field left out of the request entirely.
+			final String mode = config.publishAccountType() ? accountTypes.get().name() : null;
+
+			client.publish(config.uploadUrl(), identity.getToken(), name, mode,
 				msg ->
 				{
 					publishedState = true;
@@ -422,6 +432,12 @@ public class UploadService
 	public boolean isPublishing()
 	{
 		return config.publishName() && identity.isRegistered();
+	}
+
+	/** Whether the account mode rides along with a published name. */
+	public boolean isPublishingAccountType()
+	{
+		return isPublishing() && config.publishAccountType();
 	}
 
 	/** Non-null when uploading has stopped because of a client fault. */

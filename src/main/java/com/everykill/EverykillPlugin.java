@@ -7,6 +7,7 @@ package com.everykill;
 import com.everykill.detect.KillDetector;
 import com.everykill.detect.LootDetector;
 import com.everykill.ledger.LocalLedger;
+import com.everykill.detect.AccountTypes;
 import com.everykill.model.AccountType;
 import net.runelite.api.clan.ClanID;
 import net.runelite.api.gameval.VarbitID;
@@ -106,6 +107,9 @@ public class EverykillPlugin extends Plugin
 
 	@Inject
 	private MilestoneNotifier notifier;
+
+	@Inject
+	private AccountTypes accountTypes;
 
 	@Inject
 	private XpService xpService;
@@ -488,27 +492,10 @@ public class EverykillPlugin extends Plugin
 	 * hardcores die and become regular irons, and {@code spec-data-model.md} stores
 	 * account type <b>per session, not per player</b> for exactly that reason.
 	 */
+	/** Delegates, so the loot rules and the publish path can't disagree. */
 	private AccountType accountType()
 	{
-		if (client.getGameState() != GameState.LOGGED_IN)
-		{
-			return AccountType.UNKNOWN;
-		}
-
-		final AccountType fromVarbit =
-			AccountType.fromVarbit(client.getVarbitValue(VarbitID.IRONMAN));
-
-		// group ironman isn't in that varbit at all - core's own switch has no case for
-		// it and falls through. it lives in the group's clan channel instead, which is
-		// how NameAutocompleter finds it. verified live 2026-08-24: the test account is a GIM and
-		// the varbit alone reported UNRESOLVED.
-		if (fromVarbit == AccountType.GROUP_UNRESOLVED
-			&& client.getClanSettings(ClanID.GROUP_IRONMAN) != null)
-		{
-			return AccountType.GROUP_IRONMAN;
-		}
-
-		return fromVarbit;
+		return accountTypes.get();
 	}
 
 	private void onKill(KillRecord kill)

@@ -129,6 +129,18 @@ public interface EverykillConfig extends Config
 	}
 
 	// ------------------------------------------------------------------
+	@ConfigItem(
+		keyName = "dinkNotifications",
+		name = "Send milestones to Dink",
+		description = "Sends kill-count milestones and fastest kills to Dink, which forwards them to your Discord webhook. Requires the Dink plugin with 'External Plugin Requests' enabled. Everykill never contacts Discord itself and never sees your webhook URL.",
+		position = 24,
+		section = noticeSection
+	)
+	default boolean dinkNotifications()
+	{
+		return false;
+	}
+
 	@ConfigSection(
 		name = "Upload & privacy",
 		description = "Nothing leaves your machine unless you turn this on",
@@ -201,6 +213,31 @@ public interface EverykillConfig extends Config
 	default boolean publishName()
 	{
 		return false;
+	}
+
+	/**
+	 * Whether the account MODE is published alongside the name.
+	 *
+	 * <p>Separate from the name for a real safety reason, not tidiness. A public
+	 * board that says <i>"Hardcore Ironman, 4,000 gargoyles this week"</i> is a
+	 * target list — it tells a PKer the account has one life, plays a known monster,
+	 * and plays it often. Mode is genuinely useful for comparing like with like, and
+	 * genuinely dangerous attached to a name, so it gets its own switch.
+	 *
+	 * <p>Defaults ON because most accounts are mains and the comparison is the point;
+	 * a player who does not want it toggles it, and the description says plainly what
+	 * it reveals. Nothing here fires unless {@code publishName} is also on.
+	 */
+	@ConfigItem(
+		keyName = "publishAccountType",
+		name = "Show my account type",
+		description = "Shows Ironman, Hardcore, Group and so on next to your name on public leaderboards. Turn this off to appear as an unranked account - useful if you would rather not advertise a hardcore or ironman account publicly. Only applies when your name is published.",
+		position = 34,
+		section = uploadSection
+	)
+	default boolean publishAccountType()
+	{
+		return true;
 	}
 
 	enum NoticeLevel
