@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --bg:#0b0c0e; --panel:#16181d; --bg-alt:#101216; --line:#23262d;
+    --fg:#e8eaed; --fg-dim:#9aa0a8; --fg-faint:#63696f; --acc:#d94f2b;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0;background:transparent;color:var(--fg);
+       font-family:ui-sans-serif,system-ui,sans-serif}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+        padding:14px;display:flex;flex-direction:column;gap:10px}
+  .top{display:flex;align-items:center;gap:14px}
+  .name{font-family:var(--mono);font-size:11px;color:var(--acc);
+        letter-spacing:.1em;text-transform:uppercase}
+  .desc{font-size:11px;color:var(--fg-dim);line-height:1.45;min-height:44px}
+  .sizes{display:flex;align-items:flex-end;gap:10px;padding-top:8px;
+         border-top:1px solid var(--line)}
+  .sizes span{font-family:var(--mono);font-size:9px;color:var(--fg-faint)}
+  h3{font-family:var(--mono);font-size:12px;color:var(--fg-faint);
+     letter-spacing:.12em;margin:22px 0 10px;font-weight:400}
+  .row1{display:flex;align-items:center;gap:18px;background:var(--bg-alt);
+        border:1px solid var(--line);border-radius:8px;padding:14px}
+</style>
+</head>
+<body>
+
+<h3>SIX MARKS</h3>
+<div class="grid">
+
+  <!-- 1. TALLY-K -->
+  <div class="card">
+    <div class="top">
+      <svg width="64" height="64" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="11" fill="#d94f2b"/>
+        <g stroke="#fff" stroke-width="5" stroke-linecap="round">
+          <line x1="19" y1="18" x2="19" y2="46"/>
+          <line x1="30" y1="18" x2="30" y2="46"/>
+          <line x1="41" y1="18" x2="41" y2="46"/>
+          <line x1="13" y1="46" x2="47" y2="18"/>
+        </g>
+      </svg>
+      <div class="name">Tally</div>
+    </div>
+    <div class="desc">Four strokes and a slash — the universal count-to-five.
+      The slash doubles as the K's leg. Reads instantly at any size.</div>
+    <div class="sizes">
+      <svg width="48" height="48" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round"><line x1="19" y1="18" x2="19" y2="46"/><line x1="30" y1="18" x2="30" y2="46"/><line x1="41" y1="18" x2="41" y2="46"/><line x1="13" y1="46" x2="47" y2="18"/></g></svg>
+      <svg width="28" height="28" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round"><line x1="19" y1="18" x2="19" y2="46"/><line x1="30" y1="18" x2="30" y2="46"/><line x1="41" y1="18" x2="41" y2="46"/><line x1="13" y1="46" x2="47" y2="18"/></g></svg>
+      <svg width="16" height="16" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round"><line x1="19" y1="18" x2="19" y2="46"/><line x1="30" y1="18" x2="30" y2="46"/><line x1="41" y1="18" x2="41" y2="46"/><line x1="13" y1="46" x2="47" y2="18"/></g></svg>
+      <span>48 / 28 / 16</span>
+    </div>
+  </div>
+
+  <!-- 2. EK LIGATURE -->
+  <div class="card">
+    <div class="top">
+      <svg width="64" height="64" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="11" fill="#d94f2b"/>
+        <g stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none">
+          <line x1="21" y1="17" x2="21" y2="47"/>
+          <line x1="21" y1="17" x2="38" y2="17"/>
+          <line x1="21" y1="32" x2="34" y2="32"/>
+          <line x1="21" y1="47" x2="38" y2="47"/>
+          <line x1="46" y1="17" x2="46" y2="47"/>
+          <line x1="46" y1="32" x2="34" y2="20"/>
+          <line x1="46" y1="32" x2="34" y2="44"/>
+        </g>
+      </svg>
+      <div class="name">Ligature</div>
+    </div>
+    <div class="desc">E and K sharing a spine. Most literal, most obviously
+      the brand — but the busiest, and the middle bar crowds at 16px.</div>
+    <div class="sizes">
+      <svg width="48" height="48" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none"><line x1="21" y1="17" x2="21" y2="47"/><line x1="21" y1="17" x2="38" y2="17"/><line x1="21" y1="32" x2="34" y2="32"/><line x1="21" y1="47" x2="38" y2="47"/><line x1="46" y1="17" x2="46" y2="47"/><line x1="46" y1="32" x2="34" y2="20"/><line x1="46" y1="32" x2="34" y2="44"/></g></svg>
+      <svg width="28" height="28" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none"><line x1="21" y1="17" x2="21" y2="47"/><line x1="21" y1="17" x2="38" y2="17"/><line x1="21" y1="32" x2="34" y2="32"/><line x1="21" y1="47" x2="38" y2="47"/><line x1="46" y1="17" x2="46" y2="47"/><line x1="46" y1="32" x2="34" y2="20"/><line x1="46" y1="32" x2="34" y2="44"/></g></svg>
+      <svg width="16" height="16" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none"><line x1="21" y1="17" x2="21" y2="47"/><line x1="21" y1="17" x2="38" y2="17"/><line x1="21" y1="32" x2="34" y2="32"/><line x1="21" y1="47" x2="38" y2="47"/><line x1="46" y1="17" x2="46" y2="47"/><line x1="46" y1="32" x2="34" y2="20"/><line x1="46" y1="32" x2="34" y2="44"/></g></svg>
+      <span>48 / 28 / 16</span>
+    </div>
+  </div>
+
+  <!-- 3. TALLY-E -->
+  <div class="card">
+    <div class="top">
+      <svg width="64" height="64" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="11" fill="#d94f2b"/>
+        <g stroke="#fff" stroke-width="5" stroke-linecap="round">
+          <line x1="18" y1="17" x2="18" y2="47"/>
+          <line x1="18" y1="17" x2="44" y2="17"/>
+          <line x1="18" y1="32" x2="38" y2="32"/>
+          <line x1="18" y1="47" x2="44" y2="47"/>
+        </g>
+        <line x1="13" y1="52" x2="49" y2="12" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".55"/>
+      </svg>
+      <div class="name">Struck</div>
+    </div>
+    <div class="desc">An E with the fifth-mark slash through it. Counting and
+      crossing-off in one glyph. The slash is the whole idea.</div>
+    <div class="sizes">
+      <svg width="48" height="48" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round"><line x1="18" y1="17" x2="18" y2="47"/><line x1="18" y1="17" x2="44" y2="17"/><line x1="18" y1="32" x2="38" y2="32"/><line x1="18" y1="47" x2="44" y2="47"/></g><line x1="13" y1="52" x2="49" y2="12" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".55"/></svg>
+      <svg width="28" height="28" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round"><line x1="18" y1="17" x2="18" y2="47"/><line x1="18" y1="17" x2="44" y2="17"/><line x1="18" y1="32" x2="38" y2="32"/><line x1="18" y1="47" x2="44" y2="47"/></g><line x1="13" y1="52" x2="49" y2="12" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".55"/></svg>
+      <svg width="16" height="16" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round"><line x1="18" y1="17" x2="18" y2="47"/><line x1="18" y1="17" x2="44" y2="17"/><line x1="18" y1="32" x2="38" y2="32"/><line x1="18" y1="47" x2="44" y2="47"/></g><line x1="13" y1="52" x2="49" y2="12" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".55"/></svg>
+      <span>48 / 28 / 16</span>
+    </div>
+  </div>
+
+  <!-- 4. NOTCH -->
+  <div class="card">
+    <div class="top">
+      <svg width="64" height="64" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="11" fill="#16181d" stroke="#d94f2b" stroke-width="3"/>
+        <g stroke="#d94f2b" stroke-width="5" stroke-linecap="round">
+          <line x1="20" y1="20" x2="20" y2="44"/>
+          <line x1="31" y1="20" x2="31" y2="44"/>
+          <line x1="42" y1="20" x2="42" y2="44"/>
+        </g>
+        <line x1="15" y1="47" x2="49" y2="17" stroke="#e8eaed" stroke-width="5" stroke-linecap="round"/>
+      </svg>
+      <div class="name">Outline</div>
+    </div>
+    <div class="desc">Same tally, inverted — rust on dark with a white fifth
+      stroke. Sits better on a light Discord theme than a solid block.</div>
+    <div class="sizes">
+      <svg width="48" height="48" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#16181d" stroke="#d94f2b" stroke-width="3"/><g stroke="#d94f2b" stroke-width="5" stroke-linecap="round"><line x1="20" y1="20" x2="20" y2="44"/><line x1="31" y1="20" x2="31" y2="44"/><line x1="42" y1="20" x2="42" y2="44"/></g><line x1="15" y1="47" x2="49" y2="17" stroke="#e8eaed" stroke-width="5" stroke-linecap="round"/></svg>
+      <svg width="28" height="28" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#16181d" stroke="#d94f2b" stroke-width="3"/><g stroke="#d94f2b" stroke-width="5" stroke-linecap="round"><line x1="20" y1="20" x2="20" y2="44"/><line x1="31" y1="20" x2="31" y2="44"/><line x1="42" y1="20" x2="42" y2="44"/></g><line x1="15" y1="47" x2="49" y2="17" stroke="#e8eaed" stroke-width="5" stroke-linecap="round"/></svg>
+      <svg width="16" height="16" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#16181d" stroke="#d94f2b" stroke-width="3"/><g stroke="#d94f2b" stroke-width="5" stroke-linecap="round"><line x1="20" y1="20" x2="20" y2="44"/><line x1="31" y1="20" x2="31" y2="44"/><line x1="42" y1="20" x2="42" y2="44"/></g><line x1="15" y1="47" x2="49" y2="17" stroke="#e8eaed" stroke-width="5" stroke-linecap="round"/></svg>
+      <span>48 / 28 / 16</span>
+    </div>
+  </div>
+
+  <!-- 5. KEYSTONE -->
+  <div class="card">
+    <div class="top">
+      <svg width="64" height="64" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="11" fill="#d94f2b"/>
+        <g stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none">
+          <line x1="22" y1="16" x2="22" y2="48"/>
+          <line x1="22" y1="32" x2="44" y2="14"/>
+          <line x1="22" y1="32" x2="44" y2="50"/>
+          <line x1="22" y1="32" x2="36" y2="32"/>
+        </g>
+      </svg>
+      <div class="name">Arrow-K</div>
+    </div>
+    <div class="desc">Just the K, with the crossbar making it read as a
+      target pointer too. Cleanest at 16px of anything here.</div>
+    <div class="sizes">
+      <svg width="48" height="48" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none"><line x1="22" y1="16" x2="22" y2="48"/><line x1="22" y1="32" x2="44" y2="14"/><line x1="22" y1="32" x2="44" y2="50"/><line x1="22" y1="32" x2="36" y2="32"/></g></svg>
+      <svg width="28" height="28" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none"><line x1="22" y1="16" x2="22" y2="48"/><line x1="22" y1="32" x2="44" y2="14"/><line x1="22" y1="32" x2="44" y2="50"/><line x1="22" y1="32" x2="36" y2="32"/></g></svg>
+      <svg width="16" height="16" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none"><line x1="22" y1="16" x2="22" y2="48"/><line x1="22" y1="32" x2="44" y2="14"/><line x1="22" y1="32" x2="44" y2="50"/><line x1="22" y1="32" x2="36" y2="32"/></g></svg>
+      <span>48 / 28 / 16</span>
+    </div>
+  </div>
+
+  <!-- 6. CURRENT -->
+  <div class="card">
+    <div class="top">
+      <svg width="64" height="64" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="11" fill="#d94f2b"/>
+        <text x="32" y="41" text-anchor="middle" fill="#fff"
+              font-family="ui-monospace,Menlo,monospace" font-size="26"
+              font-weight="700" letter-spacing="1">EK</text>
+      </svg>
+      <div class="name">Current</div>
+    </div>
+    <div class="desc">What ships today. Fine as a favicon, but it's a
+      wordmark — it can't stand alone as a pfp without the name beside it.</div>
+    <div class="sizes">
+      <svg width="48" height="48" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><text x="32" y="41" text-anchor="middle" fill="#fff" font-family="ui-monospace,Menlo,monospace" font-size="26" font-weight="700">EK</text></svg>
+      <svg width="28" height="28" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><text x="32" y="41" text-anchor="middle" fill="#fff" font-family="ui-monospace,Menlo,monospace" font-size="26" font-weight="700">EK</text></svg>
+      <svg width="16" height="16" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><text x="32" y="41" text-anchor="middle" fill="#fff" font-family="ui-monospace,Menlo,monospace" font-size="26" font-weight="700">EK</text></svg>
+      <span>48 / 28 / 16</span>
+    </div>
+  </div>
+
+</div>
+
+<h3>IN CONTEXT — TALLY, AS A LOCKUP</h3>
+<div class="row1">
+  <svg width="34" height="34" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round"><line x1="19" y1="18" x2="19" y2="46"/><line x1="30" y1="18" x2="30" y2="46"/><line x1="41" y1="18" x2="41" y2="46"/><line x1="13" y1="46" x2="47" y2="18"/></g></svg>
+  <span style="font-size:20px;letter-spacing:-.01em">Everykill</span>
+  <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--fg-faint)">
+    ROUND, FOR DISCORD
+  </span>
+  <svg width="34" height="34" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="#d94f2b"/><g stroke="#fff" stroke-width="5" stroke-linecap="round"><line x1="19" y1="18" x2="19" y2="46"/><line x1="30" y1="18" x2="30" y2="46"/><line x1="41" y1="18" x2="41" y2="46"/><line x1="13" y1="46" x2="47" y2="18"/></g></svg>
+</div>
+
+</body>
+</html>

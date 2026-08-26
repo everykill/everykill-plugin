@@ -32,6 +32,9 @@ import java.util.Set;
 import javax.inject.Inject;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
+import java.awt.BasicStroke;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -356,6 +359,55 @@ public class EverykillPanel extends PluginPanel
 		};
 	}
 
+	/**
+	 * The Everykill mark. Four tally uprights, struck through.
+	 *
+	 * <p>Same geometry as {@code brand/everykill-mark.svg} in a 64-unit box, scaled
+	 * to whatever size it is given — one set of numbers for the plugin, the hub icon
+	 * and the site, so they cannot drift apart.
+	 */
+	private static final class TallyMark extends JComponent
+	{
+		private static final int[] UPRIGHTS = {18, 27, 36, 45};
+		private static final int TOP = 20, BOT = 44;
+		private static final int SX1 = 13, SY1 = 41, SX2 = 50, SY2 = 23;
+
+		TallyMark()
+		{
+			setPreferredSize(new Dimension(20, 20));
+			setMaximumSize(new Dimension(20, 20));
+			setOpaque(false);
+		}
+
+		@Override
+		protected void paintComponent(Graphics graphics)
+		{
+			final Graphics2D g = (Graphics2D) graphics.create();
+			try
+			{
+				g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+					RenderingHints.VALUE_ANTIALIAS_ON);
+				g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL,
+					RenderingHints.VALUE_STROKE_PURE);
+
+				final double s = Math.min(getWidth(), getHeight()) / 64.0;
+				g.scale(s, s);
+
+				g.setColor(SITE_ACC);
+				g.setStroke(new BasicStroke(4.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+				for (int x : UPRIGHTS)
+				{
+					g.drawLine(x, TOP, x, BOT);
+				}
+				g.drawLine(SX1, SY1, SX2, SY2);
+			}
+			finally
+			{
+				g.dispose();
+			}
+		}
+	}
+
 	private JPanel buildBrandBar()
 	{
 		final JPanel bar = new JPanel(new BorderLayout());
@@ -364,13 +416,9 @@ public class EverykillPanel extends PluginPanel
 		bar.setMaximumSize(new Dimension(Short.MAX_VALUE, 24));
 		bar.setAlignmentX(LEFT_ALIGNMENT);
 
-		// the site's .brand-mark: --acc square, white mono initials.
-		final JLabel mark = new JLabel("EK", SwingConstants.CENTER);
-		mark.setOpaque(true);
-		mark.setBackground(SITE_ACC);
-		mark.setForeground(Color.WHITE);
-		mark.setFont(FontManager.getRunescapeSmallFont());
-		mark.setPreferredSize(new Dimension(20, 18));
+		// the tally: four uprights struck through, rust on --panel. drawn rather
+		// than loaded so it scales with the panel and needs no resource round-trip.
+		final JComponent mark = new TallyMark();
 
 		final JLabel name = new JLabel(" Everykill");
 		name.setFont(FontManager.getRunescapeBoldFont());

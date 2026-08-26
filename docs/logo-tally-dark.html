@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root{
+    --bg:#0b0c0e; --panel:#16181d; --bg-alt:#101216; --line:#23262d;
+    --fg:#e8eaed; --fg-dim:#9aa0a8; --fg-faint:#63696f; --acc:#d94f2b;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:transparent;color:var(--fg);
+       font-family:ui-sans-serif,system-ui,sans-serif}
+  h3{font-family:var(--mono);font-size:11px;color:var(--fg-faint);
+     letter-spacing:.14em;margin:0 0 12px;font-weight:400}
+  h3:not(:first-child){margin-top:26px}
+  .row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+        padding:13px;display:flex;flex-direction:column;gap:9px}
+  .card.pick{border-color:var(--acc)}
+  .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.09em;
+       text-transform:uppercase;color:var(--fg-dim)}
+  .card.pick .lbl{color:var(--acc)}
+  .note{font-size:11px;color:var(--fg-dim);line-height:1.45;min-height:44px}
+  .ctx{display:flex;align-items:center;gap:14px;background:var(--bg-alt);
+       border:1px solid var(--line);border-radius:8px;padding:15px}
+  .light{background:#f2f3f5;border-color:#d8dade}
+  .cap{font-family:var(--mono);font-size:10px;color:var(--fg-faint);
+       letter-spacing:.08em;margin-left:auto}
+  .light .cap{color:#5b6068}
+</style>
+</head>
+<body>
+
+<h3>TALLY — RUST ON BLACK</h3>
+<div class="row">
+
+  <div class="card pick">
+    <div class="lbl">a — 4.5px</div>
+    <svg width="72" height="72" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="11" fill="#0b0c0e"/>
+      <g stroke="#d94f2b" stroke-width="4.5" stroke-linecap="round">
+        <line x1="17" y1="19" x2="17" y2="45"/>
+        <line x1="26" y1="19" x2="26" y2="45"/>
+        <line x1="35" y1="19" x2="35" y2="45"/>
+        <line x1="44" y1="19" x2="44" y2="45"/>
+        <line x1="12" y1="45" x2="49" y2="19"/>
+      </g>
+    </svg>
+    <div class="note">Four uprights struck through, 9px pitch. Same geometry
+      as before, just inverted.</div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">b — 5.5px</div>
+    <svg width="72" height="72" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="11" fill="#0b0c0e"/>
+      <g stroke="#d94f2b" stroke-width="5.5" stroke-linecap="round">
+        <line x1="17" y1="19" x2="17" y2="45"/>
+        <line x1="26" y1="19" x2="26" y2="45"/>
+        <line x1="35" y1="19" x2="35" y2="45"/>
+        <line x1="44" y1="19" x2="44" y2="45"/>
+        <line x1="12" y1="45" x2="49" y2="19"/>
+      </g>
+    </svg>
+    <div class="note">Heavier. Rust on black needs more weight than white on
+      rust did — thin light strokes on dark lose contrast.</div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">c — white fifth</div>
+    <svg width="72" height="72" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="11" fill="#0b0c0e"/>
+      <g stroke="#d94f2b" stroke-width="5" stroke-linecap="round">
+        <line x1="17" y1="19" x2="17" y2="45"/>
+        <line x1="26" y1="19" x2="26" y2="45"/>
+        <line x1="35" y1="19" x2="35" y2="45"/>
+        <line x1="44" y1="19" x2="44" y2="45"/>
+      </g>
+      <line x1="12" y1="45" x2="49" y2="19" stroke="#e8eaed" stroke-width="5"
+            stroke-linecap="round"/>
+    </svg>
+    <div class="note">The fifth mark in white. Separates the count from the
+      strike — two colours, but it earns them.</div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">d — panel + border</div>
+    <svg width="72" height="72" viewBox="0 0 64 64">
+      <rect x="1.5" y="1.5" width="61" height="61" rx="10"
+            fill="#16181d" stroke="#23262d" stroke-width="2"/>
+      <g stroke="#d94f2b" stroke-width="5" stroke-linecap="round">
+        <line x1="17" y1="19" x2="17" y2="45"/>
+        <line x1="26" y1="19" x2="26" y2="45"/>
+        <line x1="35" y1="19" x2="35" y2="45"/>
+        <line x1="44" y1="19" x2="44" y2="45"/>
+        <line x1="12" y1="45" x2="49" y2="19"/>
+      </g>
+    </svg>
+    <div class="note">On <code>--panel</code> with a <code>--line</code>
+      border — the site's own card.</div>
+  </div>
+
+</div>
+
+<h3>A AT REAL SIZES</h3>
+<div class="ctx">
+  <svg width="128" height="128" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="4.5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+  <svg width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="4.5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+  <svg width="48" height="48" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="4.5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+  <svg width="32" height="32" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="4.5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+  <svg width="20" height="20" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="4.5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+  <svg width="16" height="16" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="4.5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+  <span class="cap">128 → 16</span>
+</div>
+
+<h3>B AT REAL SIZES — HEAVIER HOLDS SMALL</h3>
+<div class="ctx">
+  <svg width="128" height="128" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="5.5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+  <svg width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="5.5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+  <svg width="48" height="48" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="5.5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+  <svg width="32" height="32" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="5.5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+  <svg width="20" height="20" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="5.5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+  <svg width="16" height="16" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="5.5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+  <span class="cap">128 → 16</span>
+</div>
+
+<h3>WHERE IT LIVES</h3>
+<div class="ctx" style="gap:24px">
+  <div style="display:flex;align-items:center;gap:11px">
+    <svg width="32" height="32" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+    <div>
+      <div style="font-size:13px;font-weight:600">Everykill</div>
+      <div style="font-size:11px;color:var(--fg-dim)">Discord — round crop</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
+    <svg width="26" height="26" viewBox="0 0 64 64"><rect width="64" height="64" rx="11" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+    <span style="font-size:19px;letter-spacing:-.01em">Everykill</span>
+  </div>
+</div>
+
+<div class="ctx light" style="margin-top:12px">
+  <svg width="32" height="32" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="#0b0c0e"/><g stroke="#d94f2b" stroke-width="5" stroke-linecap="round"><line x1="17" y1="19" x2="17" y2="45"/><line x1="26" y1="19" x2="26" y2="45"/><line x1="35" y1="19" x2="35" y2="45"/><line x1="44" y1="19" x2="44" y2="45"/><line x1="12" y1="45" x2="49" y2="19"/></g></svg>
+  <span style="font-size:13px;font-weight:600;color:#16181d">Everykill</span>
+  <span class="cap">LIGHT THEME</span>
+</div>
+
+</body>
+</html>
