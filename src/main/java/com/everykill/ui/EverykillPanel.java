@@ -784,6 +784,46 @@ public class EverykillPanel extends PluginPanel
 	 * kills/xp/elapsed pushed the actual session data down the panel and stayed there
 	 * until dismissed.
 	 */
+	/**
+	 * A titled card, matching the Records tab's own container.
+	 *
+	 * <p>Account used to stack bare lines directly on the background while every
+	 * other tab used bordered cards, which made one tab look like a different
+	 * screen. Same shell, so the tabs read as one panel.
+	 */
+	private static JPanel titledCard(String title)
+	{
+		final JPanel p = new JPanel();
+		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+		p.setBackground(SITE_PANEL);
+		p.setAlignmentX(LEFT_ALIGNMENT);
+		p.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(SITE_LINE, 1),
+			BorderFactory.createEmptyBorder(7, 8, 8, 8)));
+
+		final JLabel h = new JLabel(title);
+		h.setFont(FontManager.getRunescapeSmallFont());
+		h.setForeground(SITE_FG_FAINT);
+		h.setAlignmentX(LEFT_ALIGNMENT);
+		h.setMaximumSize(new Dimension(Short.MAX_VALUE, 14));
+		p.add(h);
+		p.add(javax.swing.Box.createVerticalStrut(3));
+		return p;
+	}
+
+	/**
+	 * Fixes a card at the height its content needs.
+	 *
+	 * <p>Called AFTER the children are added — measuring an empty panel returns the
+	 * border and nothing else, which is a different wrong answer. Without this a
+	 * card has no maximum, so BoxLayout treats it as stretchable and hands it a
+	 * share of the leftover space on a short tab.
+	 */
+	private static void pin(JPanel card)
+	{
+		card.setMaximumSize(new Dimension(Short.MAX_VALUE, card.getPreferredSize().height));
+	}
+
 	private void buildAccount()
 	{
 		monsterHeader.setText("ACCOUNT");
@@ -795,19 +835,19 @@ public class EverykillPanel extends PluginPanel
 			monsterList.add(javax.swing.Box.createVerticalStrut(6));
 		}
 
-		monsterList.add(sectionLine("UPLOAD"));
-		monsterList.add(detailLine("status", uploadService.getStatus()));
+		final JPanel upload = titledCard("UPLOAD");
+		upload.add(detailLine("status", uploadService.getStatus()));
 
 		final int queued = uploadService.queued();
 		if (queued > 0)
 		{
-			monsterList.add(detailLine("waiting", String.valueOf(queued)));
+			upload.add(detailLine("waiting", String.valueOf(queued)));
 		}
 
 		final int dropped = uploadService.dropped();
 		if (dropped > 0)
 		{
-			monsterList.add(detailLine("dropped", String.valueOf(dropped)));
+			upload.add(detailLine("dropped", String.valueOf(dropped)));
 		}
 
 		final String halted = uploadService.getHalted();
@@ -815,29 +855,38 @@ public class EverykillPanel extends PluginPanel
 		{
 			final JLabel warn = paragraph(halted
 				+ "<br>Your kills are safe and still queued.", SITE_ACC);
-			warn.setBorder(BorderFactory.createEmptyBorder(2, 0, 4, 0));
-			monsterList.add(warn);
+			warn.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
+			upload.add(warn);
 		}
+		pin(upload);
+		monsterList.add(upload);
+		monsterList.add(javax.swing.Box.createVerticalStrut(6));
 
-		monsterList.add(javax.swing.Box.createVerticalStrut(8));
-		monsterList.add(sectionLine("LEADERBOARD"));
+		final JPanel board = titledCard("LEADERBOARD");
+		board.add(detailLine("name",
+			uploadService.isPublishing() ? "published" : "not shown"));
 
 		// the name itself is never held anywhere - not on the record, not in the
 		// identity file, not cached here for display. showing the STATE says what the
 		// user needs without this panel becoming the field that gets populated.
-		monsterList.add(detailLine("name",
-			uploadService.isPublishing() ? "published" : "not shown"));
-
 		final JLabel note = paragraph(uploadService.isPublishing()
 			? "Your display name is on public leaderboards."
 			: "You are ranked anonymously. Turn on “Publish my name”"
 				+ " in settings to appear by name.", SITE_FG_DIM);
 		note.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
-		monsterList.add(note);
+		board.add(note);
+		pin(board);
+		monsterList.add(board);
+		monsterList.add(javax.swing.Box.createVerticalStrut(6));
 
-		monsterList.add(javax.swing.Box.createVerticalStrut(8));
-		monsterList.add(sectionLine("YOUR DATA"));
-		monsterList.add(dataRights());
+		final JPanel data = titledCard("YOUR DATA");
+		data.add(dataRights());
+		pin(data);
+		monsterList.add(data);
+
+		// takes the leftover vertical space so the cards above keep their own
+		// height instead of stretching to fill a short tab.
+		monsterList.add(javax.swing.Box.createVerticalGlue());
 	}
 
 	private JPanel dataRights()
