@@ -4,6 +4,7 @@
  */
 package com.everykill.ui;
 
+import com.everykill.detect.SlayerTask;
 import com.everykill.ledger.LocalLedger;
 import com.google.gson.Gson;
 import com.everykill.model.Confidence;
@@ -110,6 +111,17 @@ public class EverykillPanel extends PluginPanel
 	 */
 	private final Map<Integer, Integer> priceCache = new HashMap<>();
 
+	/**
+	 * The slayer task, snapshotted on the client thread.
+	 *
+	 * <p>{@code rebuild()} runs on the EDT and varp / DB-table reads are client-thread
+	 * work — the same trap that {@code getItemPrice} sprang on the drop rows. Refresh
+	 * off-EDT, paint from the snapshot.
+	 */
+	private volatile String taskLine;
+
+	private volatile String taskProgress;
+
 	private enum View
 	{
 		KILLS("Kill log"),
@@ -142,6 +154,7 @@ public class EverykillPanel extends PluginPanel
 	private final NpcIcons npcIcons;
 
 	private final UploadService uploadService;
+	private final SlayerTask slayerTask;
 
 	// npc ids whose skill breakdown is open. panel state, never persisted.
 	private final Set<Integer> expanded = new HashSet<>();
@@ -173,7 +186,7 @@ public class EverykillPanel extends PluginPanel
 	@Inject
 	EverykillPanel(LocalLedger ledger, MilestoneNotifier notifier, XpService xpService,
 		ItemManager itemManager, ClientThread clientThread, Gson gson,
-		UploadService uploadService)
+		UploadService uploadService, SlayerTask slayerTask)
 	{
 		super(false);
 		this.ledger = ledger;
@@ -182,6 +195,7 @@ public class EverykillPanel extends PluginPanel
 		this.itemManager = itemManager;
 		this.clientThread = clientThread;
 		this.uploadService = uploadService;
+		this.slayerTask = slayerTask;
 
 		// injected Gson, per CONVENTIONS - never build one. read once at construction
 		// because it's a 238-entry file off the classpath, not per repaint.
@@ -627,12 +641,40 @@ public class EverykillPanel extends PluginPanel
 	}
 
 	/**
-	 * Fills {@link #priceCache} for anything we haven't priced yet.
-	 *
-	 * <p>Hops to the client thread because {@code getItemPrice} asserts it, then comes
-	 * back to Swing to repaint only if something actually changed - otherwise this
-	 * would loop forever against its own rebuild.
+	 * Reads the slayer task on the client thread, repainting only if it moved.
 	 */
+	private void refreshTask()
+	{
+		clientThread.invokeLater(() ->
+		{
+			String line = null;
+			String progress = null;
+
+			if (slayerTask.active())
+			{
+				final String name = slayerTask.name();
+				if (name != null)
+				{
+					final String where = slayerTask.location();
+					line = where == null ? title(name) : title(name) + " · " + where;
+
+					final int left = slayerTask.remaining();
+					final int assigned = slayerTask.assigned();
+					progress = assigned > 0 ? left + " of " + assigned : String.valueOf(left);
+				}
+			}
+
+			// guard the repaint or this loops forever: rebuild -> refresh -> rebuild.
+			if (!java.util.Objects.equals(line, taskLine)
+				|| !java.util.Objects.equals(progress, taskProgress))
+			{
+				taskLine = line;
+				taskProgress = progress;
+				SwingUtilities.invokeLater(this::rebuild);
+			}
+		});
+	}
+
 	/**
 	 * Personal records, from data we already store.
 	 *
@@ -644,11 +686,10 @@ public class EverykillPanel extends PluginPanel
 	/**
 	 * Live view of this session.
 	 *
-	 * <p>{@code spec-plugin-ux.md} §1b also lists supplies consumed, damage taken,
-	 * deaths, and the current slayer task. None of those are built: nothing tracks
-	 * inventory changes, our own hitpoints, or the slayer varbits, and a panel that
-	 * showed 0 for all four would read as "you took no damage" rather than "we are
-	 * not watching". They arrive when something measures them.
+	 * <p>{@code spec-plugin-ux.md} §1b also lists supplies consumed, damage taken and
+	 * deaths. None are built: nothing tracks inventory changes or our own hitpoints,
+	 * and a panel showing 0 for all three would read as "you took no damage" rather
+	 * than "we are not watching". They arrive when something measures them.
 	 *
 	 * <p>The session boundary is the spec's other open item. Ours is "since the
 	 * counters were last zeroed" — login or a manual reset — not the fixed 10-minute
@@ -822,6 +863,16 @@ public class EverykillPanel extends PluginPanel
 	private static void pin(JPanel card)
 	{
 		card.setMaximumSize(new Dimension(Short.MAX_VALUE, card.getPreferredSize().height));
+	}
+
+	/** The DB stores task names upper case; the panel doesn't shout. */
+	private static String title(String upper)
+	{
+		if (upper == null || upper.isEmpty())
+		{
+			return upper;
+		}
+		return upper.charAt(0) + upper.substring(1).toLowerCase();
 	}
 
 	private void buildAccount()
@@ -1000,6 +1051,18 @@ public class EverykillPanel extends PluginPanel
 		{
 			monsterList.add(caption("Nothing killed yet."));
 			return;
+		}
+
+		final String task = taskLine;
+		if (task != null)
+		{
+			monsterList.add(sectionLine("SLAYER TASK"));
+			monsterList.add(detailLine("task", task));
+			if (taskProgress != null)
+			{
+				monsterList.add(detailLine("remaining", taskProgress));
+			}
+			monsterList.add(javax.swing.Box.createVerticalStrut(8));
 		}
 
 		// spec-plugin-ux 1b wants upload state always visible, so a one-line summary
@@ -1426,6 +1489,7 @@ public class EverykillPanel extends PluginPanel
 		// asserts that thread, and its price map is empty until an async fetch lands -
 		// so anything read at drop time may have been 0 and needs a second chance.
 		refreshPrices(rows);
+		refreshTask();
 		monsterHeader.setText(window.tooltip.toUpperCase() + " · " + rows.size());
 
 		// the view tabs are rebuilt from showRecords each time, so they always reflect

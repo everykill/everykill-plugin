@@ -165,6 +165,50 @@ New high-end PvM boss plugins are not accepted as a blanket policy.
 - No menu modifications for Blackjacking
 - No conditional menu entry removal based on NPC type, friend status, etc. (can be overpowered)
 
+## Swing panels — the BoxLayout size trap
+
+Every layout bug in this plugin so far has been one root cause, in four costumes.
+It cost five rounds of "it needs to hug the left wall", three of "the rows are
+squished", and one of "the text is cut off". Read this before adjusting a border.
+
+**A `BoxLayout` child with no maximum size is stretchable.** The container hands
+it leftover space along the layout axis, and centres it on the other one.
+`setAlignmentX` positions a child; it does not stretch one.
+
+That produces:
+
+| Symptom | Real cause |
+|---|---|
+| Content floats away from the left edge | No max width — BoxLayout centred it |
+| Rows squish when a sibling expands | No max height — the sibling took their space |
+| Cards look loose and stretched on a short tab | No max height and no glue — they soaked up the slack |
+| Wrapping text is clipped after one line | HTML label derived height from an unbounded width |
+
+**The rules:**
+
+1. **Set a maximum size on every child of a vertical `BoxLayout`.**
+   `setMaximumSize(new Dimension(Short.MAX_VALUE, h))` for a full-width row.
+2. **Measure AFTER adding children.** `getPreferredSize()` on an empty panel
+   returns the border and nothing else. Measuring too early is a different wrong
+   answer, not a safer one.
+3. **Never hardcode a row height.** A literal `26` was correct the day it was
+   written and stale the moment a 24px icon moved in, silently crushing every
+   row by 12px. Measure the first child and use that.
+4. **Put `Box.createVerticalGlue()` at the end of a short list**, so leftover
+   space has somewhere to go that isn't your content. Glue alone is not enough —
+   an unpinned child still competes with it.
+5. **Wrapping `<html>` labels must be measured explicitly.** A JLabel derives its
+   preferred *height* from its preferred *width*, and in a vertical BoxLayout
+   nothing tells it how wide it will be, so it assumes one enormous line and
+   reports one line of height. Use `BasicHTML.createHTMLView`, `setSize(width, 0)`,
+   then `getPreferredSpan(Y_AXIS)`. `EverykillPanel.paragraph()` does this.
+
+**When a layout is wrong, measure it before changing it.** Every one of these was
+found by dumping actual numbers — a script that printed every `EmptyBorder` inset
+(largest was 5px, so borders were never the problem), a harness that printed tab
+label widths against cell widths, a probe that showed a label wanting 1107x16 when
+it needed 191x112. None were found by nudging padding.
+
 ## Interface Restrictions
 
 - No unhiding hidden interface components (special attack bar, minimap)
