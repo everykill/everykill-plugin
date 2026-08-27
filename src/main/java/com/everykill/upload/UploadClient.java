@@ -342,6 +342,89 @@ public class UploadClient
 	 *
 	 * <p>Irreversible and keeps no tombstone, so the caller must have asked first.
 	 */
+	/**
+	 * Redeems a recovery code, re-pointing the account at this install.
+	 *
+	 * <p>The one route that reads a code we have been telling players to write down.
+	 * Until it existed, the banner's promise was not true on either side.
+	 *
+	 * <p>{@code rebound=false} in the response means this client id already belongs to
+	 * a different account. The server issues a working token for the recovered account
+	 * and leaves both ids alone rather than silently merging two histories — so the
+	 * token is usable, but the local id does not map to it and the caller must not
+	 * assume it does.
+	 *
+	 * @param onDone token, then whether the account was rebound to this install
+	 * @param onError a message already fit to show a player
+	 */
+	public void recover(String baseUrl, String code, String clientId,
+		java.util.function.BiConsumer<String, Boolean> onDone, Consumer<String> onError)
+	{
+		final JsonObject body = new JsonObject();
+		body.addProperty("code", code);
+		body.addProperty("clientId", clientId);
+
+		final Request request = new Request.Builder()
+			.url(baseUrl + "/v1/recover")
+			.post(RequestBody.create(JSON, gson.toJson(body)))
+			.build();
+
+		httpClient.newCall(request).enqueue(new Callback()
+		{
+			@Override
+			public void onFailure(Call call, IOException e)
+			{
+				onError.accept("Could not reach the server.");
+			}
+
+			@Override
+			public void onResponse(Call call, Response response)
+			{
+				try (Response r = response)
+				{
+					final String text = r.body() == null ? "" : r.body().string();
+					final int status = r.code();
+
+					if (status == 404)
+					{
+						// the server does not distinguish wrong from unknown, and
+						// neither should we - saying which would confirm that a code
+						// exists.
+						onError.accept("That code doesn't match an account.");
+						return;
+					}
+
+					if (status == 400)
+					{
+						onError.accept("That doesn't look like a recovery code.");
+						return;
+					}
+
+					if (!r.isSuccessful())
+					{
+						onError.accept("The server refused that (" + status + ").");
+						return;
+					}
+
+					final JsonObject json = gson.fromJson(text, JsonObject.class);
+					if (json == null || !json.has("token"))
+					{
+						onError.accept("The server's reply made no sense.");
+						return;
+					}
+
+					onDone.accept(json.get("token").getAsString(),
+						json.has("rebound") && json.get("rebound").getAsBoolean());
+				}
+				catch (IOException | RuntimeException e)
+				{
+					log.debug("everykill: recover failed", e);
+					onError.accept("Something went wrong reading the reply.");
+				}
+			}
+		});
+	}
+
 	public void erase(String baseUrl, String token, Consumer<String> onDone,
 		Consumer<String> onError)
 	{

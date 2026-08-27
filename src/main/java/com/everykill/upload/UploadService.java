@@ -129,6 +129,57 @@ public class UploadService
 		}
 	}
 
+	/**
+	 * Redeems a recovery code and adopts the account it belongs to.
+	 *
+	 * <p>Runs off the client thread — it touches the network and then the identity
+	 * file. Status goes into the panel, since the player is standing there watching
+	 * after pasting a code.
+	 */
+	public void recover(String code)
+	{
+		if (code == null || code.trim().isEmpty())
+		{
+			return;
+		}
+
+		executor.execute(() ->
+		{
+			if (identity.getClientId() == null)
+			{
+				identity.load();
+			}
+
+			status = "Recovering...";
+
+			client.recover(uploadUrl(), code.trim(), identity.getClientId(),
+				(token, rebound) ->
+				{
+					// the recovered account's token replaces ours. no recovery code
+					// comes back here - the player already has one, it is the thing
+					// they just typed, and it does not rotate.
+					identity.save(token, null);
+
+					if (rebound)
+					{
+						status = "Recovered";
+					}
+					else
+					{
+						// this install's id belongs to a different account. the token
+						// works, but the id does not map to it, and saying "recovered"
+						// would hide that.
+						status = "Recovered - this install was already tracking another "
+							+ "account, so both were kept separate";
+					}
+				},
+				error ->
+				{
+					status = error;
+				});
+		});
+	}
+
 	/** Queues a kill. Cheap and non-blocking — safe from the client thread. */
 	public void offer(KillRecord kill)
 	{

@@ -911,6 +911,45 @@ public class EverykillPanel extends PluginPanel
 		monsterList.add(upload);
 		monsterList.add(javax.swing.Box.createVerticalStrut(6));
 
+		// the slot the recovery code goes into. here rather than in config because
+		// this is where the code was shown when it was minted, so it is where someone
+		// will look for the hole it fits.
+		final JPanel restore = titledCard("RESTORE AN ACCOUNT");
+		restore.add(paragraph("Reinstalled or moved machine? Paste the recovery code "
+			+ "you saved to bring your history back to this install.", SITE_FG_DIM));
+		restore.add(javax.swing.Box.createVerticalStrut(6));
+
+		final javax.swing.JTextField codeField = new javax.swing.JTextField();
+		codeField.setFont(FontManager.getRunescapeSmallFont());
+		codeField.setBackground(SITE_BG_ALT);
+		codeField.setForeground(SITE_FG);
+		codeField.setCaretColor(SITE_ACC);
+		codeField.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(SITE_LINE, 1),
+			BorderFactory.createEmptyBorder(4, 5, 4, 5)));
+		codeField.setAlignmentX(LEFT_ALIGNMENT);
+		codeField.setMaximumSize(new Dimension(Short.MAX_VALUE, 24));
+		restore.add(codeField);
+		restore.add(javax.swing.Box.createVerticalStrut(6));
+
+		restore.add(actionLabel("Restore my history", () ->
+		{
+			final String code = codeField.getText();
+			if (code == null || code.trim().isEmpty())
+			{
+				return;
+			}
+			uploadService.recover(code);
+			codeField.setText("");
+			// the service writes progress into the status line above. rebuild so the
+			// player sees it move instead of wondering whether the click landed.
+			SwingUtilities.invokeLater(this::rebuild);
+		}));
+
+		pin(restore);
+		monsterList.add(restore);
+		monsterList.add(javax.swing.Box.createVerticalStrut(8));
+
 		final JPanel board = titledCard("LEADERBOARD");
 		board.add(detailLine("name",
 			uploadService.isPublishing() ? "published" : "not shown"));
