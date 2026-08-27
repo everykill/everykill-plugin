@@ -113,6 +113,23 @@ public class UploadService
 		return EverykillConfig.UPLOAD_URL;
 	}
 
+	/**
+	 * Host of the server we upload to. Host only, not the whole URL — a port change
+	 * between dev runs is the same server, and treating it as a different one would
+	 * throw away a working token for nothing.
+	 */
+	private String uploadHost()
+	{
+		try
+		{
+			return java.net.URI.create(uploadUrl()).getHost();
+		}
+		catch (RuntimeException e)
+		{
+			return null;
+		}
+	}
+
 	/** True only for an address on this machine. */
 	private static boolean isLoopback(String url)
 	{
@@ -147,7 +164,7 @@ public class UploadService
 		{
 			if (identity.getClientId() == null)
 			{
-				identity.load();
+				identity.load(uploadHost());
 			}
 
 			status = "Recovering...";
@@ -158,7 +175,7 @@ public class UploadService
 					// the recovered account's token replaces ours. no recovery code
 					// comes back here - the player already has one, it is the thing
 					// they just typed, and it does not rotate.
-					identity.save(token, null);
+					identity.save(token, null, uploadHost());
 
 					if (rebound)
 					{
@@ -245,7 +262,7 @@ public class UploadService
 		{
 			if (identity.getClientId() == null)
 			{
-				identity.load();
+				identity.load(uploadHost());
 			}
 
 			if (!identity.isRegistered())
@@ -277,7 +294,7 @@ public class UploadService
 					// straight to disk, including the recovery code. it is minted
 					// exactly once, so holding it in memory means a restart before
 					// the user copies it loses their history permanently.
-					identity.save(reg.token, reg.recoveryCode);
+					identity.save(reg.token, reg.recoveryCode, uploadHost());
 					status = "Registered";
 				}
 				catch (RuntimeException e)

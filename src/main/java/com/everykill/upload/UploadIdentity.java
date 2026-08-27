@@ -47,6 +47,9 @@ public class UploadIdentity
 	// the only way back into their history - forever, with no rsn on file.
 	private static final String KEY_RECOVERY = "recoveryCode";
 
+	/** Which server minted the token and code below. */
+	private static final String KEY_HOST = "host";
+
 	/** Synced by RuneLite with the rest of the RS profile config. */
 	private static final String CONFIG_KEY = "uploadClientId";
 
@@ -69,6 +72,8 @@ public class UploadIdentity
 	private String clientId;
 	private String token;
 	private String recoveryCode;
+
+	private String host;
 
 	@Inject
 	public UploadIdentity(ConfigManager configManager)
@@ -114,7 +119,18 @@ public class UploadIdentity
 	 * written here; it is written once a token comes back, so a failed registration
 	 * cannot burn an id and orphan a history that never existed.
 	 */
+	/** Loads with no host check — for callers that don't know where they'll talk. */
 	public synchronized void load()
+	{
+		load(null);
+	}
+
+	/**
+	 * Loads the identity, discarding anything a different server issued.
+	 *
+	 * @param currentHost host we are about to talk to, or null to skip the check
+	 */
+	public synchronized void load(String currentHost)
 	{
 		final Properties props = new Properties();
 
@@ -133,6 +149,26 @@ public class UploadIdentity
 		clientId = props.getProperty(KEY_CLIENT_ID);
 		token = props.getProperty(KEY_TOKEN);
 		recoveryCode = props.getProperty(KEY_RECOVERY);
+		host = props.getProperty(KEY_HOST);
+
+		// a token and a recovery code belong to the server that minted them. pointing
+		// the plugin somewhere else makes both meaningless - production answers
+		// "Token not recognised." to a dev server's token, and a recovery code from
+		// the wrong server is worse than none, because the panel calls it the only way
+		// back to your history.
+		//
+		// the CLIENT ID stays. it is a random local identifier, not the server's
+		// property; each server derives its own account from hash(id + its own salt).
+		// keeping it is the whole reason a reinstall finds its history again.
+		if (host != null && currentHost != null && !host.equals(currentHost))
+		{
+			log.debug("everykill: identity was issued by {}, now talking to {} - "
+				+ "dropping the token and recovery code, keeping the client id",
+				host, currentHost);
+			token = null;
+			recoveryCode = null;
+			host = null;
+		}
 
 		if (clientId == null || clientId.length() != 32)
 		{
@@ -231,7 +267,21 @@ public class UploadIdentity
 	/** Stores the token, and the recovery code when the server just minted one. */
 	public synchronized void save(String newToken, String newRecoveryCode)
 	{
+		save(newToken, newRecoveryCode, host);
+	}
+
+	/**
+	 * Stores the token and code against the server that issued them.
+	 *
+	 * <p>The host is written alongside because neither a token nor a recovery code
+	 * means anything to a different server. Verified live: production answered
+	 * {@code "Token not recognised."} to a token the local dev server had minted, and
+	 * the panel was cheerfully displaying that server's recovery code at the time.
+	 */
+	public synchronized void save(String newToken, String newRecoveryCode, String issuedBy)
+	{
 		token = newToken;
+		host = issuedBy;
 		if (newRecoveryCode != null)
 		{
 			recoveryCode = newRecoveryCode;
@@ -243,6 +293,10 @@ public class UploadIdentity
 		if (recoveryCode != null)
 		{
 			props.setProperty(KEY_RECOVERY, recoveryCode);
+		}
+		if (host != null)
+		{
+			props.setProperty(KEY_HOST, host);
 		}
 
 		mirrorToConfig();
