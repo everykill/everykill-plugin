@@ -5,6 +5,7 @@
 package com.everykill.ui;
 
 import com.everykill.detect.SlayerTask;
+import com.everykill.detect.WorldFilter;
 import com.everykill.ledger.LocalLedger;
 import com.google.gson.Gson;
 import com.everykill.model.Confidence;
@@ -120,6 +121,9 @@ public class EverykillPanel extends PluginPanel
 
 	private volatile String taskProgress;
 
+	/** Non-null when this world's kills don't count toward the board. */
+	private volatile String unrankedWorld;
+
 	private enum View
 	{
 		KILLS("Kill log"),
@@ -153,6 +157,7 @@ public class EverykillPanel extends PluginPanel
 
 	private final UploadService uploadService;
 	private final SlayerTask slayerTask;
+	private final WorldFilter worldFilter;
 
 	// npc ids whose skill breakdown is open. panel state, never persisted.
 	private final Set<Integer> expanded = new HashSet<>();
@@ -184,7 +189,7 @@ public class EverykillPanel extends PluginPanel
 	@Inject
 	EverykillPanel(LocalLedger ledger, MilestoneNotifier notifier, XpService xpService,
 		ItemManager itemManager, ClientThread clientThread, Gson gson,
-		UploadService uploadService, SlayerTask slayerTask)
+		UploadService uploadService, SlayerTask slayerTask, WorldFilter worldFilter)
 	{
 		super(false);
 		this.ledger = ledger;
@@ -194,6 +199,7 @@ public class EverykillPanel extends PluginPanel
 		this.clientThread = clientThread;
 		this.uploadService = uploadService;
 		this.slayerTask = slayerTask;
+		this.worldFilter = worldFilter;
 
 		// injected Gson, per CONVENTIONS - never build one. read once at construction
 		// because it's a 238-entry file off the classpath, not per repaint.
@@ -647,6 +653,7 @@ public class EverykillPanel extends PluginPanel
 		{
 			String line = null;
 			String progress = null;
+			final String unranked = worldFilter.excludedReason();
 
 			if (slayerTask.active())
 			{
@@ -664,10 +671,12 @@ public class EverykillPanel extends PluginPanel
 
 			// guard the repaint or this loops forever: rebuild -> refresh -> rebuild.
 			if (!java.util.Objects.equals(line, taskLine)
-				|| !java.util.Objects.equals(progress, taskProgress))
+				|| !java.util.Objects.equals(progress, taskProgress)
+				|| !java.util.Objects.equals(unranked, unrankedWorld))
 			{
 				taskLine = line;
 				taskProgress = progress;
+				unrankedWorld = unranked;
 				SwingUtilities.invokeLater(this::rebuild);
 			}
 		});
@@ -886,6 +895,16 @@ public class EverykillPanel extends PluginPanel
 
 		final JPanel upload = titledCard("UPLOAD");
 		upload.add(detailLine("status", uploadService.getStatus()));
+
+		// a world whose kills don't count has to say so. "Up to date" while nothing
+		// is being sent is indistinguishable from working.
+		final String unranked = unrankedWorld;
+		if (unranked != null)
+		{
+			upload.add(detailLine("world", unranked));
+			upload.add(paragraph("Kills here are recorded locally but not uploaded - "
+				+ "this world has its own save.", SITE_FG_DIM));
+		}
 
 		final int queued = uploadService.queued();
 		if (queued > 0)

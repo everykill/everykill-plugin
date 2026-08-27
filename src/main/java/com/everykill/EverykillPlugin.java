@@ -8,6 +8,7 @@ import com.everykill.detect.KillDetector;
 import com.everykill.detect.LootDetector;
 import com.everykill.ledger.LocalLedger;
 import com.everykill.detect.AccountTypes;
+import com.everykill.detect.WorldFilter;
 import com.everykill.model.AccountType;
 import com.everykill.model.Confidence;
 import com.everykill.model.Drop;
@@ -105,6 +106,9 @@ public class EverykillPlugin extends Plugin
 
 	@Inject
 	private MilestoneNotifier notifier;
+
+	@Inject
+	private WorldFilter worldFilter;
 
 	@Inject
 	private AccountTypes accountTypes;
@@ -505,7 +509,19 @@ public class EverykillPlugin extends Plugin
 
 		// queued, not sent. the service decides when, and drops it on the floor
 		// when upload is off - so toggling it on never uploads a backlog.
-		uploadService.offer(kill);
+		//
+		// the world check gates the UPLOAD, not the record above. a deadman kill is
+		// still your kill and belongs in your own ledger; what it must not do is land
+		// on a shared board, because those saves get wiped and the rank would be
+		// permanently uncontestable. classify, never discard.
+		if (worldFilter.isRanked())
+		{
+			uploadService.offer(kill);
+		}
+		else if (config.uploadEnabled())
+		{
+			log.debug("everykill: not uploading, {} world", worldFilter.excludedReason());
+		}
 
 		// what a hand count gets checked against. without it a wrong total is just a
 		// wrong number. needs --debug.
