@@ -2,22 +2,29 @@
 
 Kill counts for every monster in the game, not just the ~90 on the hiscores.
 
+**[everykill.com](https://www.everykill.com)**
+
+## About
+
+The official hiscores rank about 90 bosses. There are 1,757 monsters in the game, and
+nobody knows who has killed the most Rockslugs, because nothing counts them.
+
+This is a passion project — built because that gap bothered us, not because anyone
+asked for it. It is actively developed and **new features land in the plugin and on
+the site with every update**. If something is missing, it is probably on the list.
+
 ## What it does
 
 Records a per-monster kill count for anything you kill, locally, and grades every
 kill by how well it can be evidenced. It also measures per-monster combat experience.
 
-A companion website is planned, where the counts will rank you on monsters nobody
+Optionally — and **off by default** — it uploads those kills to
+[everykill.com](https://www.everykill.com), where they rank you on monsters nobody
 else ranks and compare your dry streak on a drop against other people actually
-killing that thing. **It does not exist yet and this plugin does not talk to it.**
+killing that thing. Your RuneScape name is never sent unless you separately ask for
+it to be published.
 
-**Current status: P1. Local only. Nothing is uploaded.** The upload toggle exists,
-is off, and is not read by any code yet. It ships early so the required disclosure
-is in place before there is anything to disclose.
-
-**Nothing here has been confirmed in a game client yet.** It compiles against
-RuneLite 1.12.35 and its tests pass, which proves API surface and logic — not that a
-single kill registers in play. See `docs/BUILD-ORDER.md` for what still needs proving.
+The plugin is fully useful with upload off. Everything above happens locally first.
 
 ## Why it exists alongside Loot Tracker
 
@@ -80,8 +87,11 @@ Analysis lives on the server, not in the client. The rule for anything proposed
 here: *could the plugin produce this display with no network call?* If not, it does
 not belong in the client.
 
-So there is no drop-rate display, no dry percentile, no pity bar, no GP/hr, no
-Discord webhook, no NPC highlighting, no per-boss logic, and no chatbox input.
+So there is no drop-rate display, no dry percentile, no pity bar, no GP/hr, no NPC
+highlighting, no per-boss logic, and no chatbox input.
+
+Discord notifications are handed to [Dink](https://github.com/pajlads/DinkPlugin)
+rather than rebuilt — see `docs/DINK-INTEGRATION.md`.
 
 ## Compliance
 

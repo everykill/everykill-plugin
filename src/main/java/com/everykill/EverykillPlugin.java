@@ -68,7 +68,7 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 @PluginDescriptor(
 	name = "Everykill",
-	description = "Kill counts for every monster in the game, not just the ~90 on the hiscores",
+	description = "Kill counts for every monster in the game, not just the ~90 on the hiscores. Ranks at everykill.com",
 	tags = {"kill", "count", "kc", "slayer", "boss", "monster", "tracker", "rank"}
 )
 public class EverykillPlugin extends Plugin
