@@ -51,6 +51,22 @@ public class AccountTypes
 		final AccountType fromVarbit =
 			AccountType.fromVarbit(client.getVarbitValue(VarbitID.IRONMAN));
 
+		// a fallen hardcore reads as a plain ironman in VarbitID.IRONMAN - the mode
+		// really did change. IRONMAN_HARDCORE_DEAD (5403) is what separates one from
+		// an account that was never hardcore.
+		//
+		// UNVERIFIED: no core plugin reads 5403, so the name comes from the cache
+		// constants and the "nonzero means dead" reading is inference, not a
+		// measurement. designed so being wrong is cheap - a false positive labels a
+		// regular iron as fallen-hardcore on a board they were not on, and every loot
+		// rule is identical either way. the server's own mode-transition check is the
+		// authority; this is the fast path so a fresh install can tell.
+		if (fromVarbit == AccountType.IRONMAN
+			&& client.getVarbitValue(VarbitID.IRONMAN_HARDCORE_DEAD) != 0)
+		{
+			return AccountType.DEAD_HARDCORE_IRONMAN;
+		}
+
 		// group ironman isn't in that varbit at all - core's own switch has no case
 		// for it and falls through. it lives in the group's clan channel instead.
 		// verified live 2026-08-24: the test account is a GIM and the varbit alone

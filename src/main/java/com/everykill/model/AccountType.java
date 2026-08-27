@@ -41,6 +41,25 @@ public enum AccountType
 	HARDCORE_IRONMAN("Hardcore Ironman", 3),
 
 	/**
+	 * A hardcore that died. Still an ironman for every loot rule.
+	 *
+	 * <p>The official hiscores do not delete a fallen hardcore: the HCIM entry is
+	 * <b>locked</b> at the moment of death and the name is struck through, per the
+	 * wiki — <i>"their experience and total level on the Hardcore Ironman HiScores
+	 * table will be locked, with their name slashed across"</i>
+	 * (oldschool.runescape.wiki/w/Ironman_Mode, read 2026-08-26). The account then
+	 * carries on as a normal ironman.
+	 *
+	 * <p>Those kills were real and were earned under hardcore rules. Deleting them
+	 * would be dishonest; moving them to the ironman board would be worse, because it
+	 * credits a normal iron with a hardcore's work.
+	 *
+	 * <p>Not a raw varbit value — see {@code AccountTypes}, which pairs
+	 * {@code VarbitID.IRONMAN} = 1 with {@code IRONMAN_HARDCORE_DEAD}.
+	 */
+	DEAD_HARDCORE_IRONMAN("Hardcore Ironman (fallen)", -4),
+
+	/**
 	 * Group ironman. Not a varbit value — this is only reachable by checking the
 	 * group's clan channel, so {@link #fromVarbit} can never return it.
 	 *
@@ -118,7 +137,18 @@ public enum AccountType
 	public boolean outsideDamageVoidsLoot()
 	{
 		return this == IRONMAN || this == ULTIMATE_IRONMAN || this == HARDCORE_IRONMAN
-			|| this == GROUP_IRONMAN;
+			|| this == GROUP_IRONMAN || this == DEAD_HARDCORE_IRONMAN;
+	}
+
+	/**
+	 * Whether kills should still count toward the hardcore board.
+	 *
+	 * <p>False once fallen: the entry is frozen, exactly as the official hiscores
+	 * freeze it. New kills belong to the ironman board.
+	 */
+	public boolean countsAsHardcore()
+	{
+		return this == HARDCORE_IRONMAN;
 	}
 
 	/** Any ironman mode, group included. */

@@ -8,32 +8,45 @@ import org.junit.Assert;
 import org.junit.Test;
 
 /**
- * Account type mapping.
+ * Account modes, and the one that stops being itself.
  *
- * The rules measured on 2026-08-24 — a contested kill voiding an ironman's drop
- * entirely, even at 90% of the damage — are wrong for a main, who wins that same drop.
- * So the mapping has to be right and the unknown cases have to stay visible.
+ * <p>The hardcore rules here follow the official hiscores rather than anything we
+ * invented: a fallen HCIM's entry is <b>locked</b>, not deleted and not migrated —
+ * <i>"their experience and total level on the Hardcore Ironman HiScores table will be
+ * locked, with their name slashed across"</i>
+ * (oldschool.runescape.wiki/w/Ironman_Mode, read 2026-08-26).
  */
 public class AccountTypeTest
 {
 	@Test
-	public void theVarbitMappingIsCoresNotOurs()
+	public void aFallenHardcoreStillHasIronmanLootRules()
 	{
-		// HiscorePlugin.java:277-286, corroborated by DailyTasksPlugin's "!= 2 /* UIM */"
-		Assert.assertEquals(AccountType.MAIN, AccountType.fromVarbit(0));
-		Assert.assertEquals(AccountType.IRONMAN, AccountType.fromVarbit(1));
-		Assert.assertEquals(AccountType.ULTIMATE_IRONMAN, AccountType.fromVarbit(2));
-		Assert.assertEquals(AccountType.HARDCORE_IRONMAN, AccountType.fromVarbit(3));
+		// the account is a normal ironman now. every loot rule applies unchanged, and
+		// getting this wrong would silently switch drop voiding off.
+		Assert.assertTrue(AccountType.DEAD_HARDCORE_IRONMAN.outsideDamageVoidsLoot());
+		Assert.assertTrue(AccountType.DEAD_HARDCORE_IRONMAN.isIronman());
 	}
 
 	@Test
-	public void anUnknownValueIsNotQuietlyTreatedAsAMain()
+	public void aFallenHardcoreNoLongerEarnsHardcoreRank()
 	{
-		// jagex adding a mode must not switch the ironman rules off for accounts that
-		// need them. failing loud beats failing convenient.
-		Assert.assertEquals(AccountType.GROUP_UNRESOLVED, AccountType.fromVarbit(4));
-		Assert.assertEquals(AccountType.GROUP_UNRESOLVED, AccountType.fromVarbit(99));
-		Assert.assertEquals(AccountType.GROUP_UNRESOLVED, AccountType.fromVarbit(-1));
+		// the board is frozen at the moment of death. new kills belong to the ironman
+		// board - crediting them to hardcore would rank a dead account against living
+		// ones.
+		Assert.assertFalse(AccountType.DEAD_HARDCORE_IRONMAN.countsAsHardcore());
+		Assert.assertTrue(AccountType.HARDCORE_IRONMAN.countsAsHardcore());
+	}
+
+	@Test
+	public void onlyHardcoreCountsAsHardcore()
+	{
+		for (AccountType type : AccountType.values())
+		{
+			if (type != AccountType.HARDCORE_IRONMAN)
+			{
+				Assert.assertFalse(type + " must not rank as hardcore", type.countsAsHardcore());
+			}
+		}
 	}
 
 	@Test
@@ -42,43 +55,44 @@ public class AccountTypeTest
 		Assert.assertTrue(AccountType.IRONMAN.outsideDamageVoidsLoot());
 		Assert.assertTrue(AccountType.ULTIMATE_IRONMAN.outsideDamageVoidsLoot());
 		Assert.assertTrue(AccountType.HARDCORE_IRONMAN.outsideDamageVoidsLoot());
+		Assert.assertTrue(AccountType.GROUP_IRONMAN.outsideDamageVoidsLoot());
+		Assert.assertTrue(AccountType.DEAD_HARDCORE_IRONMAN.outsideDamageVoidsLoot());
 	}
 
 	@Test
-	public void aMainKeepsItsContestedDrops()
+	public void aMainDoesNotVoidLoot()
 	{
-		// measured the other way round: a main who deals the most damage receives the
-		// drop. treating a main like an iron would discard real kills.
 		Assert.assertFalse(AccountType.MAIN.outsideDamageVoidsLoot());
 	}
 
 	@Test
-	public void groupIronmanIsNotReachableFromTheVarbit()
+	public void anUnknownModeIsNotTreatedAsAMain()
 	{
-		// core's switch has no case for it - it falls through to normal. group status
-		// comes from the clan channel, so no varbit value may ever map here.
-		for (int v = -5; v <= 20; v++)
+		// jagex adding a mode must not quietly switch ironman rules off. an
+		// unrecognised value becomes GROUP_UNRESOLVED, never MAIN.
+		Assert.assertEquals(AccountType.GROUP_UNRESOLVED, AccountType.fromVarbit(99));
+		Assert.assertEquals(AccountType.GROUP_UNRESOLVED, AccountType.fromVarbit(-7));
+	}
+
+	@Test
+	public void theKnownVarbitValuesMapAsCoreMapsThem()
+	{
+		Assert.assertEquals(AccountType.MAIN, AccountType.fromVarbit(0));
+		Assert.assertEquals(AccountType.IRONMAN, AccountType.fromVarbit(1));
+		Assert.assertEquals(AccountType.ULTIMATE_IRONMAN, AccountType.fromVarbit(2));
+		Assert.assertEquals(AccountType.HARDCORE_IRONMAN, AccountType.fromVarbit(3));
+	}
+
+	@Test
+	public void modesThatAreNotVarbitValuesCannotBeReturnedByFromVarbit()
+	{
+		// group and fallen-hardcore both need a second read - the clan channel and
+		// IRONMAN_HARDCORE_DEAD. fromVarbit must never guess at either.
+		for (int value = -10; value <= 20; value++)
 		{
-			Assert.assertNotEquals("varbit " + v, AccountType.GROUP_IRONMAN,
-				AccountType.fromVarbit(v));
+			final AccountType type = AccountType.fromVarbit(value);
+			Assert.assertNotEquals(AccountType.GROUP_IRONMAN, type);
+			Assert.assertNotEquals(AccountType.DEAD_HARDCORE_IRONMAN, type);
 		}
-	}
-
-	@Test
-	public void aGroupIronmanStillLosesLootToOutsiders()
-	{
-		// they're an ironman. the nuance is that a GROUPMATE isn't an outsider, and we
-		// can't tell those apart yet, so this is conservative on purpose.
-		Assert.assertTrue(AccountType.GROUP_IRONMAN.outsideDamageVoidsLoot());
-		Assert.assertTrue(AccountType.GROUP_IRONMAN.isIronman());
-	}
-
-	@Test
-	public void anUnresolvedAccountDoesNotVoidLoot()
-	{
-		// deliberate. wrong here leaves a groupmate's fair kill in the denominator.
-		// wrong the other way voids every legitimate group kill a GIM ever makes.
-		Assert.assertFalse(AccountType.GROUP_UNRESOLVED.outsideDamageVoidsLoot());
-		Assert.assertFalse(AccountType.UNKNOWN.outsideDamageVoidsLoot());
 	}
 }
