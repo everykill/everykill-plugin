@@ -89,7 +89,7 @@ Anything not already transitive to `runelite-client` requires cryptographic hash
 ⚠️ **`GistUploader` must be removed before submission.** Arbitrary user-supplied upload URLs make compliance impossible to verify, and the review policy states plainly that if it is difficult to establish a plugin isn't against the rules, it will not be merged.
 
 - [x] On-disk buffering only in `.runelite/everykill-plugin/` via `RuneLite.RUNELITE_DIR` — verified 2026-08-26
-- [ ] Resources loaded via **`getResourceAsStream`**, never `getResource` — ships as a jar, never unpacked
+- [x] Resources loaded via **`getResourceAsStream`**, never `getResource` — `NpcIcons` reads the json as a stream; both PNGs go through core's `ImageUtil.loadImageResource`, which streams internally — verified 2026-08-27
 
 ---
 
