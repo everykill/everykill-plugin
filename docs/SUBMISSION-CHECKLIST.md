@@ -10,7 +10,7 @@ Review focuses on **two things only**: security, and Jagex game-rule compliance.
 
 ## 1. Mechanical requirements
 
-- [ ] **Public GitHub repository**
+- [x] **Public GitHub repository** — `github.com/everykill/everykill-plugin`, confirmed `"private": false` via the unauthenticated API — verified 2026-08-27
 - [x] **`LICENSE` at repo root** — BSD 2-Clause, `Copyright (c) 2026, Delkyy`
 - [x] **Java 11** language level in `build.gradle` — `options.release.set(11)`, verified 2026-08-25
 - [x] **`runeLiteVersion = 'latest.release'`** — verified 2026-08-25
@@ -126,7 +126,7 @@ Everything prohibited is a **combat-assist** feature. Passive recording is clear
 Not hard rules, but reviewers hold them.
 
 - [x] Able to state clearly **why this is new functionality** — written up in `docs/WHY-NOT-A-DUPLICATE.md`, with the survey and install counts in `PROJECT.md` behind it — verified 2026-08-26
-- [ ] Repository under the **`everykill` GitHub org**, not a personal account — the PR references the repo URL permanently
+- [x] Repository under the **`everykill` GitHub org** — transferred from `Delkyy`; `support` in `runelite-plugin.properties` updated to the org URL — verified 2026-08-27
 
 ---
 
