@@ -43,18 +43,28 @@ Excluded outright — the kill is rejected at ingest with
 `"world type does not count toward the boards"`:
 
 ```
-deadman  seasonal  tournament_world  beta_world  nosave_mode  eoc_only
-legacy_only  pvp  high_risk  bounty  pvp_arena  last_man_standing
-quest_speedrunning  fresh_start_world
+deadman  seasonal  tournament_world  last_man_standing  beta_world
+nosave_mode  eoc_only  legacy_only  quest_speedrunning  fresh_start_world
 ```
 
 `seasonal` is Leagues. That's the same call as dropping the two Echo bosses
 from the monster index, so the two decisions agree.
 
-**Still counts:** `members`, `skill_total`, and no flags at all. A members world
-is where most of the game happens, and a 2000-total world is an ordinary world
-with a login requirement. Neither changes what a kill means. This is the half a
-blunt "special world" filter gets wrong.
+**Still counts:** `members`, `skill_total`, **every pvp world**, and no flags at
+all.
+
+I had pvp, high risk, bounty and pvp arena excluded at first. Delk overruled it
+and he's right: those are your account, your gear, your levels, and the monster
+died the same way it dies anywhere else. Someone hunting you while you do it
+makes the kill harder, not less real — arguably it's the one worth bragging
+about. The risk is to the player, not to the number.
+
+LMS stays out, and it's the odd one in that group: it hands you a preset
+inventory inside a lobby minigame, so nothing killed there is your account
+killing it with your gear. Same reason tournament and beta worlds are out.
+
+A members world is where most of the game happens, and a 2000-total world is an
+ordinary world with a login requirement. Neither changes what a kill means.
 
 **Unknown type names do NOT exclude.** Jagex adds world types faster than my
 deploys; a name I've never seen is more likely a new ordinary flag than a new
@@ -88,13 +98,14 @@ live-sea-1 -> rejected  world type does not count toward the boards
 live-ok-1  -> accepted
 ```
 
-11 tests on my side, including one that walks the whole excluded list so adding
-a type without wiring it up fails, and one that checks `DEADMAN` in caps can't
-walk through a case-sensitive comparison.
+13 tests on my side, including one that walks the whole excluded list so adding
+a type without wiring it up fails, one that checks `DEADMAN` in caps can't walk
+through a case-sensitive comparison, and one pinning the four pvp types as
+accepted so they don't get swept back into a "special worlds" bucket later.
 
 ## If you disagree with the list
 
-`fresh_start_world` is the one I'd argue about — it's a real progression track,
-just a separate one, and you could reasonably say those kills should count on
-their own board rather than nowhere. Same for `pvp`: a kill is a kill, even if
-you were being hunted while you got it. Say the word and I'll move either.
+`fresh_start_world` is the one left worth arguing about — it's a real
+progression track, just a separate one, and you could reasonably say those
+kills should count on their own board rather than nowhere. Say the word and
+I'll move it.
