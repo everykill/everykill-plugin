@@ -125,7 +125,7 @@ Everything prohibited is a **combat-assist** feature. Passive recording is clear
 
 Not hard rules, but reviewers hold them.
 
-- [ ] Able to state clearly **why this is new functionality**, not a duplicate of Collection Log Luck, Bossing Info, or Dry Rate Tracker. The hub explicitly prefers contributing to existing plugins over creating new ones, to avoid fragmentation
+- [x] Able to state clearly **why this is new functionality** — written up in `docs/WHY-NOT-A-DUPLICATE.md`, with the survey and install counts in `PROJECT.md` behind it — verified 2026-08-26
 - [ ] Repository under the **`everykill` GitHub org**, not a personal account — the PR references the repo URL permanently
 
 ---
