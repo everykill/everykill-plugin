@@ -1,83 +1,96 @@
-# Plugin → site: the suffix filter misses 25 seasonal monsters
+# Plugin → site: hide seasonal monsters, don't drop them
 
 **From:** Tyler (plugin lane)
 **To:** Gage (website/backend lane)
 **Date:** 2026-08-27
-**Re:** `docs/from-gage-league-monsters.md`
+**Re:** `docs/from-gage-league-monsters.md`, and my earlier note
 
-Your reasoning is right and I'd have done the same. Filtering on the name suffix
-rather than an id list is the correct call — ids change every league, the naming
-convention doesn't.
+Delk's call, and it's better than either option I put to you: **flag seasonal monsters
+instead of filtering them out, so a Leagues leaderboard is a query later rather than a
+migration.**
 
-**But our scrape doesn't carry the suffixes.** So the filter is matching against names
-that were never labelled, and it's letting 25 through.
+Ignore my suggestion to fix it in the scrape. This is the right shape.
 
-## What I found
+## Why hiding beats dropping
 
-Started from one line in your note — that `(Echo)` monsters sit at 15612–15617 — and
-checked every unsuffixed id in that block against the wiki:
+Your build removes seasonal monsters from `monsters.json`. The kills still arrive from
+the plugin — there's just nowhere to put them, so they're discarded server-side.
 
-| npc | our TSV says | the wiki says |
-|---|---|---|
-| 15610 | `Black dragon` | **Black dragon (Echo)** |
-| 15548 | `Scurrius` | **Scurrius (Deadman)** |
-| 15549 | `Phantom Muspah` | **Phantom Muspah (Deadman)** |
-| 15551 | `Tumeken's Warden` | **Tumeken's Warden (Deadman)** |
-| 15552 | `Elidinis' Warden` | **Elidinis' Warden (Deadman)** |
-| 15554 | `Sol Heredit` | **Sol Heredit (Deadman)** |
-| 15555 | `Yama` | **Yama (Deadman)** |
-| 15556 | `Pestilent Bloat` | **Pestilent Bloat (Deadman)** |
-| 15564 | `Zemouregal` | **Zemouregal (Deadman)** |
-| 15566, 15568 | `Guard` | **Guard (Deadman Mode)** |
+Flagging them instead means:
 
-Plus `Splatter`, `Big Evil Chicken`, `Veiled kraken`, six `Zemouregal Summon` rows and
-`I DSCIM YOU` — 25 in total, all carrying a league or Deadman category on the wiki.
+**The data is already there when Leagues launches.** Every Deadman Yama kill anyone
+has ever uploaded is sitting in the table. A leagues board becomes `WHERE seasonal`,
+not a backfill you can't do because the kills were thrown away.
 
-## Why this is worse than the two you caught
+**It matches the rule we already agreed.** `PROJECT.md`: *store raw `npc_id` forever,
+display grouping is a read-time concern.* Filtering at build time is grouping at write
+time.
 
-Cerberus (Echo) at least *looked* like a separate monster. These don't. Since the site
-groups by name, **a Deadman Yama kill merges into the real Yama's board.** Same for
-Sol Heredit, the ToA wardens, Phantom Muspah.
+**`MONSTER_COUNT` stops being fragile.** You flagged that a drift makes the EVERYKILL
+title permanently unearnable and nothing reports it. With a flag, the count is
+`WHERE NOT seasonal` — a query, not a constant that goes stale every time I touch the
+TSV. That's the part I'd sell you on even if Leagues never happened.
 
-So it isn't a phantom entry on the monster list any more. It's a rank on a real boss,
-inflated by kills from a game mode that gets wiped — and invisible, because the row
-looks completely normal.
+## The list: 115 ids, not 25
 
-## What I'd suggest
+`data/seasonal-npcs.json` in the plugin repo. Keyed by npc id, valued with the wiki
+page title.
 
-**Filter by npc id, not name, for this block.** Your objection to id lists is right in
-general, but the reason the suffix approach works — consistent naming — is exactly
-what fails here, because the name we hold isn't the wiki's name.
+I built it from the wiki's **own categories** — Demonic Pacts, Raging Echoes,
+Trailblazer, Shattered Relics, Twisted, and the five Deadman seasons — then resolved
+each page's `id=` fields back to ids in our TSV. So a membership is the wiki's
+statement, not my inference from an id range.
 
-The ids are stable per league even if they change between leagues, and they're
-knowable at build time. A range plus an explicit list beats a suffix match on data
-that doesn't carry suffixes.
+**Do not use an id range for this.** I nearly suggested one and it would have been
+wrong: Deadman content starts at **3361** and runs to **15617**, scattered through
+ordinary monsters the whole way. A range would have swept up hundreds of real ones.
 
-**Or fix it in the scrape.** I can make the TSV carry the wiki's full title — that's
-my side and it fixes the root cause rather than the symptom. Say the word and I'll
-rebuild it. It'd shift your monster count again, which touches `MONSTER_COUNT`, so I
-won't do it unprompted.
-
-## One thing NOT to filter
-
-The same audit turned up 17 more name mismatches that are **location disambiguators,
-not seasonal**:
+What it catches that a name filter cannot:
 
 ```
-15021-15024  Pirate            ->  Pirate (The Red Reef)
-15034        Giant lobster     ->  Giant lobster (The Red Reef)
-15230, 15232 Mogre             ->  Mogre (sea)
-16271-16273  Monk of Zamorak   ->  Monk of Zamorak (Paterdomus)
+ 3361, 6574-6702, 11199-11211   Guard              -> Guard (Deadman Mode)
+12439-12447                     KBD, dagannoths,   -> ... (Deadman)
+                                GWD bosses, Dharok
+12538-12588                     Bloodthirsty *      Deadman-only slayer variants
+13656-13662                     Vardorvis, Cerberus,-> ... (Deadman)
+                                TzTok-Jad
+14146, 15610                    Black dragon       -> Black dragon (Echo)
+15548-15556                     Scurrius, Yama,    -> ... (Deadman)
+                                Sol Heredit, wardens
 ```
 
-Those are real monsters in the live game and **should** merge into their parent's
-board — a Pirate is a Pirate. Worth knowing before anyone writes a rule that keys on
-"the wiki title differs from ours", because that rule would eat these too.
+`12452 Giant goblin` and `13663 Magic Mark` carry no suffix on the wiki at all but sit
+in `Category:Deadman: Annihilation` — checked both by hand.
 
-## The count
+## What is NOT in the list, deliberately
 
-You flagged that `MONSTER_COUNT` is load-bearing and a drift makes the EVERYKILL title
-unearnable. Dropping 25 more moves it again. **Whatever we do here, do it in one pass
-rather than two** — I'd rather your test fail once, loudly, than twice.
+Location disambiguators. These are real monsters in the live game and **should** merge
+into their parent's board:
+
+```
+15021-15024  Pirate           -> Pirate (The Red Reef)
+15034        Giant lobster    -> Giant lobster (The Red Reef)
+15230, 15232 Mogre            -> Mogre (sea)
+16271-16273  Monk of Zamorak  -> Monk of Zamorak (Paterdomus)
+```
+
+A rule keying on "the wiki title differs from ours" would eat these. That rule is
+tempting and wrong.
+
+## What I'd ask for
+
+1. **A `seasonal` boolean on the monster row**, set from this file, rather than a
+   build-time drop.
+2. **Kills on a flagged npc still stored**, just not counted toward the main board or
+   the monster count.
+3. **`MONSTER_COUNT` derived**, so my TSV edits stop being a tripwire for your test.
+
+The plugin needs no change — it already sends raw `npcId` and the contract says to key
+on it, never on the name.
+
+## Refresh
+
+Regenerate with the script that built it whenever a new league ships. The ids change
+every season; the wiki's categories are what stay reliable.
 
 — Tyler
