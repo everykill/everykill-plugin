@@ -101,6 +101,37 @@ public enum AccountType
 	}
 
 	/**
+	 * The value the ingest server accepts for this mode.
+	 *
+	 * <p><b>Not {@link #name()}.</b> Verified against the live server 2026-08-27:
+	 * {@code DEAD_HARDCORE_IRONMAN} and {@code GROUP_UNRESOLVED} are both rejected
+	 * with {@code 400 "not a known game mode"}, so publishing on a fallen hardcore
+	 * would have failed silently from the player's side.
+	 *
+	 * <p>The server's list is: {@code main}, {@code ironman}, {@code ultimate_ironman},
+	 * {@code hardcore_ironman}, {@code group_ironman},
+	 * {@code hardcore_group_ironman}, {@code unknown}. It lowercases and normalises
+	 * what it receives, so case does not matter — membership does.
+	 */
+	public String wireValue()
+	{
+		switch (this)
+		{
+			case DEAD_HARDCORE_IRONMAN:
+				// the hiscores freeze the hardcore entry and the account carries on as
+				// a normal iron. ironman is what it is now, and countsAsHardcore()
+				// already agrees.
+				return "ironman";
+			case GROUP_UNRESOLVED:
+				// we could not read the mode. that is what unknown means, and the
+				// server stores it as withheld rather than drawing a wrong badge.
+				return "unknown";
+			default:
+				return name().toLowerCase(java.util.Locale.ROOT);
+		}
+	}
+
+	/**
 	 * Maps a raw {@code VarbitID.IRONMAN} value.
 	 *
 	 * <p>An unrecognised value becomes {@link #GROUP_UNRESOLVED} rather than

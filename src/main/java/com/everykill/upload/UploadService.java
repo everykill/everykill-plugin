@@ -448,7 +448,7 @@ public class UploadService
 			// read here on the client thread with the name, and only if the player
 			// asked for it. an ironman who would rather not advertise the mode gets
 			// the field left out of the request entirely.
-			final String mode = config.publishAccountType() ? accountTypes.get().name() : null;
+			final String mode = config.publishAccountType() ? accountTypes.get().wireValue() : null;
 
 			client.publish(uploadUrl(), identity.getToken(), name, mode,
 				msg ->
