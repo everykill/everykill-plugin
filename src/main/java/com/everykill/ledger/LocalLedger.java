@@ -64,6 +64,10 @@ public class LocalLedger
 	@Getter
 	private long sessionStartMillis = System.currentTimeMillis();
 
+	/** Most-killed monster this session. Volatile: written on the client thread,
+	 * read by the overlay's render thread. */
+	private volatile NpcStat sessionFocus;
+
 	private final Map<Confidence, Integer> sessionGrades = new HashMap<>();
 
 	/** Set by {@link #addXp}, cleared by {@link #save()}. See {@link #flush()}. */
@@ -178,6 +182,7 @@ public class LocalLedger
 	{
 		session.clear();
 		sessionGrades.clear();
+		sessionFocus = null;
 		sessionKills = 0;
 		sessionStartMillis = System.currentTimeMillis();
 	}
@@ -230,6 +235,8 @@ public class LocalLedger
 		{
 			sessionStat.recordDrops(kill.drops, kill.timestampMillis);
 		}
+
+		refreshSessionFocus();
 
 		sessionKills++;
 
@@ -334,6 +341,15 @@ public class LocalLedger
 	/** The most-killed NPC this session. Drives the overlay's second line. */
 	public NpcStat sessionFocus()
 	{
+		// a field, not a scan. the overlay reads this from render(), which runs every
+		// frame - walking the session map 50 times a second to answer a question that
+		// only changes on a kill is exactly what "overlay computation minimal" means.
+		return sessionFocus;
+	}
+
+	/** Recomputes the focus. Called on write, never on read. */
+	private void refreshSessionFocus()
+	{
 		NpcStat best = null;
 		for (NpcStat stat : session.values())
 		{
@@ -342,7 +358,7 @@ public class LocalLedger
 				best = stat;
 			}
 		}
-		return best;
+		sessionFocus = best;
 	}
 
 	/** Experience measured this session, across every monster. */

@@ -66,13 +66,13 @@ Anything not already transitive to `runelite-client` requires cryptographic hash
 
 ## 5. Threading and lifecycle
 
-- [ ] No blocking network or disk IO on the client thread
+- [x] No blocking network or disk IO on the client thread — identity load/save run on the scheduler, erase on the executor, and the ledger goes through `ConfigManager` (in-memory; core batches to disk itself) — verified 2026-08-26
 - [x] All OkHttp calls via **`enqueue()`** — register, kills, publish, export, erase — verified 2026-08-26
 - [x] No blocking in `startUp()` or teardown — no `awaitTermination` in the tree — verified 2026-08-26
 - [x] Scheduled tasks (`ScheduledFuture`) explicitly cancelled on teardown — the upload service is stopped before the ledger flush — verified 2026-08-26
 - [x] Subscriptions, listeners and overlays cleaned up on teardown — overlay, nav button, damage listener, detector, xp service — verified 2026-08-26
-- [ ] Scene not scanned every tick — event-driven collections only
-- [ ] Overlay computation minimal (runs every frame)
+- [x] Scene not scanned every tick — no `getNpcs`/`getPlayers`/`getScene`/`getTiles` anywhere in `src/main` — verified 2026-08-26
+- [x] Overlay computation minimal — `sessionFocus` was a full scan of the session map per frame; now a volatile field recomputed on write. No allocation in `render` — verified 2026-08-26
 
 ---
 
