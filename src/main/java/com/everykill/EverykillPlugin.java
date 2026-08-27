@@ -355,7 +355,11 @@ public class EverykillPlugin extends Plugin
 			loot.resolveNames(this::itemName, this::itemPrice);
 		}
 
-		onKill(attachLoot(kill, reported, accountType()));
+		// stamped here, at kill time. a world hop mid-session changes the answer and a
+		// value cached at login would tag the new world's kills with the old world's
+		// types - gage flagged exactly that.
+		onKill(attachLoot(kill, reported, accountType())
+			.withWorldTypes(worldFilter.currentTypes()));
 	}
 
 	/**

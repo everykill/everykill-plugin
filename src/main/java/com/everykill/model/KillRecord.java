@@ -26,6 +26,19 @@ public class KillRecord
 	/** Where we engaged, from the first hitsplat. -1 when the location was unreadable. */
 	public final int regionId;
 
+	/**
+	 * World types active when this kill happened, lowercase.
+	 *
+	 * <p>Empty means a plain free world; that is different from never having been
+	 * told, which the server stores as null. Read at kill time rather than at login,
+	 * because a world hop mid-session would otherwise tag new kills with the old
+	 * world's types.
+	 *
+	 * <p>The server rejects kills from worlds on a separate or temporary save, so this
+	 * is what stops a Deadman grind landing on a shared board.
+	 */
+	public final List<String> worldTypes;
+
 	public final Confidence grade;
 
 	/** How the death was learned about. Diagnostic; the grade is the judgement. */
@@ -76,13 +89,14 @@ public class KillRecord
 	{
 		this(eventId, npcId, npcName, combatLevel, regionId, grade, signal, myDamage,
 			othersDamage, attacksCount, hitsCount, maxHit, timestampMillis,
-			Collections.emptyList(), LootConfidence.NONE, 0);
+			Collections.emptyList(), LootConfidence.NONE, 0, Collections.emptyList());
 	}
 
 	public KillRecord(String eventId, int npcId, String npcName, int combatLevel, int regionId,
 		Confidence grade, DeathSignal signal, int myDamage, int othersDamage,
 		int attacksCount, int hitsCount, int maxHit, long timestampMillis,
-		List<Drop> drops, LootConfidence lootConfidence, int fightTicks)
+		List<Drop> drops, LootConfidence lootConfidence, int fightTicks,
+		List<String> worldTypes)
 	{
 		this.eventId = eventId;
 		this.npcId = npcId;
@@ -100,6 +114,21 @@ public class KillRecord
 		this.fightTicks = fightTicks;
 		this.drops = Collections.unmodifiableList(drops);
 		this.lootConfidence = lootConfidence;
+		this.worldTypes = worldTypes == null
+			? Collections.emptyList() : Collections.unmodifiableList(worldTypes);
+	}
+
+	/**
+	 * The same kill, stamped with the world it happened on.
+	 *
+	 * <p>Applied in the adapter rather than built in, because {@code KillStateMachine}
+	 * has no client access — that split is why the detection rules are testable.
+	 */
+	public KillRecord withWorldTypes(List<String> types)
+	{
+		return new KillRecord(eventId, npcId, npcName, combatLevel, regionId, grade, signal,
+			myDamage, othersDamage, attacksCount, hitsCount, maxHit, timestampMillis,
+			drops, lootConfidence, fightTicks, types);
 	}
 
 	/**
@@ -113,7 +142,7 @@ public class KillRecord
 	{
 		return new KillRecord(eventId, npcId, npcName, combatLevel, regionId, grade, signal,
 			myDamage, othersDamage, attacksCount, hitsCount, maxHit, timestampMillis,
-			drops, lootConfidence, fightTicks);
+			drops, lootConfidence, fightTicks, worldTypes);
 	}
 
 	// ours + everyone else's, but only since we engaged - the record opens on the

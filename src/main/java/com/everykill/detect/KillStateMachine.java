@@ -391,7 +391,11 @@ public class KillStateMachine
 			com.everykill.model.LootConfidence.NONE,
 			// ticks we were actually fighting it. 0 when we never damaged it, so
 			// nothing downstream mistakes "unknown" for "instant".
-			r.firstDamageTick == 0 ? 0 : Math.max(1, tick - r.firstDamageTick)));
+			r.firstDamageTick == 0 ? 0 : Math.max(1, tick - r.firstDamageTick),
+			// the adapter fills these in. this class has no client access by design -
+			// it decides what counts as a kill, and where you were standing is not
+			// its business.
+			java.util.Collections.emptyList()));
 	}
 
 	/**

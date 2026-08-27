@@ -31,7 +31,8 @@ public class UploadGsonTest
 	{
 		return new KillRecord("e1", 7271, "Cyclops", 56, 6556, grade,
 			DeathSignal.OBSERVED, 75, 0, 9, 7, 17, 1_756_100_000_000L,
-			Collections.singletonList(new Drop(532, 1, "Big bones", 0)), loot, 12);
+			Collections.singletonList(new Drop(532, 1, "Big bones", 0)), loot, 12,
+			Collections.emptyList());
 	}
 
 	private JsonObject serialise(KillRecord k)
@@ -91,6 +92,38 @@ public class UploadGsonTest
 			Assert.assertTrue("contract field missing from the wire: " + field,
 				json.has(field));
 		}
+	}
+
+	@Test
+	public void worldTypesReachTheWire()
+	{
+		// the field only does anything if it survives serialisation. the last wire
+		// bug compiled fine and failed only against the live server.
+		final KillRecord k = new KillRecord("e1", 7271, "Cyclops", 56, 6556,
+			Confidence.UNCONTESTED, DeathSignal.OBSERVED, 75, 0, 9, 7, 17,
+			1_756_100_000_000L, Collections.emptyList(), LootConfidence.NONE, 12,
+			java.util.Arrays.asList("members", "skill_total"));
+
+		final JsonObject json = serialise(k);
+		Assert.assertTrue("worldTypes must be on the wire", json.has("worldTypes"));
+
+		final com.google.gson.JsonArray types = json.getAsJsonArray("worldTypes");
+		Assert.assertEquals(2, types.size());
+		Assert.assertEquals("members", types.get(0).getAsString());
+		Assert.assertEquals("skill_total", types.get(1).getAsString());
+	}
+
+	@Test
+	public void aPlainFreeWorldSendsAnEmptyArrayNotNull()
+	{
+		// gage distinguishes [] - "a plain free world" - from null, which means "a
+		// client that never told us". sending null for a free world would look like
+		// an out-of-date plugin.
+		final JsonObject json = serialise(kill(Confidence.UNCONTESTED, LootConfidence.NONE));
+
+		Assert.assertTrue(json.has("worldTypes"));
+		Assert.assertTrue(json.get("worldTypes").isJsonArray());
+		Assert.assertEquals(0, json.getAsJsonArray("worldTypes").size());
 	}
 
 	@Test

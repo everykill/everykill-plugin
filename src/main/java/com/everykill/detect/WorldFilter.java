@@ -98,6 +98,34 @@ public class WorldFilter
 		return true;
 	}
 
+	/**
+	 * The current world's types, lowercase, for the wire.
+	 *
+	 * <p>Gage's format: lowercase RuneLite enum names, an empty list meaning a plain
+	 * free world. That is deliberately different from the server's null, which means
+	 * "a client that never told us".
+	 *
+	 * <p>Call at kill time. A world hop mid-session changes the answer, and a value
+	 * cached at login would tag the new world's kills with the old world's types.
+	 *
+	 * <p>Must be called on the client thread.
+	 */
+	public java.util.List<String> currentTypes()
+	{
+		final EnumSet<WorldType> types = client.getWorldType();
+		if (types == null || types.isEmpty())
+		{
+			return java.util.Collections.emptyList();
+		}
+
+		final java.util.List<String> out = new java.util.ArrayList<>(types.size());
+		for (WorldType type : types)
+		{
+			out.add(type.name().toLowerCase(java.util.Locale.ROOT));
+		}
+		return out;
+	}
+
 	/** A short label for the world type, or null on an ordinary world. */
 	public String excludedReason()
 	{

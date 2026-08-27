@@ -77,7 +77,7 @@ public class DinkNotifierTest
 		return new KillRecord("evt-1", 7271, "Cyclops", 56, 6556,
 			Confidence.UNCONTESTED, DeathSignal.OBSERVED,
 			75, 0, 9, 7, 17, 1_700_000_000_000L,
-			Collections.emptyList(), LootConfidence.CONFIRMED, 12);
+			Collections.emptyList(), LootConfidence.CONFIRMED, 12, Collections.emptyList());
 	}
 
 	@Test
