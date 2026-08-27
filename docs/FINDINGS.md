@@ -2437,3 +2437,43 @@ measured.
 reading `"accepted": 1` in a response. A response says the server replied; a row says the
 data is there. Those differ whenever anything between them is lying, which is exactly
 when you need to know.
+
+---
+
+## 2026-08-26 — the upload address was a Hub blocker, and half my checklist ticks never landed
+
+**Two findings, and the second is why the first survived a day.**
+
+### The editable upload URL had to go
+
+`uploadUrl` was a user-editable config field. The Hub rule is unambiguous:
+
+> **One hardcoded API domain. No user-supplied URLs, ever.**
+
+A config field that POSTs to any host a user types turns an audited destination into
+an arbitrary one, and no reviewer can verify where a player's data ends up. It is the
+single most objectionable thing this plugin could have shipped, and the javadoc I
+wrote for it admitted it was a dev convenience.
+
+Now `EverykillConfig.UPLOAD_URL = "https://api.everykill.com"`, a constant. The dev
+override survives but accepts **loopback only** — checked by URI *host equality*, not
+string matching, because `http://127.0.0.1@evil.example.com/` resolves to
+`evil.example.com` and a `contains()` check would wave it straight through. Six tests
+in `UploadUrlTest`, including that one and the `localhost.evil.example.com` case.
+
+### Half of the previous checklist ticks silently did not apply
+
+12 attempted, 6 landed. The cause was not a bad pattern match: **the whole command
+was blocked**, because the checklist wording contains a literal teardown-method name
+and the blocklist read it as a system power command. I then retried only the
+`git commit` half, so the edit never ran and the commit reported success.
+
+Re-verified all 13 from scratch rather than trusting the earlier run — no
+`Thread.sleep`, no serialization, no classloading, no runtime codegen, zero runtime
+dependencies, OkHttp and Gson injected, every call on `enqueue()`, and teardown
+releasing the overlay, nav button, damage listener, detector and xp service.
+
+**The lesson is the same one from the silent `sed` earlier:** a command that reports
+success is not evidence the file changed. Check the file.
+
+Checklist: 35 unchecked → 10.

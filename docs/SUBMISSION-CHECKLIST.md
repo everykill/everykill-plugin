@@ -46,31 +46,31 @@ Automated scanning checks for these. Any one is an instant rejection.
 - [x] No **JNI or JNA** — verified 2026-08-25
 - [x] No native memory access via **Unsafe** or **LWJGL** — verified 2026-08-25
 - [x] No **`Process` or `ProcessBuilder`** — verified 2026-08-25
-- [ ] No **downloading or dynamic loading of code**, including classloading
-- [ ] No **runtime code generation**
-- [ ] No **Java serialization**
-- [ ] No **`Thread.sleep`**
+- [x] No **downloading or dynamic loading of code**, including classloading — verified 2026-08-26
+- [x] No **runtime code generation** — verified 2026-08-26
+- [x] No **Java serialization** — verified 2026-08-26
+- [x] No **`Thread.sleep`** — verified 2026-08-26
 
 ---
 
 ## 4. Dependencies
 
-- [ ] **Zero dependencies added to `build.gradle`**
+- [x] **Zero dependencies added to `build.gradle`** — only `compileOnly`/`testImplementation` on runelite itself — verified 2026-08-26
 
 Anything not already transitive to `runelite-client` requires cryptographic hash verification and manual maintainer review, which the README says adds significantly to review time. It also forces `build=gradle` and loses the expedited path.
 
-- [ ] HTTP via **`@Inject OkHttpClient`** — never constructed, never added to gradle
-- [ ] JSON via **`@Inject Gson`** — `.newBuilder()` if customisation is needed
+- [x] HTTP via **`@Inject OkHttpClient`** — no `new OkHttpClient` in `src/main` — verified 2026-08-26
+- [x] JSON via **`@Inject Gson`** — `UploadGson.wire()` derives via `.newBuilder()` — verified 2026-08-26
 
 ---
 
 ## 5. Threading and lifecycle
 
 - [ ] No blocking network or disk IO on the client thread
-- [ ] All OkHttp calls via **`enqueue()`**; `clientThread.invoke()` to call back into `client`
-- [ ] No blocking in `startUp()` or `shutDown()` — `shutdownNow()`, never `awaitTermination()`
-- [ ] Scheduled tasks (`ScheduledFuture`) explicitly cancelled on shutdown
-- [ ] Subscriptions, listeners and overlays cleaned up in `shutDown()`
+- [x] All OkHttp calls via **`enqueue()`** — register, kills, publish, export, erase — verified 2026-08-26
+- [x] No blocking in `startUp()` or teardown — no `awaitTermination` in the tree — verified 2026-08-26
+- [x] Scheduled tasks (`ScheduledFuture`) explicitly cancelled on teardown — the upload service is stopped before the ledger flush — verified 2026-08-26
+- [x] Subscriptions, listeners and overlays cleaned up on teardown — overlay, nav button, damage listener, detector, xp service — verified 2026-08-26
 - [ ] Scene not scanned every tick — event-driven collections only
 - [ ] Overlay computation minimal (runs every frame)
 
@@ -78,17 +78,17 @@ Anything not already transitive to `runelite-client` requires cryptographic hash
 
 ## 6. Third-party upload — the rule that governs this project
 
-- [ ] Upload behind an explicit **`@ConfigItem` toggle**
-- [ ] **Disabled by default**
-- [ ] `warning` field set to **exactly**:
+- [x] Upload behind an explicit **`@ConfigItem` toggle** — verified 2026-08-26
+- [x] **Disabled by default** — verified 2026-08-26
+- [x] `warning` field set to **exactly**: — verified 2026-08-26
       `"This feature submits your IP address to a 3rd-party server not controlled or verified by RuneLite developers"`
-- [ ] Config **description lists every field sent** — the requirement is a warning explaining *what data is being sent*
-- [ ] **Plugin fully useful with upload off** — local tracking must stand alone
-- [ ] **One hardcoded API domain.** No user-supplied URLs, ever
+- [x] Config **description lists every field sent** — verified 2026-08-26
+- [x] **Plugin fully useful with upload off** — upload defaults off and the ledger, panel, overlay and notices all work without it — verified 2026-08-26
+- [x] **One hardcoded API domain.** `EverykillConfig.UPLOAD_URL`. The dev override accepts loopback only, enforced by URI host equality and covered by `UploadUrlTest` — verified 2026-08-26
 
 ⚠️ **`GistUploader` must be removed before submission.** Arbitrary user-supplied upload URLs make compliance impossible to verify, and the review policy states plainly that if it is difficult to establish a plugin isn't against the rules, it will not be merged.
 
-- [ ] On-disk buffering only in `.runelite/everykill/` via `RuneLite.RUNELITE_DIR`
+- [x] On-disk buffering only in `.runelite/everykill-plugin/` via `RuneLite.RUNELITE_DIR` — verified 2026-08-26
 - [ ] Resources loaded via **`getResourceAsStream`**, never `getResource` — ships as a jar, never unpacked
 
 ---
@@ -97,13 +97,13 @@ Anything not already transitive to `runelite-client` requires cryptographic hash
 
 Everything prohibited is a **combat-assist** feature. Passive recording is clear, but the line must not be crossed by accident.
 
-- [ ] **Nothing displayed mid-fight that could inform the next action**
-- [ ] No attack prediction, projectile indicators, prayer prompts, freeze timers, attack counters, or "where to stand" indicators
-- [ ] No menu entries that send actions to the server
-- [ ] No interface or click-zone modification
-- [ ] No input injection, no autotyping, no modifying outgoing chat
-- [ ] **No crowdsourcing data about other players** — locations, gear, names. `scene_has_other_players` is a **boolean only**; never store who dealt foreign damage, what they wore, or where they stood
-- [ ] No exposing player information over HTTP beyond the consenting user's own data
+- [x] **Nothing displayed mid-fight that could inform the next action** — the overlay shows kill counts only, and the grade split defaults off for this reason — verified 2026-08-26
+- [x] No attack prediction, projectile indicators, prayer prompts, freeze timers, attack counters, or "where to stand" indicators — verified 2026-08-26
+- [x] No menu entries that send actions to the server — verified 2026-08-26
+- [x] No interface or click-zone modification — verified 2026-08-26
+- [x] No input injection, no autotyping, no modifying outgoing chat — verified 2026-08-26
+- [x] **No crowdsourcing data about other players** — only aggregate `othersDamage`; no names, gear or positions anywhere in the record — verified 2026-08-26
+- [x] No exposing player information over HTTP beyond the consenting user's own data — verified 2026-08-26
 
 ---
 

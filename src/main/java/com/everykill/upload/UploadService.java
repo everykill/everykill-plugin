@@ -95,6 +95,40 @@ public class UploadService
 		this.accountTypes = accountTypes;
 	}
 
+	/**
+	 * The address to upload to: the hardcoded domain, unless a loopback dev override
+	 * is set.
+	 *
+	 * <p>Enforced here rather than trusted from config. A dev override that accepted
+	 * any host would be the user-supplied URL the Hub rule forbids, just spelled
+	 * differently — so anything that is not this machine is discarded.
+	 */
+	private String uploadUrl()
+	{
+		final String dev = config.devUploadUrl();
+		if (dev != null && !dev.trim().isEmpty() && isLoopback(dev.trim()))
+		{
+			return dev.trim();
+		}
+		return EverykillConfig.UPLOAD_URL;
+	}
+
+	/** True only for an address on this machine. */
+	private static boolean isLoopback(String url)
+	{
+		try
+		{
+			final String host = java.net.URI.create(url).getHost();
+			return "127.0.0.1".equals(host) || "localhost".equals(host) || "[::1]".equals(host)
+				|| "::1".equals(host);
+		}
+		catch (IllegalArgumentException e)
+		{
+			// an unparseable override is not a loopback address.
+			return false;
+		}
+	}
+
 	/** Queues a kill. Cheap and non-blocking — safe from the client thread. */
 	public void offer(KillRecord kill)
 	{
@@ -140,7 +174,7 @@ public class UploadService
 			return;
 		}
 
-		if (!config.uploadEnabled() || config.uploadUrl().trim().isEmpty())
+		if (!config.uploadEnabled())
 		{
 			status = "Uploading is off";
 			return;
@@ -184,7 +218,7 @@ public class UploadService
 	{
 		status = "Registering";
 
-		client.register(config.uploadUrl(), identity.getClientId(),
+		client.register(uploadUrl(), identity.getClientId(),
 			reg ->
 			{
 				try
@@ -229,7 +263,7 @@ public class UploadService
 
 		status = "Sending " + batch.size();
 
-		client.send(config.uploadUrl(), identity.getToken(), batch,
+		client.send(uploadUrl(), identity.getToken(), batch,
 			result ->
 			{
 				if (result.systemicReason != null)
@@ -321,7 +355,7 @@ public class UploadService
 
 		if (!wanted)
 		{
-			client.publish(config.uploadUrl(), identity.getToken(), null, null,
+			client.publish(uploadUrl(), identity.getToken(), null, null,
 				msg ->
 				{
 					publishedState = false;
@@ -348,7 +382,7 @@ public class UploadService
 			// the field left out of the request entirely.
 			final String mode = config.publishAccountType() ? accountTypes.get().name() : null;
 
-			client.publish(config.uploadUrl(), identity.getToken(), name, mode,
+			client.publish(uploadUrl(), identity.getToken(), name, mode,
 				msg ->
 				{
 					publishedState = true;
@@ -372,7 +406,7 @@ public class UploadService
 			return;
 		}
 
-		client.export(config.uploadUrl(), identity.getToken(),
+		client.export(uploadUrl(), identity.getToken(),
 			json -> executor.execute(() ->
 			{
 				try
@@ -407,7 +441,7 @@ public class UploadService
 			return;
 		}
 
-		client.erase(config.uploadUrl(), identity.getToken(),
+		client.erase(uploadUrl(), identity.getToken(),
 			json -> executor.execute(() ->
 			{
 				identity.forget();

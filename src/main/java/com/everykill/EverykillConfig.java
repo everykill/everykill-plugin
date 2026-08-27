@@ -172,21 +172,35 @@ public interface EverykillConfig extends Config
 	}
 
 	/**
-	 * Where kills go.
+	 * The one address kills are sent to. Not user-editable, by Hub rule.
 	 *
-	 * <p>Editable because nothing is deployed yet — the reference server runs locally
-	 * and this is how it gets pointed at. It carries the same third-party warning as
-	 * the toggle: a user-supplied address is exactly the case the warning exists for.
+	 * <p><i>"One hardcoded API domain. No user-supplied URLs, ever."</i> A config field
+	 * that POSTs to any host a user types is the single most objectionable thing a
+	 * plugin can ship — it turns an audited destination into an arbitrary one, and no
+	 * reviewer can verify where a player's data ends up.
+	 *
+	 * <p>This was editable while nothing was deployed, which was a dev convenience
+	 * wearing a config item's clothes. {@link #devUploadUrl()} replaces it and only
+	 * accepts loopback.
+	 */
+	String UPLOAD_URL = "https://api.everykill.com";
+
+	/**
+	 * Points the plugin at a reference server on this machine. Loopback only.
+	 *
+	 * <p>Exists so the ingest server can be developed against without shipping an
+	 * editable production URL. Anything that is not {@code 127.0.0.1} or
+	 * {@code localhost} is ignored and {@link #UPLOAD_URL} is used instead, so this
+	 * cannot be talked into sending someone's kills to a stranger's host.
 	 */
 	@ConfigItem(
-		keyName = "uploadUrl",
-		name = "Upload address",
-		description = "Base address of the Everykill ingest server, e.g. http://127.0.0.1:8790",
-		warning = "This feature submits your IP address to a 3rd-party server not controlled or verified by RuneLite developers",
-		position = 32,
+		keyName = "devUploadUrl",
+		name = "Local server (advanced)",
+		description = "For testing against a local ingest server only, e.g. http://127.0.0.1:8790. Anything that is not on this computer is ignored. Leave blank.",
+		position = 39,
 		section = uploadSection
 	)
-	default String uploadUrl()
+	default String devUploadUrl()
 	{
 		return "";
 	}
