@@ -9,8 +9,6 @@ import com.everykill.detect.LootDetector;
 import com.everykill.ledger.LocalLedger;
 import com.everykill.detect.AccountTypes;
 import com.everykill.model.AccountType;
-import net.runelite.api.clan.ClanID;
-import net.runelite.api.gameval.VarbitID;
 import com.everykill.model.Confidence;
 import com.everykill.model.Drop;
 import com.everykill.model.LootConfidence;

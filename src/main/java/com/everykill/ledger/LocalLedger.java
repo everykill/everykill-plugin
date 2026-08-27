@@ -61,11 +61,16 @@ public class LocalLedger
 
 	private int bestSessionKills;
 
-	@Getter
+	// no @Getter: getSessionStartMillis() is written out by hand below, because the
+	// session tab wanted it before this field had an accessor.
 	private long sessionStartMillis = System.currentTimeMillis();
 
-	/** Most-killed monster this session. Volatile: written on the client thread,
-	 * read by the overlay's render thread. */
+	/**
+	 * Most-killed monster this session.
+	 *
+	 * <p>Volatile because it is written on the client thread and read by the
+	 * overlay's render thread.
+	 */
 	private volatile NpcStat sessionFocus;
 
 	private final Map<Confidence, Integer> sessionGrades = new HashMap<>();

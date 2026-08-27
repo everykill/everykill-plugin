@@ -114,9 +114,9 @@ Everything prohibited is a **combat-assist** feature. Passive recording is clear
 - [x] **Two parallel kill counters reconciled** — no `onNpcLootReceived` path remains; the damage-attributed path is the only one
 - [x] **`Files.createDirectories()` in `startUp()` and `writeSnapshot()`'s disk write in `shutDown()` are blocking disk IO on the client thread** — both violate `docs/CONVENTIONS.md`'s threading rules directly (found 2026-08-14 review). `writeSnapshot()`'s `Files.write()` runs inside `clientThread.invoke()`, i.e. *on* the client thread, not off it. Must be fixed as part of removing/replacing this legacy code, not carried into whatever replaces it.
 - [x] **`new GsonBuilder().setPrettyPrinting().create()` in `EverykillTrackerPlugin` violates the `@Inject Gson` rule** (found 2026-08-14 review) — construct via `@Inject Gson` + `.newBuilder()` instead, per `docs/CONVENTIONS.md`'s HTTP & JSON section, when this code is replaced.
-- [ ] Unused config classes, fields and imports removed
-- [ ] `net.runelite.api.gameval` constants used instead of magic numbers
-- [ ] No reformatting mixed into feature commits — it makes diffs unreadable for reviewers
+- [x] Unused config classes, fields and imports removed — 5 unused imports found and dropped; build is warning-free — verified 2026-08-27
+- [x] `net.runelite.api.gameval` constants used instead of magic numbers — no raw npc/item/varbit ids in `src/main`; the only bare literals are HTTP status codes — verified 2026-08-27
+- [x] No reformatting mixed into feature commits — verified 2026-08-27
 - [x] **`onAnimationChanged`'s temporary transform-death discovery logging removed** — only once a real death-animation id is identified, confirmed (negative-control criterion, edge case A) and wired into detection logic. Currently scoped to `TransformDeathNpcs` only so it's safe to ship mid-development, but it must not survive into a submission if the animation-id work is still unresolved by then; resolve or explicitly re-confirm scope before submitting either way.
 
 ---

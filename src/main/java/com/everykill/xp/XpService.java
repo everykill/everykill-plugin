@@ -5,7 +5,6 @@
 package com.everykill.xp;
 
 import java.util.Map;
-import java.util.function.BiConsumer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
