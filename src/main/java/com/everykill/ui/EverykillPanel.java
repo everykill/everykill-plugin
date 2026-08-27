@@ -1910,6 +1910,13 @@ public class EverykillPanel extends PluginPanel
 		return row;
 	}
 
+	/** A short absolute date, for things that happened once. */
+	private static String shortDate(long millis)
+	{
+		return new java.text.SimpleDateFormat("d MMM yy")
+			.format(new java.util.Date(millis));
+	}
+
 	private static JPanel statBlock(String value, String caption)
 	{
 		final JPanel p = new JPanel();
@@ -2139,13 +2146,63 @@ public class EverykillPanel extends PluginPanel
 
 				detail.add(stats);
 
+				// a second row for the numbers we were storing and never showing.
+				// only the ones that have a value - a row of dashes is worse than a
+				// shorter row.
+				final JPanel more = new JPanel(new java.awt.GridLayout(1, 0, 2, 0));
+				more.setBackground(NEST_BG);
+				more.setAlignmentX(LEFT_ALIGNMENT);
+				more.setMaximumSize(new Dimension(Short.MAX_VALUE, 34));
+				int extras = 0;
+
+				if (stat.fastestTicks > 0)
+				{
+					// ticks, not seconds. it is what we measured, and 0.6s per tick
+					// means converting invents precision we do not have.
+					more.add(statBlock(stat.fastestTicks + "t", "fastest"));
+					extras++;
+				}
+
+				// average damage per kill, over kills we actually measured damage on -
+				// dividing by total() would drag it down with every kill recorded
+				// before damage tracking existed.
+				if (stat.killsWithDamage > 0 && stat.myDamageTotal > 0)
+				{
+					more.add(statBlock(
+						String.valueOf(stat.myDamageTotal / stat.killsWithDamage), "dmg/kill"));
+					extras++;
+				}
+
+				if (stat.firstKillMillis > 0)
+				{
+					more.add(statBlock(shortDate(stat.firstKillMillis), "first"));
+					extras++;
+				}
+
+				if (extras > 0)
+				{
+					detail.add(javax.swing.Box.createVerticalStrut(4));
+					detail.add(more);
+				}
+
 				if (hasSkills)
 				{
 					detail.add(javax.swing.Box.createVerticalStrut(10));
 					detail.add(sectionLine(windowed ? "XP  (ALL TIME)" : "XP"));
+
+					// combat skills first, then hitpoints and slayer. sorting purely
+					// by value puts Hitpoints top on nearly every monster - it is paid
+					// on every hit whatever the style - which buries the skill you
+					// actually trained.
 					stat.xpBySkill.entrySet().stream()
-						.sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+						.sorted(java.util.Comparator
+							.comparingInt((Map.Entry<String, Long> e) -> skillRank(e.getKey()))
+							.thenComparing(Map.Entry.<String, Long>comparingByValue().reversed()))
 						.forEach(e -> detail.add(skillLine(e.getKey(), e.getValue())));
+
+					// the sum, next to the parts. it was on stat.xp all along.
+					detail.add(javax.swing.Box.createVerticalStrut(2));
+					detail.add(totalLine("total", shortXp(stat.xp)));
 				}
 
 				if (hasDrops)
@@ -2344,6 +2401,48 @@ public class EverykillPanel extends PluginPanel
 		p.add(head, BorderLayout.WEST);
 		p.add(left, BorderLayout.CENTER);
 		p.add(worth, BorderLayout.EAST);
+		return p;
+	}
+
+	/** Combat skills before the ones every style pays into. */
+	private static int skillRank(String skill)
+	{
+		switch (skill.toLowerCase())
+		{
+			case "attack":
+			case "strength":
+			case "defence":
+			case "ranged":
+			case "magic":
+				return 0;
+			case "hitpoints":
+				return 1;
+			default:
+				return 2;
+		}
+	}
+
+	/** A skill line with a rule above it, for the sum of the lines before it. */
+	private static JPanel totalLine(String label, String value)
+	{
+		final JPanel p = new JPanel(new BorderLayout());
+		p.setBackground(NEST_BG);
+		p.setAlignmentX(LEFT_ALIGNMENT);
+		p.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createMatteBorder(1, 0, 0, 0, SITE_LINE),
+			BorderFactory.createEmptyBorder(3, 0, 0, 0)));
+		p.setMaximumSize(new Dimension(Short.MAX_VALUE, 16));
+
+		final JLabel l = new JLabel(label);
+		l.setFont(FontManager.getRunescapeSmallFont());
+		l.setForeground(SITE_FG_DIM);
+
+		final JLabel v = new JLabel(value);
+		v.setFont(FontManager.getRunescapeSmallFont());
+		v.setForeground(SITE_FG);
+
+		p.add(l, BorderLayout.WEST);
+		p.add(v, BorderLayout.EAST);
 		return p;
 	}
 
