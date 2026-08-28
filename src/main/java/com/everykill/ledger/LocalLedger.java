@@ -6,6 +6,7 @@ package com.everykill.ledger;
 
 import com.everykill.EverykillConfig;
 import com.everykill.model.Confidence;
+import com.everykill.model.BossVariant;
 import com.everykill.model.KillRecord;
 import com.everykill.model.LootConfidence;
 import com.everykill.model.NpcStat;
@@ -197,11 +198,20 @@ public class LocalLedger
 	/** Record a kill; returns the NPC's all-time stat including it. */
 	public NpcStat record(KillRecord kill)
 	{
-		final NpcStat stat = allTime.computeIfAbsent(String.valueOf(kill.npcId),
-			k -> new NpcStat(kill.npcId, kill.npcName));
+		// awakened dt2 bosses reuse their npc id, so the id alone would merge them into
+		// the post-quest row. the key is already a String, so the variant extends it
+		// without a schema change and existing rows keep their kills.
+		final String ledgerKey = kill.variant == null
+			? String.valueOf(kill.npcId)
+			: kill.npcId + "#" + kill.variant;
+		final String displayName = BossVariant.label(kill.npcName, kill.variant);
 
-		// NPC names can change between game updates; keep the latest.
-		stat.name = kill.npcName;
+		final NpcStat stat = allTime.computeIfAbsent(ledgerKey,
+			k -> new NpcStat(kill.npcId, displayName));
+
+		// NPC names can change between game updates; keep the latest. the variant
+		// suffix rides along, so the panel's name roll-up separates them for free.
+		stat.name = displayName;
 
 		// but never let a zero overwrite a level we already knew. getCombatLevel()
 		// returns 0 when the composition wasn't loaded at the moment we asked, and
@@ -228,8 +238,12 @@ public class LocalLedger
 			stat.recordDrops(kill.drops, kill.timestampMillis);
 		}
 
+		// keyed on the raw id, which is fine: the panel rolls up by NAME, and the
+		// variant suffix is already on displayName - so awakened separates in the
+		// session view without widening this key.
 		final NpcStat sessionStat = session.computeIfAbsent(kill.npcId,
-			k -> new NpcStat(kill.npcId, kill.npcName));
+			k -> new NpcStat(kill.npcId, displayName));
+		sessionStat.name = displayName;
 		sessionStat.record(kill.grade, kill.timestampMillis, kill.myDamage, kill.othersDamage);
 		sessionStat.recordFight(kill.fightTicks);
 

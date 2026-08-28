@@ -127,6 +127,31 @@ public class UploadGsonTest
 	}
 
 	@Test
+	public void awakenedReachesTheWire()
+	{
+		// gage can't derive this - his leaderboard rollup is keyed (account_id, npc_id)
+		// and collapses awakened into the post-quest row before any query runs. if the
+		// field doesn't serialise, the board he's building can never exist.
+		final KillRecord k = new KillRecord("e1", 12223, "Vardorvis", 1136, 6556,
+			Confidence.UNCONTESTED, DeathSignal.OBSERVED, 300, 0, 40, 30, 42,
+			1_756_100_000_000L, Collections.emptyList(), LootConfidence.NONE, 250,
+			Collections.emptyList());
+
+		final JsonObject json = serialise(k);
+		Assert.assertTrue("variant must be on the wire", json.has("variant"));
+		Assert.assertEquals("awakened", json.get("variant").getAsString());
+	}
+
+	@Test
+	public void anOrdinaryKillSendsNoVariantAtAll()
+	{
+		// null means "no variant", and gson omits it. a literal "null" string or an
+		// empty string would both be values the server has to special-case.
+		final JsonObject json = serialise(kill(Confidence.UNCONTESTED, LootConfidence.NONE));
+		Assert.assertFalse("variant must be absent, not empty", json.has("variant"));
+	}
+
+	@Test
 	public void thereIsNoPlayerFieldOnTheWire()
 	{
 		// identity comes from the bearer token, never the row. an rsn appearing here

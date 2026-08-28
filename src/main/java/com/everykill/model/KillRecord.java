@@ -23,6 +23,15 @@ public class KillRecord
 	public final String npcName;
 	public final int combatLevel;
 
+	/**
+	 * Which version of the boss, when the npc id can't say. Null for almost everything.
+	 *
+	 * <p>Only the four DT2 bosses set this today — they reuse their id across quest,
+	 * post-quest and Awakened, so the combat level is the only signal, and the server
+	 * can't see it because its rollup is keyed on npc id alone. See {@link BossVariant}.
+	 */
+	public final String variant;
+
 	/** Where we engaged, from the first hitsplat. -1 when the location was unreadable. */
 	public final int regionId;
 
@@ -102,6 +111,7 @@ public class KillRecord
 		this.npcId = npcId;
 		this.npcName = npcName;
 		this.combatLevel = combatLevel;
+		this.variant = BossVariant.of(npcId, combatLevel);
 		this.regionId = regionId;
 		this.grade = grade;
 		this.signal = signal;
