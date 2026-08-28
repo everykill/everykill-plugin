@@ -19,7 +19,7 @@ of us wrote a line:
 
 Both are protecting something real. A board showing `player_a3f8c1` killed 4,000
 gargoyles isn't a leaderboard — the whole first-run payoff is *"nobody is ranked
-#1 on 1,757 monsters, go take some,"* and a record nobody can see is yours is
+#1 on hundreds of monsters, go take some,"* and a record nobody can see is yours is
 worth nothing. Equally, a searchable RSN-to-activity database is a surveillance
 tool in a hiscores costume.
 

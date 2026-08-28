@@ -6,7 +6,7 @@ For the Hub PR, and for anyone who asks. Keep it short — reviewers read a lot 
 
 **The official hiscores rank about 90 bosses. Everykill ranks everything else.**
 
-There are 1,757 monsters in the game. Nobody knows who's killed the most Rockslugs
+There are more than 1,300 monsters in the game. Nobody knows who's killed the most Rockslugs
 because nothing counts them.
 
 ## What the plugins we're compared to actually do

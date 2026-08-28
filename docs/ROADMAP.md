@@ -95,7 +95,7 @@ user could inflate their own kill count and the whole honesty argument dies with
 
 ## Also deferred
 
-**Kill Log with all 1,757 monsters** (`spec-plugin-ux.md` §1) — needs a defensible
+**Kill Log with every monster** (`spec-plugin-ux.md` §1) — needs a defensible
 denominator (what counts as one entry: variants, quest NPCs, dummies), grouping
 rules, search, and virtualisation for ~1,800 rows. The spec's own open questions
 section admits this isn't decided.

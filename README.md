@@ -6,7 +6,7 @@ Kill counts for every monster in the game, not just the ~90 on the hiscores.
 
 ## About
 
-The official hiscores rank about 90 bosses. There are 1,757 monsters in the game, and
+The official hiscores rank about 90 bosses and activities. There are more than 1,300 monsters in the game, and
 nobody knows who has killed the most Rockslugs, because nothing counts them.
 
 This is a passion project — built because that gap bothered us, not because anyone

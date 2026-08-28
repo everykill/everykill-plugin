@@ -106,3 +106,17 @@ Plugin Hub install distribution is steep — the top plugin has ~595k, the 250th
 - Build one step at a time. Each step in `BUILD-ORDER.md` has acceptance criteria — do not move on until they're met.
 - The author is newer to coding. Explain what code does in plain language, and say why an approach was chosen over alternatives.
 - The specs are **designed, not verified**. When testing contradicts one, say so plainly and propose the correction rather than working around it.
+
+## Monster count
+
+**1,347** distinct monster names in `data/monsters.tsv`; **1,305** excluding the npc
+ids in `data/seasonal-npcs.json`. Counted 2026-08-27 by
+`python -c "..."` over the tsv — re-derive it, never quote it from memory.
+
+Public copy says **"more than 1,300"** on purpose. The exact denominator is undecided
+(variants, quest npcs, dummies — see the Kill Log entry in `ROADMAP.md`), and Gage's
+`MONSTER_COUNT` is derived from his own build, so a precise figure printed in a README
+would drift out of agreement with the site.
+
+An earlier claim of "1,757 monsters" was in the README, the Hub PR body and three docs.
+It had no source — it came from my own draft in `c577393` and was never checked.

@@ -37,7 +37,7 @@ the detail lives in the repo.
 
 Kill counts for every monster in the game, not just the ~90 on the hiscores.
 
-There are 1,757 monsters in OSRS. The official hiscores rank about 90 of them, so
+There are more than 1,300 monsters in OSRS. The official hiscores rank about 90 bosses and activities, so
 nobody knows who's killed the most Rockslugs — nothing counts them. This plugin
 counts them, locally, and grades every kill by how well it can be evidenced.
 
