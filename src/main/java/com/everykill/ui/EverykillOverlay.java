@@ -13,6 +13,8 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import javax.inject.Inject;
+import net.runelite.api.Client;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.MenuAction;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPanel;
@@ -37,13 +39,16 @@ public class EverykillOverlay extends OverlayPanel
 	/** everykill-site --acc. Same rust as the panel and the hub icon. */
 	private static final Color BRAND = new Color(0xd9, 0x4f, 0x2b);
 
+	private final Client client;
 	private final EverykillConfig config;
 	private final LocalLedger ledger;
 
 	@Inject
-	EverykillOverlay(EverykillPlugin plugin, EverykillConfig config, LocalLedger ledger)
+	EverykillOverlay(EverykillPlugin plugin, Client client, EverykillConfig config,
+		LocalLedger ledger)
 	{
 		super(plugin);
+		this.client = client;
 		this.config = config;
 		this.ledger = ledger;
 
@@ -59,6 +64,14 @@ public class EverykillOverlay extends OverlayPanel
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
+		// cutscenes are the game telling a story with the hud out of the way. an
+		// overlay sitting on top of one is the plugin talking over it. core does the
+		// same check in TileIndicatorsOverlay.
+		if (client.getVarbitValue(VarbitID.CUTSCENE_STATUS) == 1)
+		{
+			return null;
+		}
+
 		if (!config.showOverlay())
 		{
 			return null;

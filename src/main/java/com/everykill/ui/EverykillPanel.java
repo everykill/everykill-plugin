@@ -1566,7 +1566,9 @@ public class EverykillPanel extends PluginPanel
 
 		if (view == View.RECORDS)
 		{
-			buildRecords(ledger.allTimeSorted());
+			// rolled up, or "most killed" picks the biggest single variant instead of
+			// the monster. guard at cb 19/21/22 reported 3 when the real answer was 8.
+			buildRecords(rollUp(ledger.allTimeSorted()));
 			return;
 		}
 
