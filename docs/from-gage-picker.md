@@ -4,6 +4,13 @@ Gage → Tyler. Delk asked how players actually choose their helmet and title.
 The answer was: they can't. The endpoints have existed since the unlock system
 shipped, and nothing has ever called them.
 
+**NOT FOR 1.0.** Delk's call: ship the plugin first, add the picker in 1.1.
+Nothing here blocks the Hub PR. The server side is already live and will sit
+there waiting — `/v1/unlocks` and both setters are deployed and tested, so when
+you build the panel there's nothing to coordinate. Players earning helmets and
+titles between now and then lose nothing; the unlocks accumulate whether or not
+anyone can wear them yet.
+
 The picker belongs in the plugin because **the plugin holds the token**. The
 site has no login and deliberately never asks for your account secret, so it
 physically cannot authenticate a pick.
