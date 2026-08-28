@@ -1632,7 +1632,12 @@ public class EverykillPanel extends PluginPanel
 
 		for (NpcStat stat : stats)
 		{
-			final String key = (stat.name == null ? "?" : stat.name) + "\u0000" + stat.combatLevel;
+			// name only. keying on the combat level too split Guard into three rows
+			// for a player who killed cb 19, 21 and 22 guards - the same monster
+			// wearing different levels. the label carries the levels instead, so a
+			// real distinction like Xarpus 331/960/1160 (entry/normal/hard) is still
+			// visible without inventing a rule about which levels "count".
+			final String key = stat.name == null ? "?" : stat.name;
 			final NpcStat into = byKey.get(key);
 
 			if (into == null)
@@ -1660,12 +1665,26 @@ public class EverykillPanel extends PluginPanel
 	{
 		final NpcStat out = new NpcStat(from.npcId, from.name);
 		out.combatLevel = from.combatLevel;
+		out.mergedLevels = new java.util.TreeSet<>();
+		if (from.combatLevel > 0)
+		{
+			out.mergedLevels.add(from.combatLevel);
+		}
 		absorb(out, from);
 		return out;
 	}
 
 	private static void absorb(NpcStat into, NpcStat from)
 	{
+		if (into.mergedLevels == null)
+		{
+			into.mergedLevels = new java.util.TreeSet<>();
+		}
+		if (from.combatLevel > 0)
+		{
+			into.mergedLevels.add(from.combatLevel);
+		}
+
 		into.uncontested += from.uncontested;
 		into.inferred += from.inferred;
 		into.ambiguous += from.ambiguous;
@@ -2520,6 +2539,26 @@ public class EverykillPanel extends PluginPanel
 	private static String label(NpcStat stat)
 	{
 		final String name = stat.name == null ? "Unknown" : stat.name;
+
+		// several levels folded into one row: show them all. four ordinary guards read
+		// as "Guard (19, 21, 22)", and ToB reads as "Xarpus (331, 960, 1160)" - which
+		// is entry, normal and hard mode, and worth seeing.
+		if (stat.mergedLevels != null && stat.mergedLevels.size() > 1)
+		{
+			final StringBuilder sb = new StringBuilder(name).append(" (");
+			boolean first = true;
+			for (Integer level : stat.mergedLevels)
+			{
+				if (!first)
+				{
+					sb.append(", ");
+				}
+				sb.append(level);
+				first = false;
+			}
+			return sb.append(')').toString();
+		}
+
 		return stat.combatLevel > 0 ? name + " (" + stat.combatLevel + ")" : name;
 	}
 

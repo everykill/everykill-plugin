@@ -73,15 +73,48 @@ public class EverykillPanelRollupTest
 	}
 
 	@Test
-	public void differentCombatLevelsStayApart() throws Exception
+	public void differentCombatLevelsOfOneMonsterMerge() throws Exception
 	{
-		// a level 82 lesser demon and a level 87 one have different drop tables.
-		// merging them would hide the distinction drop rates depend on.
+		// this used to assert the opposite, on a comment claiming level 82 and 87
+		// lesser demons had different drop tables. they don't - the wiki has ONE
+		// section, "Level 82, 87, and 94 drops". the justification was invented.
+		//
+		// the real cost showed up in testing: ordinary guards exist at cb 19, 20, 21
+		// and 22, so a player who killed a few got three identical-looking rows.
 		final List<NpcStat> out = rollUp(Arrays.asList(
 			stat(7247, "Lesser demon", 82, 41),
 			stat(7865, "Lesser demon", 87, 12)));
 
-		Assert.assertEquals(2, out.size());
+		Assert.assertEquals(1, out.size());
+		Assert.assertEquals(53, out.get(0).total());
+	}
+
+	@Test
+	public void aMergedRowRemembersEveryLevelItSwallowed() throws Exception
+	{
+		// merging must not hide a real distinction. xarpus at 331/960/1160 is entry,
+		// normal and hard mode tob - one row, but the label has to say so.
+		final List<NpcStat> out = rollUp(Arrays.asList(
+			stat(8340, "Xarpus", 331, 5),
+			stat(10768, "Xarpus", 960, 3),
+			stat(10772, "Xarpus", 1160, 1)));
+
+		Assert.assertEquals(1, out.size());
+		Assert.assertEquals(Arrays.asList(331, 960, 1160),
+			new java.util.ArrayList<>(out.get(0).mergedLevels));
+	}
+
+	@Test
+	public void guardStopsBeingThreeRows() throws Exception
+	{
+		// the reported bug, from a real profile: three "Guard" rows, 3 + 3 + 2.
+		final List<NpcStat> out = rollUp(Arrays.asList(
+			stat(3271, "Guard", 19, 3),
+			stat(1546, "Guard", 21, 3),
+			stat(397, "Guard", 22, 2)));
+
+		Assert.assertEquals(1, out.size());
+		Assert.assertEquals(8, out.get(0).total());
 	}
 
 	@Test

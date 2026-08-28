@@ -45,6 +45,16 @@ public class NpcStat
 	// recorded before this existed - that's fine, it fills in on the next kill.
 	public Map<String, Long> xpBySkill;
 
+	/**
+	 * Combat levels folded into this row by the panel's roll-up.
+	 *
+	 * <p>Panel-only and deliberately transient: never saved, never uploaded. The ledger
+	 * keeps one row per npc id and every kill still carries its own raw id, so the site
+	 * can group however it likes. This exists so one merged row can say
+	 * "Xarpus (331, 960, 1160)" instead of hiding that three modes went into it.
+	 */
+	public transient java.util.SortedSet<Integer> mergedLevels;
+
 	public long firstKillMillis;
 	public long lastKillMillis;
 
