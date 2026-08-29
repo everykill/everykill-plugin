@@ -26,6 +26,10 @@ it to be published.
 
 The plugin is fully useful with upload off. Everything above happens locally first.
 
+Turning upload on means *from now on*: kills counted while it was off stay in your
+local ledger and are never sent, even retroactively. Nothing is queued up behind a
+switch you haven't flipped.
+
 ## Why it exists alongside Loot Tracker
 
 RuneLite's Loot Tracker already stores per-NPC kill counts — `ConfigLoot` holds

@@ -549,6 +549,18 @@ public class UploadService
 	}
 
 	/** Kills queued but not yet sent. */
+	/**
+	 * Whether uploading is switched on right now.
+	 *
+	 * <p>For the panel, so it can say that kills counted while this is off will never
+	 * be sent — a tester turned it on midway through a task and lost the first half,
+	 * with nothing having warned him.
+	 */
+	public boolean isEnabled()
+	{
+		return config.uploadEnabled();
+	}
+
 	public int queued()
 	{
 		synchronized (pending)

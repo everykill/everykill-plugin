@@ -896,6 +896,15 @@ public class EverykillPanel extends PluginPanel
 		final JPanel upload = titledCard("UPLOAD");
 		upload.add(detailLine("status", uploadService.getStatus()));
 
+		// the toggle means "from now on", and that has to be said BEFORE someone
+		// spends a task finding out. a tester turned upload on midway through and the
+		// first half was never sent - nothing had told him it wouldn't be.
+		if (!uploadService.isEnabled())
+		{
+			upload.add(paragraph("Kills counted while this is off are never uploaded, "
+				+ "even if you turn it on later.", SITE_FG_DIM));
+		}
+
 		// a world whose kills don't count has to say so. "Up to date" while nothing
 		// is being sent is indistinguishable from working.
 		final String unranked = unrankedWorld;

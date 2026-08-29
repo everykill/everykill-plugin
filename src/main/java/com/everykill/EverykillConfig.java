@@ -161,7 +161,7 @@ public interface EverykillConfig extends Config
 	@ConfigItem(
 		keyName = "uploadEnabled",
 		name = "Upload to the site",
-		description = "Sends your recorded kills so you are ranked. Each kill sends: monster id and name, combat level, region, kill grade, your damage and other players' damage, hit counts, fight length, and the items dropped. Your account name is NEVER sent - you are identified by a random id generated on this computer. Uploading ranks you pseudonymously; putting a name on a public leaderboard is a separate opt-in below.",
+		description = "Sends your recorded kills so you are ranked. Each kill sends: monster id and name, combat level, region, kill grade, your damage and other players' damage, hit counts, fight length, and the items dropped. Your account name is NEVER sent - you are identified by a random id generated on this computer. Uploading ranks you pseudonymously; putting a name on a public leaderboard is a separate opt-in below. Kills recorded while this is off are never uploaded, including if you turn it on later - the toggle means from now on.",
 		warning = "This feature submits your IP address to a 3rd-party server not controlled or verified by RuneLite developers",
 		position = 31,
 		section = uploadSection
