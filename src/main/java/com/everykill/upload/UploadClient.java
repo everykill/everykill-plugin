@@ -265,6 +265,54 @@ public class UploadClient
 	 * that leaks.
 	 */
 	/**
+	 * The full cosmetic catalogue: names, tiers, unlock text, rarity.
+	 *
+	 * <p>No auth and no rate limit. Needed because {@code /v1/unlocks} returns earned
+	 * items as bare ids — without this the panel would list "cowl" instead of
+	 * "Leather cowl".
+	 */
+	public void catalogue(String baseUrl,
+		java.util.function.BiConsumer<java.util.List<Unlocks.Item>,
+			java.util.List<Unlocks.Item>> onDone, Consumer<String> onError)
+	{
+		final HttpUrl url = endpoint(baseUrl, "helmets");
+		if (url == null)
+		{
+			onError.accept("Upload address is not a valid URL");
+			return;
+		}
+
+		httpClient.newCall(new Request.Builder().url(url).get().build())
+			.enqueue(new Callback()
+			{
+				@Override
+				public void onFailure(Call call, IOException e)
+				{
+					onError.accept("Could not reach the site");
+				}
+
+				@Override
+				public void onResponse(Call call, Response response)
+				{
+					try (ResponseBody rb = response.body())
+					{
+						if (!response.isSuccessful() || rb == null)
+						{
+							onError.accept("The site could not answer");
+							return;
+						}
+						final JsonObject o = gson.fromJson(rb.string(), JsonObject.class);
+						onDone.accept(items(o, "helmets"), items(o, "titles"));
+					}
+					catch (IOException | RuntimeException e)
+					{
+						onError.accept("The catalogue made no sense");
+					}
+				}
+			});
+	}
+
+	/**
 	 * What this account has earned and is wearing.
 	 *
 	 * <p>One call per panel open. {@code /v1/unlocks} is a GET and unlimited, but the
@@ -331,6 +379,17 @@ public class UploadClient
 			items(o, "next"));
 	}
 
+	/**
+	 * Reads either shape the server uses.
+	 *
+	 * <p>{@code helmets} and {@code titles} are bare id strings — the account has
+	 * earned them and the catalogue holds the detail. {@code next} is full objects,
+	 * because a rung you haven't reached needs its unlock text.
+	 *
+	 * <p>Found on a real account: parsing all three as objects returned empty lists and
+	 * the panel told someone with two unlocks they had nothing. A fresh account can't
+	 * catch that — empty lists parse the same either way.
+	 */
 	private static java.util.List<Unlocks.Item> items(JsonObject o, String key)
 	{
 		final java.util.List<Unlocks.Item> out = new java.util.ArrayList<>();
@@ -340,6 +399,13 @@ public class UploadClient
 		}
 		for (com.google.gson.JsonElement e : o.getAsJsonArray(key))
 		{
+			if (e.isJsonPrimitive())
+			{
+				// an earned id. the name is filled in from the catalogue.
+				final String id = e.getAsString();
+				out.add(new Unlocks.Item(id, id, null, null, null, 0));
+				continue;
+			}
 			if (!e.isJsonObject())
 			{
 				continue;

@@ -90,6 +90,9 @@ public class UploadService
 	 */
 	private volatile Unlocks unlocks;
 
+	/** Cosmetic catalogue, fetched once. Names for the bare ids /v1/unlocks returns. */
+	private volatile java.util.Map<String, Unlocks.Item> catalogue;
+
 	/** Set while a fetch is in flight, so a fast tab switch can't stack requests. */
 	private final java.util.concurrent.atomic.AtomicBoolean unlocksInFlight =
 		new java.util.concurrent.atomic.AtomicBoolean();
@@ -608,10 +611,47 @@ public class UploadService
 			return;
 		}
 
-		executor.execute(() -> client.unlocks(uploadUrl(), token,
+		executor.execute(() ->
+		{
+			if (catalogue == null)
+			{
+				// needed before unlocks means anything: /v1/unlocks returns earned
+				// items as bare ids, so without the catalogue the panel would list
+				// "cowl" rather than "Leather cowl". No auth, no rate limit, once.
+				client.catalogue(uploadUrl(),
+					(helmets, titles) ->
+					{
+						final java.util.Map<String, Unlocks.Item> m =
+							new java.util.HashMap<>();
+						for (Unlocks.Item i : helmets)
+						{
+							m.put(i.id, i);
+						}
+						for (Unlocks.Item i : titles)
+						{
+							m.put(i.id, i);
+						}
+						catalogue = m;
+						fetchUnlocks(token, onChange);
+					},
+					error ->
+					{
+						// the ids still work; only the names are missing.
+						catalogue = java.util.Collections.emptyMap();
+						fetchUnlocks(token, onChange);
+					});
+				return;
+			}
+			fetchUnlocks(token, onChange);
+		});
+	}
+
+	private void fetchUnlocks(String token, Runnable onChange)
+	{
+		client.unlocks(uploadUrl(), token,
 			result ->
 			{
-				unlocks = result;
+				unlocks = enrich(result);
 				unlocksInFlight.set(false);
 				if (onChange != null)
 				{
@@ -622,7 +662,34 @@ public class UploadService
 			{
 				unlocksInFlight.set(false);
 				log.debug("everykill: unlocks failed - {}", error);
-			}));
+			});
+	}
+
+	/** Fills earned ids in with their catalogue detail. */
+	private Unlocks enrich(Unlocks raw)
+	{
+		final java.util.Map<String, Unlocks.Item> cat = catalogue;
+		if (cat == null || cat.isEmpty())
+		{
+			return raw;
+		}
+		return new Unlocks(raw.published,
+			named(raw.helmets, cat), named(raw.titles, cat),
+			raw.wearingHelmet, raw.wearingTitle, raw.next);
+	}
+
+	private static java.util.List<Unlocks.Item> named(
+		java.util.List<Unlocks.Item> items, java.util.Map<String, Unlocks.Item> cat)
+	{
+		final java.util.List<Unlocks.Item> out = new java.util.ArrayList<>(items.size());
+		for (Unlocks.Item i : items)
+		{
+			final Unlocks.Item full = cat.get(i.id);
+			// an id the catalogue doesn't know: keep it. the site earned it, and
+			// showing the raw id beats dropping it off the list.
+			out.add(full == null ? i : full);
+		}
+		return out;
 	}
 
 	/**
