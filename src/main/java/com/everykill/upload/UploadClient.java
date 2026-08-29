@@ -264,6 +264,201 @@ public class UploadClient
 	 * it — a {@code published = false} column with the name still in it is the version
 	 * that leaks.
 	 */
+	/**
+	 * What this account has earned and is wearing.
+	 *
+	 * <p>One call per panel open. {@code /v1/unlocks} is a GET and unlimited, but the
+	 * pick endpoints share the upload limiter, so the panel snapshots rather than
+	 * refetching on every rebuild.
+	 */
+	public void unlocks(String baseUrl, String token,
+		Consumer<Unlocks> onDone, Consumer<String> onError)
+	{
+		final HttpUrl url = endpoint(baseUrl, "unlocks");
+		if (url == null)
+		{
+			onError.accept("Upload address is not a valid URL");
+			return;
+		}
+
+		final Request request = new Request.Builder()
+			.url(url)
+			.header("Authorization", "Bearer " + token)
+			.get()
+			.build();
+
+		httpClient.newCall(request).enqueue(new Callback()
+		{
+			@Override
+			public void onFailure(Call call, IOException e)
+			{
+				onError.accept("Could not reach the site");
+			}
+
+			@Override
+			public void onResponse(Call call, Response response)
+			{
+				try (ResponseBody rb = response.body())
+				{
+					if (response.code() == 401 || response.code() == 403)
+					{
+						onError.accept("Not signed in yet");
+						return;
+					}
+					if (!response.isSuccessful() || rb == null)
+					{
+						onError.accept("The site could not answer");
+						return;
+					}
+					onDone.accept(parseUnlocks(gson.fromJson(rb.string(), JsonObject.class)));
+				}
+				catch (IOException | RuntimeException e)
+				{
+					onError.accept("The site's reply made no sense");
+				}
+			}
+		});
+	}
+
+	private static Unlocks parseUnlocks(JsonObject o)
+	{
+		return new Unlocks(
+			o.has("published") && o.get("published").getAsBoolean(),
+			items(o, "helmets"),
+			items(o, "titles"),
+			str(o.getAsJsonObject("wearing"), "helmet"),
+			str(o.getAsJsonObject("wearing"), "title"),
+			items(o, "next"));
+	}
+
+	private static java.util.List<Unlocks.Item> items(JsonObject o, String key)
+	{
+		final java.util.List<Unlocks.Item> out = new java.util.ArrayList<>();
+		if (o == null || !o.has(key) || !o.get(key).isJsonArray())
+		{
+			return out;
+		}
+		for (com.google.gson.JsonElement e : o.getAsJsonArray(key))
+		{
+			if (!e.isJsonObject())
+			{
+				continue;
+			}
+			final JsonObject i = e.getAsJsonObject();
+			out.add(new Unlocks.Item(
+				str(i, "id"), str(i, "name"), str(i, "file"),
+				str(i, "tier"), str(i, "how"),
+				i.has("rarity") && !i.get("rarity").isJsonNull()
+					? i.get("rarity").getAsInt() : 0));
+		}
+		return out;
+	}
+
+	private static String str(JsonObject o, String key)
+	{
+		if (o == null || !o.has(key) || o.get(key).isJsonNull())
+		{
+			return null;
+		}
+		return o.get(key).getAsString();
+	}
+
+	/** Wear a helmet, or pass null to take it off. */
+	public void pickHelmet(String baseUrl, String token, String helmetId,
+		Consumer<String> onDone, Consumer<String> onError)
+	{
+		pick(baseUrl, token, "helmet", helmetId, onDone, onError);
+	}
+
+	/** Wear a title, or pass null to take it off. */
+	public void pickTitle(String baseUrl, String token, String titleId,
+		Consumer<String> onDone, Consumer<String> onError)
+	{
+		pick(baseUrl, token, "title", titleId, onDone, onError);
+	}
+
+	private void pick(String baseUrl, String token, String kind, String id,
+		Consumer<String> onDone, Consumer<String> onError)
+	{
+		final HttpUrl url = endpoint(baseUrl, kind);
+		if (url == null)
+		{
+			onError.accept("Upload address is not a valid URL");
+			return;
+		}
+
+		final JsonObject body = new JsonObject();
+		if (id == null)
+		{
+			body.add(kind, com.google.gson.JsonNull.INSTANCE);
+		}
+		else
+		{
+			body.addProperty(kind, id);
+		}
+
+		final Request request = new Request.Builder()
+			.url(url)
+			.header("Authorization", "Bearer " + token)
+			.post(RequestBody.create(JSON, body.toString()))
+			.build();
+
+		httpClient.newCall(request).enqueue(new Callback()
+		{
+			@Override
+			public void onFailure(Call call, IOException e)
+			{
+				onError.accept("Could not reach the site");
+			}
+
+			@Override
+			public void onResponse(Call call, Response response)
+			{
+				try (ResponseBody rb = response.body())
+				{
+					final int code = response.code();
+					if (code == 200)
+					{
+						onDone.accept(id == null ? "Removed" : "Saved");
+						return;
+					}
+
+					// the server's own words where it has any - it knows why better
+					// than a switch on status codes does.
+					String detail = null;
+					if (rb != null)
+					{
+						try
+						{
+							detail = str(gson.fromJson(rb.string(), JsonObject.class), "detail");
+						}
+						catch (RuntimeException ignored)
+						{
+							// fall through to the generic message
+						}
+					}
+
+					if (code == 429)
+					{
+						onError.accept("Too quick - wait a minute and try again");
+					}
+					else if (code == 401 || code == 403)
+					{
+						onError.accept("Not signed in yet");
+					}
+					else
+					{
+						onError.accept(detail != null ? detail : "The site said no");
+					}
+				}
+				catch (IOException e)
+				{
+					onError.accept("Could not read the site's reply");
+				}
+			}
+		});
+	}
+
 	public void publish(String baseUrl, String token, String displayName,
 		String accountType, Consumer<String> onDone, Consumer<String> onError)
 	{

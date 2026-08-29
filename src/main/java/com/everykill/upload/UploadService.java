@@ -81,6 +81,19 @@ public class UploadService
 	@Getter
 	private volatile String status = "Not uploading";
 
+	/**
+	 * Last fetched unlocks, or null if never fetched.
+	 *
+	 * <p>Cached deliberately. The pick endpoints share the upload limiter at one
+	 * request per 60s and the panel rebuilds constantly — fetching on rebuild would
+	 * spend the budget on refreshes and leave none for actually picking something.
+	 */
+	private volatile Unlocks unlocks;
+
+	/** Set while a fetch is in flight, so a fast tab switch can't stack requests. */
+	private final java.util.concurrent.atomic.AtomicBoolean unlocksInFlight =
+		new java.util.concurrent.atomic.AtomicBoolean();
+
 	@Inject
 	UploadService(EverykillConfig config, UploadClient client, UploadIdentity identity,
 		ScheduledExecutorService executor, Client gameClient, ClientThread clientThread,
@@ -559,6 +572,98 @@ public class UploadService
 	public boolean isEnabled()
 	{
 		return config.uploadEnabled();
+	}
+
+	/** Whatever was last fetched, or null. Never triggers a request. */
+	public Unlocks getUnlocks()
+	{
+		return unlocks;
+	}
+
+	/**
+	 * Fetch what this account has earned.
+	 *
+	 * @param force refetch even if we already have a snapshot
+	 */
+	public void refreshUnlocks(boolean force, Runnable onChange)
+	{
+		if (!config.uploadEnabled())
+		{
+			return;
+		}
+		if (!force && unlocks != null)
+		{
+			return;
+		}
+
+		final String token = identity.getToken();
+		if (token == null)
+		{
+			// not registered yet. nothing to show and nothing to ask for.
+			return;
+		}
+
+		if (!unlocksInFlight.compareAndSet(false, true))
+		{
+			return;
+		}
+
+		executor.execute(() -> client.unlocks(uploadUrl(), token,
+			result ->
+			{
+				unlocks = result;
+				unlocksInFlight.set(false);
+				if (onChange != null)
+				{
+					onChange.run();
+				}
+			},
+			error ->
+			{
+				unlocksInFlight.set(false);
+				log.debug("everykill: unlocks failed - {}", error);
+			}));
+	}
+
+	/**
+	 * Wear a helmet, or null to remove it.
+	 *
+	 * <p>Refetches on success rather than patching the cache: the server decides what
+	 * is worn, and guessing locally is how a panel ends up disagreeing with the site.
+	 */
+	public void pickHelmet(String helmetId, Consumer<String> onResult, Runnable onChange)
+	{
+		final String token = identity.getToken();
+		if (token == null)
+		{
+			onResult.accept("Not signed in yet");
+			return;
+		}
+		executor.execute(() -> client.pickHelmet(uploadUrl(), token, helmetId,
+			ok ->
+			{
+				onResult.accept(ok);
+				refreshUnlocks(true, onChange);
+			},
+			onResult::accept));
+	}
+
+	/** Wear a title, or null to remove it. */
+	public void pickTitle(String titleId, Consumer<String> onResult, Runnable onChange)
+	{
+		final String token = identity.getToken();
+		if (token == null)
+		{
+			onResult.accept("Not signed in yet");
+			return;
+		}
+		executor.execute(() -> client.pickTitle(uploadUrl(), token, titleId,
+			ok ->
+			{
+				onResult.accept(ok);
+				refreshUnlocks(true, onChange);
+			},
+			onResult::accept));
 	}
 
 	public int queued()
