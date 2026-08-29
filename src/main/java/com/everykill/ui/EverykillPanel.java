@@ -10,6 +10,7 @@ import com.everykill.ledger.LocalLedger;
 import com.google.gson.Gson;
 import com.everykill.model.Confidence;
 import com.everykill.model.NpcStat;
+import com.everykill.upload.Unlocks;
 import com.everykill.upload.UploadService;
 import com.everykill.notice.MilestoneNotifier;
 import com.everykill.xp.XpService;
@@ -98,6 +99,7 @@ public class EverykillPanel extends PluginPanel
 	// for drop icons. getImage is async - addTo(label) repaints when it lands, so
 	// nothing blocks swing. same call LootTrackerBox makes.
 	private final ItemManager itemManager;
+	private final HelmetIcons helmetIcons;
 
 	private final ClientThread clientThread;
 
@@ -204,6 +206,7 @@ public class EverykillPanel extends PluginPanel
 		// injected Gson, per CONVENTIONS - never build one. read once at construction
 		// because it's a 238-entry file off the classpath, not per repaint.
 		this.npcIcons = NpcIcons.load(gson);
+		this.helmetIcons = HelmetIcons.load(gson);
 
 		setLayout(new BorderLayout());
 		setBorder(BorderFactory.createEmptyBorder(8, 0, 8, 0));
@@ -292,6 +295,17 @@ public class EverykillPanel extends PluginPanel
 			row.add(viewTab(v.label, view == v, () ->
 			{
 				view = v;
+
+				// fetched HERE, on the tab click - not in the card builder, which runs
+				// on every rebuild. the pick endpoints share the upload limiter at one
+				// request per 60s, and a refresh that spends the budget leaves none
+				// for the thing the user opened the tab to do.
+				if (v == View.ACCOUNT)
+				{
+					uploadService.refreshUnlocks(false,
+						() -> SwingUtilities.invokeLater(this::rebuild));
+				}
+
 				rebuild();
 			}));
 		}
@@ -1003,6 +1017,12 @@ public class EverykillPanel extends PluginPanel
 		monsterList.add(board);
 		monsterList.add(javax.swing.Box.createVerticalStrut(6));
 
+		final JPanel look = titledCard("APPEARANCE");
+		look.add(appearance());
+		pin(look);
+		monsterList.add(look);
+		monsterList.add(javax.swing.Box.createVerticalStrut(6));
+
 		final JPanel data = titledCard("YOUR DATA");
 		data.add(dataRights());
 		pin(data);
@@ -1011,6 +1031,175 @@ public class EverykillPanel extends PluginPanel
 		// takes the leftover vertical space so the cards above keep their own
 		// height instead of stretching to fill a short tab.
 		monsterList.add(javax.swing.Box.createVerticalGlue());
+	}
+
+	/**
+	 * Helmet and title picker.
+	 *
+	 * <p>Reads the cached snapshot only — {@code refreshUnlocks} is called when the tab
+	 * opens, never from here. This runs on every rebuild, and the pick endpoints share
+	 * the upload limiter at one request per 60s.
+	 */
+	private JPanel appearance()
+	{
+		final JPanel box = new JPanel();
+		box.setLayout(new BoxLayout(box, BoxLayout.Y_AXIS));
+		box.setOpaque(false);
+		box.setAlignmentX(LEFT_ALIGNMENT);
+
+		if (!uploadService.isEnabled())
+		{
+			box.add(paragraph("Turn on uploading to earn helmets and titles.",
+				SITE_FG_DIM));
+			return box;
+		}
+
+		final Unlocks u = uploadService.getUnlocks();
+		if (u == null)
+		{
+			box.add(paragraph("Checking what you've earned\u2026", SITE_FG_DIM));
+			return box;
+		}
+
+		box.add(detailLine("helmet", u.wearingHelmet == null
+			? "none" : nameOf(u.helmets, u.wearingHelmet)));
+		box.add(detailLine("title", u.wearingTitle == null
+			? "none" : nameOf(u.titles, u.wearingTitle)));
+
+		if (u.isEmpty())
+		{
+			// day one. 'next' is populated even when nothing is earned, so say what
+			// the first rung costs rather than showing an empty box.
+			final StringBuilder sb = new StringBuilder("Nothing earned yet.");
+			if (!u.next.isEmpty())
+			{
+				final Unlocks.Item first = u.next.get(0);
+				sb.append(" First up: ").append(first.name)
+					.append(" \u2014 ").append(first.how).append('.');
+			}
+			box.add(paragraph(sb.toString(), SITE_FG_DIM));
+			return box;
+		}
+
+		if (!u.published)
+		{
+			// picking writes to the published-name row, so there is nowhere to put a
+			// pick without one. say it here rather than letting the click fail.
+			box.add(paragraph("Publish your name to wear these.", SITE_ACC));
+		}
+
+		box.add(javax.swing.Box.createVerticalStrut(6));
+		if (!u.helmets.isEmpty())
+		{
+			box.add(sectionLine("HELMETS"));
+			box.add(unlockGrid(u.helmets, u.wearingHelmet, u.published, true));
+		}
+		if (!u.titles.isEmpty())
+		{
+			box.add(javax.swing.Box.createVerticalStrut(4));
+			box.add(sectionLine("TITLES"));
+			box.add(unlockGrid(u.titles, u.wearingTitle, u.published, false));
+		}
+
+		// the next rung, so there is always something to aim at.
+		if (!u.next.isEmpty())
+		{
+			final Unlocks.Item n = u.next.get(0);
+			box.add(javax.swing.Box.createVerticalStrut(4));
+			box.add(paragraph("Next: " + n.name + " \u2014 " + n.how, SITE_FG_FAINT));
+		}
+
+		return box;
+	}
+
+	private static String nameOf(java.util.List<Unlocks.Item> items, String id)
+	{
+		for (Unlocks.Item i : items)
+		{
+			if (i.id.equals(id))
+			{
+				return i.name;
+			}
+		}
+		// worn but not in the earned list: the site knows something we don't, and its
+		// id is more honest than pretending nothing is worn.
+		return id;
+	}
+
+	/** One clickable row per earned item, the worn one marked. */
+	private JPanel unlockGrid(java.util.List<Unlocks.Item> items, String worn,
+		boolean published, boolean helmets)
+	{
+		final JPanel grid = new JPanel();
+		grid.setLayout(new BoxLayout(grid, BoxLayout.Y_AXIS));
+		grid.setOpaque(false);
+		grid.setAlignmentX(LEFT_ALIGNMENT);
+
+		for (Unlocks.Item item : items)
+		{
+			grid.add(unlockRow(item, item.id.equals(worn), published, helmets));
+		}
+		return grid;
+	}
+
+	private JPanel unlockRow(Unlocks.Item item, boolean worn, boolean published,
+		boolean helmet)
+	{
+		final JPanel row = new JPanel(new java.awt.BorderLayout(6, 0));
+		row.setOpaque(false);
+		row.setAlignmentX(LEFT_ALIGNMENT);
+		row.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
+
+		if (helmet)
+		{
+			final int itemId = helmetIcons.itemFor(item.id);
+			final JLabel face = new JLabel();
+			face.setPreferredSize(new java.awt.Dimension(24, 22));
+			if (itemId > 0)
+			{
+				itemManager.getImage(itemId, 1, false).addTo(face);
+			}
+			row.add(face, java.awt.BorderLayout.WEST);
+		}
+
+		final JLabel name = new JLabel(item.name);
+		name.setFont(FontManager.getRunescapeSmallFont());
+		name.setForeground(worn ? SITE_ACC : SITE_FG);
+		row.add(name, java.awt.BorderLayout.CENTER);
+
+		final JLabel right = new JLabel(worn ? "worn" : (published ? "wear" : ""));
+		right.setFont(FontManager.getRunescapeSmallFont());
+		right.setForeground(worn ? SITE_ACC : SITE_FG_FAINT);
+		row.add(right, java.awt.BorderLayout.EAST);
+
+		if (published && !worn)
+		{
+			row.setCursor(java.awt.Cursor.getPredefinedCursor(
+				java.awt.Cursor.HAND_CURSOR));
+			row.addMouseListener(new java.awt.event.MouseAdapter()
+			{
+				@Override
+				public void mouseClicked(java.awt.event.MouseEvent e)
+				{
+					right.setText("saving\u2026");
+					final java.util.function.Consumer<String> done = msg ->
+						SwingUtilities.invokeLater(() -> right.setText(msg));
+
+					if (helmet)
+					{
+						uploadService.pickHelmet(item.id, done,
+							() -> SwingUtilities.invokeLater(EverykillPanel.this::rebuild));
+					}
+					else
+					{
+						uploadService.pickTitle(item.id, done,
+							() -> SwingUtilities.invokeLater(EverykillPanel.this::rebuild));
+					}
+				}
+			});
+		}
+
+		return row;
 	}
 
 	private JPanel dataRights()
