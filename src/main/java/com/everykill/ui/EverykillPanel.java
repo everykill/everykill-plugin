@@ -155,7 +155,6 @@ public class EverykillPanel extends PluginPanel
 
 	private final JPanel viewTabs = new JPanel();
 
-	private final NpcIcons npcIcons;
 
 	private final UploadService uploadService;
 	private final SlayerTask slayerTask;
@@ -205,7 +204,6 @@ public class EverykillPanel extends PluginPanel
 
 		// injected Gson, per CONVENTIONS - never build one. read once at construction
 		// because it's a 238-entry file off the classpath, not per repaint.
-		this.npcIcons = NpcIcons.load(gson);
 		this.helmetIcons = HelmetIcons.load(gson);
 
 		setLayout(new BorderLayout());
@@ -1469,8 +1467,7 @@ public class EverykillPanel extends PluginPanel
 		{
 			monsterList.add(recordCard("FASTEST KILL",
 				String.format("%.1fs", fastest.fastestTicks * 0.6),
-				fastest.name + "  ·  " + fastest.fastestTicks + " ticks",
-				npcIcons.forName(fastest.name)));
+				fastest.name + "  ·  " + fastest.fastestTicks + " ticks"));
 			monsterList.add(javax.swing.Box.createVerticalStrut(4));
 		}
 
@@ -1518,7 +1515,7 @@ public class EverykillPanel extends PluginPanel
 		if (mostKilled != null && mostKilled.total() > 0)
 		{
 			monsterList.add(recordCard("MOST KILLED", mostKilled.name,
-				mostKilled.total() + " kills", npcIcons.forName(mostKilled.name)));
+				mostKilled.total() + " kills"));
 			monsterList.add(javax.swing.Box.createVerticalStrut(4));
 		}
 
@@ -1587,7 +1584,7 @@ public class EverykillPanel extends PluginPanel
 	 * A record card with the thing it is about drawn beside it.
 	 *
 	 * <p>{@code itemId} is a real item for drop records and a stand-in from
-	 * {@link NpcIcons} for monster records — the panel cannot tell the difference and
+	 * monster records — the panel cannot tell the difference and
 	 * does not need to. -1 draws no icon, which is the normal case for a monster that
 	 * is not in the table.
 	 */
@@ -2344,12 +2341,9 @@ public class EverykillPanel extends PluginPanel
 		face.setPreferredSize(new Dimension(26, 24));
 		face.setHorizontalAlignment(SwingConstants.CENTER);
 
-		final int iconId = npcIcons.forName(stat.name);
-		if (iconId > 0)
-		{
-			// quantity 1: a stack number burnt into a monster's face is nonsense.
-			itemManager.getImage(iconId, 1, false).addTo(face);
-		}
+		// no sprite. an item standing in for a monster's face was a guess - the site
+		// has real monster images and the wiki button is one click away. the label
+		// stays at its size so names still line up in a column.
 
 		final JPanel lead = new JPanel(new BorderLayout());
 		lead.setOpaque(false);
