@@ -39,6 +39,10 @@ public class UploadIdentity
 	private static final String DIR = "everykill-plugin";
 	private static final String FILE = "identity.properties";
 
+	// written into the shared file once a profile adopts its id, so a second game
+	// account on the same machine knows the id is taken and mints its own.
+	private static final String KEY_CLAIMED = "claimedBy";
+
 	private static final String KEY_CLIENT_ID = "clientId";
 	private static final String KEY_TOKEN = "token";
 
@@ -170,6 +174,58 @@ public class UploadIdentity
 			host = null;
 		}
 
+		// ---------------------------------------------------------------------------
+		// the per-profile id wins over the file.
+		//
+		// the file lives in RUNELITE_DIR, which is per MACHINE, so every game account
+		// on this computer reads the same one. the ledger has always been per profile,
+		// so two accounts kept correct separate kill counts and uploaded them as the
+		// same person - one Everykill account, both players' kills, and the display
+		// name flipping to whoever published last.
+		//
+		// the synced store is per profile. it was already here for reinstall recovery,
+		// but only read when the file had no id, which on any existing install is
+		// never. reading it FIRST is most of the fix.
+		// no synced store means no way to tell one profile from another, so every
+		// branch below would be a guess. use the file exactly as it is - the behaviour
+		// before any of this existed.
+		final String profileId = synced == null ? null : syncedClientId();
+		final boolean canSeeProfiles = synced != null;
+		if (profileId != null && !profileId.equals(clientId))
+		{
+			// this profile has its own identity. the file belongs to another account.
+			clientId = profileId;
+			token = null;
+			recoveryCode = null;
+			host = null;
+		}
+		else if (canSeeProfiles && clientId != null && clientId.length() == 32
+			&& profileId == null)
+		{
+			// an id in the file and nothing for this profile: either an existing
+			// single-account user updating, or a second account on that user's
+			// machine. the claim marker says which.
+			final String claimedBy = props.getProperty(KEY_CLAIMED);
+			if (claimedBy == null)
+			{
+				// unclaimed, so this profile adopts it and keeps its history. the
+				// common case by a mile - almost everyone plays one account.
+				log.debug("everykill: adopting the shared identity for this profile");
+				mirrorToConfig();
+				claimFile(props);
+			}
+			else
+			{
+				// already claimed by another profile. minting fresh is what stops two
+				// accounts stacking onto one leaderboard row.
+				log.debug("everykill: shared identity is claimed, minting a new one");
+				clientId = null;
+				token = null;
+				recoveryCode = null;
+				host = null;
+			}
+		}
+
 		if (clientId == null || clientId.length() != 32)
 		{
 			// nothing local. before minting a new id - which orphans any history the
@@ -221,6 +277,39 @@ public class UploadIdentity
 		if (!clientId.equals(syncedClientId()))
 		{
 			synced.put(CONFIG_KEY, clientId);
+		}
+	}
+
+	/**
+	 * Marks the shared file as belonging to one profile.
+	 *
+	 * <p>The file is per machine; the ledger and the identity are per game account.
+	 * Without a claim, every account on the PC would adopt the same id and keep
+	 * stacking onto one leaderboard row — the bug this whole path exists to stop.
+	 *
+	 * <p>Best effort. If the write fails the worst case is a second account adopting
+	 * the id too, which is exactly today's behaviour, so a failure here cannot make
+	 * anything worse than it already was.
+	 */
+	private void claimFile(Properties props)
+	{
+		if (clientId == null)
+		{
+			return;
+		}
+		try
+		{
+			props.setProperty(KEY_CLAIMED, clientId);
+			Files.createDirectories(path.getParent());
+			try (java.io.BufferedWriter out =
+				Files.newBufferedWriter(path, StandardCharsets.UTF_8))
+			{
+				props.store(out, "everykill upload identity");
+			}
+		}
+		catch (IOException e)
+		{
+			log.debug("everykill: could not claim the identity file", e);
 		}
 	}
 
@@ -298,6 +387,11 @@ public class UploadIdentity
 		{
 			props.setProperty(KEY_HOST, host);
 		}
+
+		// whoever writes the file owns it. this rebuilds the file from scratch, so
+		// without re-stamping the claim a save would wipe it and the next game account
+		// on this machine would adopt the id - which is the bug, back again.
+		props.setProperty(KEY_CLAIMED, clientId);
 
 		mirrorToConfig();
 
