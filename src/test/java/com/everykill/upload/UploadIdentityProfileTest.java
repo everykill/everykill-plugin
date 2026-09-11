@@ -146,6 +146,69 @@ public class UploadIdentityProfileTest
 	}
 
 	@Test
+	public void twoClientsStartingAtOnceDoNotShareAnId() throws IOException
+	{
+		// two RuneLite clients open at the same time are two JVMs writing one file.
+		// every other test here loads sequentially - A finishes before B starts - which
+		// is not what happens when someone launches both at once.
+		//
+		// the dangerous window is the FIRST login after the update, when neither
+		// profile has a synced id yet and both are looking at the same unclaimed file.
+		final Path path = file();
+		Files.createDirectories(path.getParent());
+		Files.write(path, ("clientId=e918fe648dd5491486c3ccc581cd2d40"
+			+ System.lineSeparator()).getBytes());
+
+		final UploadIdentity clientA = new UploadIdentity(path, new Profile());
+		final UploadIdentity clientB = new UploadIdentity(path, new Profile());
+
+		// both read before either writes - the interleaving that a sequential test
+		// can never produce.
+		clientA.load("api.everykill.com");
+		clientB.load("api.everykill.com");
+
+		Assert.assertNotEquals(
+			"two clients starting together must not adopt the same identity",
+			clientA.getClientId(), clientB.getClientId());
+	}
+
+	@Test
+	public void concurrentSavesDoNotStealEachOthersIdentity() throws IOException
+	{
+		// both clients already have their own id. they are now both writing the shared
+		// file on every register and flush. whoever writes last owns the file - the
+		// question is whether that can drag the other account's identity with it.
+		final Path path = file();
+		final Profile a = new Profile();
+		final Profile b = new Profile();
+
+		final UploadIdentity ca = new UploadIdentity(path, a);
+		ca.load("api.everykill.com");
+		final String idA = ca.getClientId();
+
+		final UploadIdentity cb = new UploadIdentity(path, b);
+		cb.load("api.everykill.com");
+		final String idB = cb.getClientId();
+
+		// interleaved writes, the way two live clients actually behave
+		ca.save("token-a1", null, "api.everykill.com");
+		cb.save("token-b1", null, "api.everykill.com");
+		ca.save("token-a2", null, "api.everykill.com");
+		cb.save("token-b2", null, "api.everykill.com");
+
+		Assert.assertEquals("A kept its own identity", idA, ca.getClientId());
+		Assert.assertEquals("B kept its own identity", idB, cb.getClientId());
+		Assert.assertEquals("A kept its own token", "token-a2", ca.getToken());
+		Assert.assertEquals("B kept its own token", "token-b2", cb.getToken());
+
+		// and a restart of A must still find A, not whatever B wrote last
+		final UploadIdentity restartA = new UploadIdentity(path, a);
+		restartA.load("api.everykill.com");
+		Assert.assertEquals("A restarts into its own identity",
+			idA, restartA.getClientId());
+	}
+
+	@Test
 	public void anExistingUserKeepsTheirHistory() throws IOException
 	{
 		// the update case, and by far the most common: one player, one account, an id
