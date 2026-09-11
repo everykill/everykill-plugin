@@ -86,6 +86,62 @@ Two signals in your data, no plugin change needed:
 
 Worth a count either way — it tells us whether this is one player or a pattern.
 
+## Can the merged kills be unmerged?
+
+Delk asked. **Partly, and only because this player happens to be a UIM and a main.**
+
+### What a kill carries
+
+```
+eventId  npcId  npcName  combatLevel  variant  regionId  worldTypes
+grade  signal  myDamage  othersDamage  attacks  hits  maxHit
+timestampMillis  fightTicks  drops  lootConfidence
+```
+
+No account field. Nothing on a kill says which game account produced it — the same
+design that keeps RSNs off the wire. The kills are anonymous to each other.
+
+### The one thread worth pulling
+
+`accountType` is sent on **every registration**, and registration fires when the plugin
+starts. So each time he switched accounts and launched, a fresh register landed carrying
+the mode:
+
+```
+14:02  register  ultimate_ironman
+16:41  register  main
+19:15  register  ultimate_ironman
+```
+
+Kills carry `timestampMillis`. Partition the kills by which registration window they
+fall into and you have the split.
+
+**This only works if you kept the history.** If `account_type` is a column you overwrite
+on each register, the timeline is gone and so is the answer. Worth checking before
+anything else.
+
+### Three ways it fails
+
+**Two accounts of the same mode are indistinguishable.** A UIM and a main split cleanly.
+Two mains, or a UIM and a HCIM where both registered as the same string, do not. This
+player is the lucky case.
+
+**Overlapping sessions interleave.** Two clients open at once on the same PC — entirely
+plausible — and the windows overlap. Kills in the overlap are a coin flip.
+
+**It's inference, not record.** A kill at 14:32 is attributed by which window contains
+it, not by anything the kill itself says. Good enough to fix one player's history;
+not something to build a permanent feature on.
+
+### What not to do
+
+Don't split them by guessing at the monster mix — "UIMs kill these, mains kill those."
+That's fabricating data to fix a data bug, and it would be indistinguishable from the
+seeded demo accounts you purged for exactly that reason.
+
+If the registration history isn't there, the honest move is to leave the merged pile
+alone, say so on the profile if it matters, and let the client fix stop it growing.
+
 ## Timing
 
 The update PR (#15814) is open and pinned at `e386e48`. This fix isn't in it. Options
