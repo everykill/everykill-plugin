@@ -83,6 +83,69 @@ public class UploadIdentityProfileTest
 	}
 
 	@Test
+	public void fourProfilesOnOneMachineAllGetTheirOwnId() throws IOException
+	{
+		// two was the reported case. the claim is a single marker, so the question is
+		// whether accounts three and four also see a claimed file or whether one of
+		// them slips through and adopts an id that is already in use.
+		final Path path = file();
+
+		final java.util.Set<String> ids = new java.util.HashSet<>();
+		for (int i = 0; i < 4; i++)
+		{
+			final UploadIdentity identity = new UploadIdentity(path, new Profile());
+			identity.load("api.everykill.com");
+			final String id = identity.getClientId();
+
+			Assert.assertNotNull("profile " + i + " got no id", id);
+			Assert.assertTrue("profile " + i + " reused an id already in use",
+				ids.add(id));
+
+			// each one registers, which is when the file gets written
+			identity.save("token-" + i, null, "api.everykill.com");
+		}
+
+		Assert.assertEquals("four accounts must be four identities", 4, ids.size());
+	}
+
+	@Test
+	public void interleavedLoginsStillSeparate() throws IOException
+	{
+		// nobody logs in cleanly one after another. account A, then B, then back to A,
+		// then C - the file is rewritten each time, so a claim that only survives one
+		// save would let the next account adopt whatever is sitting there.
+		final Path path = file();
+		final Profile a = new Profile();
+		final Profile b = new Profile();
+		final Profile c = new Profile();
+
+		final UploadIdentity ia = new UploadIdentity(path, a);
+		ia.load("api.everykill.com");
+		final String idA = ia.getClientId();
+		ia.save("ta", null, "api.everykill.com");
+
+		final UploadIdentity ib = new UploadIdentity(path, b);
+		ib.load("api.everykill.com");
+		final String idB = ib.getClientId();
+		ib.save("tb", null, "api.everykill.com");
+
+		// back to A. it must find its OWN id, not B's, which is the last thing written
+		// to the shared file.
+		final UploadIdentity ia2 = new UploadIdentity(path, a);
+		ia2.load("api.everykill.com");
+
+		final UploadIdentity ic = new UploadIdentity(path, c);
+		ic.load("api.everykill.com");
+
+		Assert.assertEquals("account A must come back to its own identity",
+			idA, ia2.getClientId());
+		Assert.assertNotEquals(idA, idB);
+		Assert.assertNotEquals("a third account must not inherit either",
+			idA, ic.getClientId());
+		Assert.assertNotEquals(idB, ic.getClientId());
+	}
+
+	@Test
 	public void anExistingUserKeepsTheirHistory() throws IOException
 	{
 		// the update case, and by far the most common: one player, one account, an id
