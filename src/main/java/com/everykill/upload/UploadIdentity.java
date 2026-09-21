@@ -42,6 +42,11 @@ public class UploadIdentity
 	// written into the shared file once a profile adopts its id, so a second game
 	// account on the same machine knows the id is taken and mints its own.
 	private static final String KEY_CLAIMED = "claimedBy";
+	/**
+	 * Install-local salt for the account tag. Generated once, never uploaded -
+	 * it is the only thing stopping the tag from being a reversible account id.
+	 */
+	private static final String KEY_SALT = "accountSalt";
 
 	private static final String KEY_CLIENT_ID = "clientId";
 	private static final String KEY_TOKEN = "token";
@@ -77,6 +82,8 @@ public class UploadIdentity
 	private String token;
 	private String recoveryCode;
 
+	private String salt;
+
 	private String host;
 
 	@Inject
@@ -85,6 +92,12 @@ public class UploadIdentity
 		this(RuneLite.RUNELITE_DIR.toPath().resolve(DIR).resolve(FILE),
 			new SyncedStore()
 			{
+				@Override
+				public String profileKey()
+				{
+					return configManager.getRSProfileKey();
+				}
+
 				@Override
 				public boolean available()
 				{
@@ -163,6 +176,7 @@ public class UploadIdentity
 		token = props.getProperty(KEY_TOKEN);
 		recoveryCode = props.getProperty(KEY_RECOVERY);
 		host = props.getProperty(KEY_HOST);
+		salt = props.getProperty(KEY_SALT);
 
 		// a token and a recovery code belong to the server that minted them. pointing
 		// the plugin somewhere else makes both meaningless - production answers
@@ -312,6 +326,14 @@ public class UploadIdentity
 		try
 		{
 			props.setProperty(KEY_CLAIMED, clientId);
+
+		// the salt has to survive too. save() rebuilds the file from scratch, and
+		// a salt that changes is an account tag that changes - the server would see
+		// a brand new account, which is the whole failure we are fixing.
+		if (salt != null)
+		{
+			props.setProperty(KEY_SALT, salt);
+		}
 			Files.createDirectories(path.getParent());
 			try (java.io.BufferedWriter out =
 				Files.newBufferedWriter(path, StandardCharsets.UTF_8))
@@ -326,6 +348,28 @@ public class UploadIdentity
 	}
 
 	/** 32 hex chars, per the contract. */
+	/**
+	 * A stable, non-reversible tag for the logged-in account, or null when logged
+	 * out or before a salt exists.
+	 *
+	 * <p>Lets the server prove two accounts on one machine are different accounts
+	 * without being told either name.
+	 */
+	public synchronized String accountTag()
+	{
+		if (synced == null || !synced.available())
+		{
+			return null;
+		}
+
+		if (salt == null)
+		{
+			salt = newClientId();
+		}
+
+		return AccountTag.of(synced.profileKey(), salt);
+	}
+
 	private static String newClientId()
 	{
 		final byte[] bytes = new byte[16];

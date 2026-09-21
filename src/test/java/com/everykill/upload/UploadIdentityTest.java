@@ -253,6 +253,12 @@ public class UploadIdentityTest
 			}
 
 			@Override
+			public String profileKey()
+			{
+				return "rsprofile.dGVzdA==";
+			}
+
+			@Override
 			public String get(String key)
 			{
 				return store.get(key);

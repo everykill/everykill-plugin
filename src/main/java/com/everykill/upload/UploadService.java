@@ -302,7 +302,7 @@ public class UploadService
 	{
 		status = "Registering";
 
-		client.register(uploadUrl(), identity.getClientId(),
+		client.register(uploadUrl(), identity.getClientId(), identity.accountTag(),
 			reg ->
 			{
 				try

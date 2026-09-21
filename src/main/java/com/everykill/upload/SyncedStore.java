@@ -24,6 +24,14 @@ public interface SyncedStore
 	 */
 	boolean available();
 
+	/**
+	 * The current profile's key, or null when logged out.
+	 *
+	 * <p>Never send this as-is. RuneLite builds it as Base64 of the Jagex
+	 * account hash, so it decodes straight back - see {@link AccountTag}.
+	 */
+	String profileKey();
+
 	String get(String key);
 
 	void put(String key, String value);

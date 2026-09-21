@@ -44,6 +44,13 @@ public class UploadIdentityProfileTest
 		}
 
 		@Override
+		public String profileKey()
+		{
+			// no profile, so no key - exactly what ConfigManager returns.
+			return null;
+		}
+
+		@Override
 		public String get(String key)
 		{
 			return null;
@@ -70,6 +77,14 @@ public class UploadIdentityProfileTest
 		{
 			// a logged-in client: there is a profile to read and write.
 			return true;
+		}
+
+		@Override
+		public String profileKey()
+		{
+			// shaped like the real thing, distinct per instance so two
+			// profiles in one test are genuinely two accounts.
+			return "rsprofile." + Integer.toHexString(hashCode());
 		}
 
 		@Override

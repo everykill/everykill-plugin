@@ -65,8 +65,8 @@ public class UploadClient
 	 * rather than a 409, so a plugin that lost its token but kept its id recovers
 	 * silently. {@code recoveryCode} is non-null on the FIRST registration only.
 	 */
-	public void register(String baseUrl, String clientId, Consumer<Registration> onDone,
-		Consumer<String> onError)
+	public void register(String baseUrl, String clientId, String accountTag,
+		Consumer<Registration> onDone, Consumer<String> onError)
 	{
 		final HttpUrl url = endpoint(baseUrl, "register");
 		if (url == null)
@@ -77,6 +77,14 @@ public class UploadClient
 
 		final JsonObject body = new JsonObject();
 		body.addProperty("clientId", clientId);
+
+		// omitted entirely when logged out - a field that is sometimes a real
+		// tag and sometimes a placeholder is worse than an absent one, because
+		// the server cannot tell which it is looking at.
+		if (accountTag != null)
+		{
+			body.addProperty("accountTag", accountTag);
+		}
 
 		final Request request = new Request.Builder()
 			.url(url)
