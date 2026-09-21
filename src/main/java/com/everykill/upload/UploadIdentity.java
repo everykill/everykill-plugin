@@ -86,6 +86,15 @@ public class UploadIdentity
 			new SyncedStore()
 			{
 				@Override
+				public boolean available()
+				{
+					// null until the player logs in. this is the whole signal:
+					// without it we cannot tell "another account owns the
+					// shared file" from "nobody has logged in yet".
+					return configManager.getRSProfileKey() != null;
+				}
+
+				@Override
 				public String get(String key)
 				{
 					return configManager.getRSProfileConfiguration(EverykillConfig.GROUP, key);
@@ -189,9 +198,12 @@ public class UploadIdentity
 		// no synced store means no way to tell one profile from another, so every
 		// branch below would be a guess. use the file exactly as it is - the behaviour
 		// before any of this existed.
-		final String profileId = synced == null ? null : syncedClientId();
-		final boolean canSeeProfiles = synced != null;
-		if (profileId != null && !profileId.equals(clientId))
+		final String profileId = syncedClientId();
+		// a store that cannot see a profile yet cannot answer any of the
+		// questions below. before login every branch is a guess, and the
+		// guess that shipped minted a new identity on every launch.
+		final boolean canSeeProfiles = synced != null && synced.available();
+		if (canSeeProfiles && profileId != null && !profileId.equals(clientId))
 		{
 			// this profile has its own identity. the file belongs to another account.
 			clientId = profileId;

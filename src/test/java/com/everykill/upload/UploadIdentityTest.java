@@ -246,6 +246,13 @@ public class UploadIdentityTest
 		return new SyncedStore()
 		{
 			@Override
+			public boolean available()
+			{
+				// these tests model a logged-in client with a real profile.
+				return true;
+			}
+
+			@Override
 			public String get(String key)
 			{
 				return store.get(key);

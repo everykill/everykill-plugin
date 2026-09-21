@@ -31,9 +31,46 @@ public class UploadIdentityProfileTest
 	public TemporaryFolder folder = new TemporaryFolder();
 
 	/** Stands in for one RS profile's synced config. */
+	/**
+	 * A profile store that is not available yet, which is what ConfigManager does
+	 * before login: reads return null, writes go nowhere.
+	 */
+	private static class LoggedOutProfile implements SyncedStore
+	{
+		@Override
+		public boolean available()
+		{
+			return false;
+		}
+
+		@Override
+		public String get(String key)
+		{
+			return null;
+		}
+
+		@Override
+		public void put(String key, String value)
+		{
+			// dropped, exactly like setRSProfileConfiguration with no profile
+		}
+
+		@Override
+		public void remove(String key)
+		{
+		}
+	}
+
 	private static class Profile implements SyncedStore
 	{
 		private final Map<String, String> values = new HashMap<>();
+
+		@Override
+		public boolean available()
+		{
+			// a logged-in client: there is a profile to read and write.
+			return true;
+		}
 
 		@Override
 		public String get(String key)
@@ -206,6 +243,61 @@ public class UploadIdentityProfileTest
 		restartA.load("api.everykill.com");
 		Assert.assertEquals("A restarts into its own identity",
 			idA, restartA.getClientId());
+	}
+
+	@Test
+	public void loadingBeforeLoginDoesNotMintANewIdentity() throws IOException
+	{
+		// flush() is scheduled from startUp(), which runs when the PLUGIN starts, not
+		// when the player logs in - so the first flush ten seconds later routinely
+		// runs with no RS profile. Reads return null and writes are dropped.
+		//
+		// With a claimed file and no profile, the claim branch cannot tell "second
+		// account on this machine" from "nobody has logged in yet", so it mints. The
+		// mirror then goes nowhere, so the next startup mints again. One account
+		// fragments into a new one every launch.
+		final Path path = file();
+		Files.createDirectories(path.getParent());
+		Files.write(path, ("clientId=e918fe648dd5491486c3ccc581cd2d40"
+			+ System.lineSeparator()
+			+ "claimedBy=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
+			+ System.lineSeparator()).getBytes());
+
+		final String existing = "e918fe648dd5491486c3ccc581cd2d40";
+
+		final UploadIdentity first = new UploadIdentity(path, new LoggedOutProfile());
+		first.load("api.everykill.com");
+
+		final UploadIdentity second = new UploadIdentity(path, new LoggedOutProfile());
+		second.load("api.everykill.com");
+
+		Assert.assertEquals("a load before login must keep the existing identity",
+			existing, first.getClientId());
+		Assert.assertEquals("and must not mint a different one on the next launch",
+			first.getClientId(), second.getClientId());
+	}
+
+	@Test
+	public void loadingBeforeLoginNeverClaimsTheFile() throws IOException
+	{
+		// The mirror of the same bug: with no profile we also must not CLAIM, or the
+		// first pre-login flush steals the file from whichever account logs in next.
+		final Path path = file();
+		Files.createDirectories(path.getParent());
+		Files.write(path, ("clientId=e918fe648dd5491486c3ccc581cd2d40"
+			+ System.lineSeparator()).getBytes());
+
+		final UploadIdentity beforeLogin = new UploadIdentity(path, new LoggedOutProfile());
+		beforeLogin.load("api.everykill.com");
+
+		final java.util.Properties after = new java.util.Properties();
+		try (java.io.Reader r = Files.newBufferedReader(path))
+		{
+			after.load(r);
+		}
+
+		Assert.assertNull("no profile means no claim - nobody is logged in to own it",
+			after.getProperty("claimedBy"));
 	}
 
 	@Test

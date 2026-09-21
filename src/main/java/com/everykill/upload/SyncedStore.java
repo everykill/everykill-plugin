@@ -13,6 +13,17 @@ package com.everykill.upload;
  */
 public interface SyncedStore
 {
+	/**
+	 * Whether a profile exists to read and write yet.
+	 *
+	 * <p>False before login. This is not the same as the store being absent:
+	 * the object is always here, but RuneLite has no RS profile until someone
+	 * logs in, so reads return null and writes are dropped. Treating "cannot
+	 * read a profile id" as "this is a different account" is what fragmented
+	 * real accounts into a new one per launch.
+	 */
+	boolean available();
+
 	String get(String key);
 
 	void put(String key, String value);
